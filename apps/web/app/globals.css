@@ -1,0 +1,24 @@
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #101319;
+  color: #f4f7fb;
+}
+
+main {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 48px 24px;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.panel {
+  border: 1px solid #2a3140;
+  background: #171b24;
+  border-radius: 16px;
+  padding: 24px;
+}
