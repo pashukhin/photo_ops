@@ -1,0 +1,14 @@
+{
+  "name": "@photoops/proto-ts",
+  "private": true,
+  "version": "0.0.0",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "dependencies": {
+    "@grpc/grpc-js": "^1.12.6",
+    "@grpc/proto-loader": "^0.7.13",
+    "@nestjs/microservices": "^10.4.15",
+    "protobufjs": "^7.4.0",
+    "rxjs": "^7.8.1"
+  }
+}

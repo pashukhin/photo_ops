@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package photoops.publication.v1;
+
+import "common/v1/common.proto";
+import "google/api/annotations.proto";
+
+service PublicationService {
+  rpc Health(photoops.common.v1.HealthCheckRequest) returns (photoops.common.v1.HealthCheckResponse) {
+    option (google.api.http) = {get: "/v1/publication/health"};
+  }
+
+  rpc CreateDraftFromCluster(CreateDraftFromClusterRequest) returns (CreateDraftFromClusterResponse) {
+    option (google.api.http) = {
+      post: "/v1/posts/from-cluster"
+      body: "*"
+    };
+  }
+}
+
+message CreateDraftFromClusterRequest {
+  string cluster_id = 1;
+}
+
+message CreateDraftFromClusterResponse {
+  string post_id = 1;
+}

@@ -1,0 +1,77 @@
+syntax = "proto3";
+
+package photoops.photo.v1;
+
+import "common/v1/common.proto";
+import "google/api/annotations.proto";
+
+service PhotoService {
+  rpc Health(photoops.common.v1.HealthCheckRequest) returns (photoops.common.v1.HealthCheckResponse) {
+    option (google.api.http) = {get: "/v1/photo/health"};
+  }
+
+  rpc CreateUploadIntent(CreateUploadIntentRequest) returns (CreateUploadIntentResponse) {
+    option (google.api.http) = {
+      post: "/v1/photos/upload-intents"
+      body: "*"
+    };
+  }
+
+  rpc CompleteUpload(CompleteUploadRequest) returns (PhotoAsset) {
+    option (google.api.http) = {
+      post: "/v1/photos/{photo_id}/complete-upload"
+      body: "*"
+    };
+  }
+
+  rpc ListPhotos(ListPhotosRequest) returns (ListPhotosResponse) {
+    option (google.api.http) = {get: "/v1/photos"};
+  }
+}
+
+message CreateUploadIntentRequest {
+  string filename = 1;
+  string content_type = 2;
+  string size_bytes = 3;
+}
+
+message CreateUploadIntentResponse {
+  string photo_id = 1;
+  string object_key = 2;
+  string upload_url = 3;
+  string expires_at = 4;
+}
+
+message CompleteUploadRequest {
+  string photo_id = 1;
+}
+
+message ListPhotosRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListPhotosResponse {
+  repeated PhotoAsset photos = 1;
+  string next_page_token = 2;
+}
+
+message PhotoAsset {
+  string id = 1;
+  string filename = 2;
+  string content_type = 3;
+  string size_bytes = 4;
+  string object_key = 5;
+  PhotoStatus status = 6;
+  string created_at = 7;
+  string updated_at = 8;
+}
+
+enum PhotoStatus {
+  PHOTO_STATUS_UNSPECIFIED = 0;
+  PHOTO_STATUS_UPLOADING = 1;
+  PHOTO_STATUS_UPLOADED = 2;
+  PHOTO_STATUS_PROCESSING = 3;
+  PHOTO_STATUS_READY = 4;
+  PHOTO_STATUS_FAILED = 5;
+}

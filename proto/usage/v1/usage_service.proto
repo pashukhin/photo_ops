@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package photoops.usage.v1;
+
+import "common/v1/common.proto";
+import "google/api/annotations.proto";
+
+service UsageService {
+  rpc Health(photoops.common.v1.HealthCheckRequest) returns (photoops.common.v1.HealthCheckResponse) {
+    option (google.api.http) = {get: "/v1/usage/health"};
+  }
+
+  rpc GetUsageSummary(GetUsageSummaryRequest) returns (GetUsageSummaryResponse) {
+    option (google.api.http) = {get: "/v1/usage/summary"};
+  }
+}
+
+message GetUsageSummaryRequest {}
+
+message GetUsageSummaryResponse {
+  string estimated_monthly_cost = 1;
+}

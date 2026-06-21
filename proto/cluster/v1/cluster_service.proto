@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package photoops.cluster.v1;
+
+import "common/v1/common.proto";
+import "google/api/annotations.proto";
+
+service ClusterService {
+  rpc Health(photoops.common.v1.HealthCheckRequest) returns (photoops.common.v1.HealthCheckResponse) {
+    option (google.api.http) = {get: "/v1/cluster/health"};
+  }
+
+  rpc GenerateClusters(GenerateClustersRequest) returns (GenerateClustersResponse) {
+    option (google.api.http) = {
+      post: "/v1/clusters/generate"
+      body: "*"
+    };
+  }
+}
+
+message GenerateClustersRequest {
+  string scope = 1;
+}
+
+message GenerateClustersResponse {
+  string job_id = 1;
+}

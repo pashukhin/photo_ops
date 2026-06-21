@@ -6,7 +6,7 @@
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "lint": "pnpm -r lint",
-    "proto": "buf generate proto"
+    "proto": "cd proto && buf generate --template buf.gen.yaml"
   },
   "devDependencies": {
     "@bufbuild/buf": "^1.50.0"

@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package photoops.connector.v1;
+
+import "common/v1/common.proto";
+import "google/api/annotations.proto";
+
+service ConnectorService {
+  rpc Health(photoops.common.v1.HealthCheckRequest) returns (photoops.common.v1.HealthCheckResponse) {
+    option (google.api.http) = {get: "/v1/connector/health"};
+  }
+
+  rpc CreateShareText(CreateShareTextRequest) returns (CreateShareTextResponse) {
+    option (google.api.http) = {
+      post: "/v1/connectors/share-text"
+      body: "*"
+    };
+  }
+}
+
+message CreateShareTextRequest {
+  string post_id = 1;
+}
+
+message CreateShareTextResponse {
+  string text = 1;
+}

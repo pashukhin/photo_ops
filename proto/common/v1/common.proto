@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package photoops.common.v1;
+
+message Empty {}
+
+message HealthCheckRequest {}
+
+message HealthCheckResponse {
+  string status = 1;
+  string service = 2;
+}
+
+message ErrorResponse {
+  string code = 1;
+  string message = 2;
+  string correlation_id = 3;
+}
