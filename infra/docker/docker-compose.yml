@@ -56,6 +56,87 @@ services:
       timeout: 3s
       retries: 20
 
+  photo-service:
+    build:
+      context: ../..
+      dockerfile: apps/photo-service/Dockerfile
+    environment:
+      PHOTO_DATABASE_URL: ${PHOTO_DATABASE_URL}
+      PHOTO_SERVICE_GRPC_PORT: ${PHOTO_SERVICE_GRPC_PORT}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - "3002:3002"
+      - "50051:50051"
+
+  api-gateway:
+    build:
+      context: ../..
+      dockerfile: apps/api-gateway/Dockerfile
+    environment:
+      API_GATEWAY_PORT: ${API_GATEWAY_PORT}
+      PHOTO_SERVICE_GRPC_URL: photo-service:${PHOTO_SERVICE_GRPC_PORT}
+    depends_on:
+      - photo-service
+    ports:
+      - "3001:3001"
+
+  web:
+    build:
+      context: ../..
+      dockerfile: apps/web/Dockerfile
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
+    depends_on:
+      - api-gateway
+    ports:
+      - "3000:3000"
+
+  media-worker:
+    build:
+      context: ../..
+      dockerfile: apps/media-worker/Dockerfile
+    ports:
+      - "3010:3010"
+
+  cluster-service:
+    build:
+      context: ../..
+      dockerfile: apps/cluster-service/Dockerfile
+    ports:
+      - "3011:3011"
+
+  publication-service:
+    build:
+      context: ../..
+      dockerfile: apps/publication-service/Dockerfile
+    ports:
+      - "3012:3012"
+
+  usage-service:
+    build:
+      context: ../..
+      dockerfile: apps/usage-service/Dockerfile
+    ports:
+      - "3013:3013"
+
+  connector-service:
+    build:
+      context: ../..
+      dockerfile: apps/connector-service/Dockerfile
+    ports:
+      - "3014:3014"
+
 volumes:
   postgres-data:
   minio-data:
