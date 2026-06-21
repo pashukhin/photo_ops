@@ -2,9 +2,31 @@
 
 PhotoOps is a web platform for turning a personal photo bank into annotated photo publications.
 
+This repository currently implements the architecture frame, not the full MVP. The full MVP ends with a published public photo story. The first executable frame ends with upload/list.
+
+## Local Quickstart
+
+```bash
+cp .env.example .env
+make install
+make proto
+make dev
+```
+
+Open `http://localhost:3000`.
+
+## First Executable Slice
+
+The first working path is:
+
+```text
+web -> api-gateway -> photo-service -> MinIO + photo-db -> web
+```
+
+It supports creating an upload intent, uploading a JPEG directly to MinIO with a presigned PUT URL, completing the upload, and listing uploaded photos.
+
 The full MVP path is: upload photos, extract metadata, generate previews, cluster by time/place, create an annotated story, publish a public page, share a link, and see usage/cost estimates.
 
-This repository is currently at the architecture frame stage. The first executable frame is intentionally smaller than the full MVP: it ends with uploading a JPEG and seeing it in the uploaded photos list.
 
 ## Current status
 

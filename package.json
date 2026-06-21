@@ -1,0 +1,14 @@
+{
+  "name": "photo-ops",
+  "private": true,
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "proto": "buf generate proto"
+  },
+  "devDependencies": {
+    "@bufbuild/buf": "^1.50.0"
+  }
+}

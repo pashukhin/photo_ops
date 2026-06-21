@@ -6,3 +6,16 @@
 
 # Local git worktrees
 .worktrees/
+
+node_modules/
+.next/
+dist/
+coverage/
+.env
+.env.local
+*.log
+__pycache__/
+.venv/
+bin/
+tmp/
+data/
