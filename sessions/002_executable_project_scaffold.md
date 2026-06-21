@@ -1,61 +1,35 @@
 # Session 002: Executable Project Scaffold
 
-## Goal
+В этой сессии мы превратили architecture frame из Session 001 в первый исполнимый срез проекта.
 
-Build the first executable project frame from the accepted architecture plan.
-
-The target is not the full MVP. The full MVP ends with a published public photo story. This session should end with an executable upload/list slice.
-
-## Input Documents
-
-- `README.md`
-- `project_description.md`
-- `AGENTS.md`
-- `docs/superpowers/specs/2026-06-21-photoops-architecture-frame-design.md`
-- `docs/superpowers/plans/2026-06-21-architecture-frame-upload-slice.md`
-- `sessions/001_architecture_frame.md`
-
-## Primary Outcome
-
-Create the project scaffold and local runtime so the first vertical path can run:
+Ключевой результат: локально запускается путь upload/list:
 
 ```text
 web -> api-gateway -> photo-service -> MinIO + photo-db -> web
 ```
 
-The user-facing result should be: open the UI, upload a JPEG, and see it listed with status `uploaded`.
+Пользовательский сценарий работает end to end: открыть UI, выбрать JPEG, создать upload intent через `api-gateway`, загрузить файл напрямую в MinIO по presigned PUT URL, завершить upload и увидеть фото в списке со статусом `uploaded`.
 
-## Scope
+Мы собрали monorepo на `pnpm`: Next.js `web`, NestJS `api-gateway`, NestJS `photo-service`, generated TypeScript proto package, Docker Compose runtime и health-only scaffolds для остальных сервисов.
 
-- Create monorepo/tooling structure.
-- Add proto contracts and generated TypeScript support.
-- Add local Docker Compose infrastructure.
-- Implement `photo-service` upload intent, presigned PUT, complete upload, and list photos.
-- Add `api-gateway` HTTP facade.
-- Add minimal `web` upload/list UI.
-- Add health-only scaffolds for non-photo services.
-- Add smoke verification for upload/list.
+Для контрактов сохранили proto-first подход. `api-gateway` общается с `photo-service` по gRPC, а web ходит только в `api-gateway`, кроме прямого PUT в MinIO по presigned URL.
 
-## Non-Goals
+Для данных зафиксировали границу ownership: `photo-service` владеет `photo-db`; `api-gateway` и `web` не подключаются к базе. Объектные ключи для оригиналов генерируются сервером и не зависят напрямую от пользовательского имени файла.
 
-- EXIF extraction.
-- Thumbnail/preview generation.
-- Media processing jobs.
-- Clustering.
-- Publication workflow.
-- Usage dashboard.
-- Telegram or other connectors.
-- UI visual design polish.
+Остальные доменные сервисы пока не реализуют бизнес-логику. Они запускаются как health-only scaffolds, чтобы локальный runtime уже имел форму будущей production architecture, но scope сессии остался строго upload/list.
 
-## Definition Of Done
+По ходу E2E-проверки исправили runtime-детали, которые проявились только в полном Docker-сценарии: загрузку `.env` для migration target, Nest HTTP adapter dependencies, runtime proto imports, browser-accessible MinIO presigned URLs и маппинг proto enum status в человекочитаемый `uploaded` на HTTP-границе.
 
-- `make dev` starts the local frame.
-- Health endpoints respond for all scaffolded services.
-- `make migrate-photo` applies the photo schema.
-- `make smoke-upload` verifies upload/list through the gateway.
-- Manual browser check confirms JPEG upload appears in the UI as `uploaded`.
-- README or verification docs explain how to run the frame.
+Проверки, которыми зафиксирован результат:
 
-## Working Principle
+- `pnpm proto`
+- `pnpm build`
+- `pnpm test`
+- `docker compose -f infra/docker/docker-compose.yml --env-file .env build`
+- `make migrate-photo`
+- `make smoke-upload`
+- ручной browser E2E: JPEG загружается и появляется в UI со статусом `uploaded`
 
-If there is a choice between more elegant scaffolding and getting the first JPEG into the uploaded list, choose the JPEG in the list.
+Также добавлены `scripts/smoke-upload.sh` и `docs/architecture-frame-verification.md`, чтобы этот frame можно было повторно проверить без восстановления контекста из истории сессии.
+
+Следующий шаг: переходить от upload/list frame к следующему продуктово значимому слою, например EXIF/metadata extraction или preview generation, не ломая уже зафиксированные границы сервисов.
