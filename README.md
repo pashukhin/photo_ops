@@ -45,3 +45,7 @@ Session 001: Architecture Frame
 - `docs/superpowers/specs/2026-06-21-photoops-architecture-frame-design.md` - accepted architecture frame.
 - `docs/superpowers/plans/2026-06-21-architecture-frame-upload-slice.md` - implementation plan for the first executable frame.
 - `sessions/001_architecture_frame.md` - human-readable session brief.
+
+## Verification
+
+See `docs/architecture-frame-verification.md` for the commands and manual checks used to verify the first executable frame.

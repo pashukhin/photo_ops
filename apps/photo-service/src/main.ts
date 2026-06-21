@@ -10,7 +10,10 @@ async function bootstrap() {
     options: {
       package: 'photoops.photo.v1',
       protoPath: join(process.cwd(), '../../proto/photo/v1/photo_service.proto'),
-      url: `0.0.0.0:${process.env.PHOTO_SERVICE_GRPC_PORT ?? '50051'}`
+      url: `0.0.0.0:${process.env.PHOTO_SERVICE_GRPC_PORT ?? '50051'}`,
+      loader: {
+        includeDirs: [join(process.cwd(), '../../proto')]
+      }
     }
   });
   await app.startAllMicroservices();

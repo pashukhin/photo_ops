@@ -23,15 +23,15 @@ describe('PhotoController', () => {
     const { controller, photoClient } = createController();
     vi.mocked(photoClient.completeUpload).mockResolvedValue({ id: 'photo-1', status: 2 });
 
-    await expect(controller.completeUpload('photo-1')).resolves.toEqual({ id: 'photo-1', status: 2 });
+    await expect(controller.completeUpload('photo-1')).resolves.toEqual({ id: 'photo-1', status: 'uploaded' });
     expect(photoClient.completeUpload).toHaveBeenCalledWith({ photoId: 'photo-1' });
   });
 
   it('lists photos with the first frame page size', async () => {
     const { controller, photoClient } = createController();
-    vi.mocked(photoClient.listPhotos).mockResolvedValue({ photos: [] });
+    vi.mocked(photoClient.listPhotos).mockResolvedValue({ photos: [{ id: 'photo-1', status: 2 }] });
 
-    await expect(controller.listPhotos()).resolves.toEqual({ photos: [] });
+    await expect(controller.listPhotos()).resolves.toEqual({ photos: [{ id: 'photo-1', status: 'uploaded' }] });
     expect(photoClient.listPhotos).toHaveBeenCalledWith({ pageSize: 100 });
   });
 });

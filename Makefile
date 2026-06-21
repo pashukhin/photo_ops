@@ -1,5 +1,10 @@
 .PHONY: install proto build test lint dev down logs status migrate-photo smoke-upload
 
+ifneq (,$(wildcard .env))
+include .env
+export
+endif
+
 install:
 	pnpm install
 
