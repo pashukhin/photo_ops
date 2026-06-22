@@ -27,6 +27,7 @@ export interface CreateUploadIntentRequest {
   filename: string;
   contentType: string;
   sizeBytes: string;
+  userId: string;
 }
 
 export interface CreateUploadIntentResponse {
@@ -38,11 +39,13 @@ export interface CreateUploadIntentResponse {
 
 export interface CompleteUploadRequest {
   photoId: string;
+  userId: string;
 }
 
 export interface ListPhotosRequest {
   pageSize: number;
   pageToken: string;
+  userId: string;
 }
 
 export interface ListPhotosResponse {
@@ -59,12 +62,13 @@ export interface PhotoAsset {
   status: PhotoStatus;
   createdAt: string;
   updatedAt: string;
+  userId: string;
 }
 
 export const PHOTOOPS_PHOTO_V1_PACKAGE_NAME = "photoops.photo.v1";
 
 function createBaseCreateUploadIntentRequest(): CreateUploadIntentRequest {
-  return { filename: "", contentType: "", sizeBytes: "" };
+  return { filename: "", contentType: "", sizeBytes: "", userId: "" };
 }
 
 export const CreateUploadIntentRequest: MessageFns<CreateUploadIntentRequest> = {
@@ -77,6 +81,9 @@ export const CreateUploadIntentRequest: MessageFns<CreateUploadIntentRequest> = 
     }
     if (message.sizeBytes !== "") {
       writer.uint32(26).string(message.sizeBytes);
+    }
+    if (message.userId !== "") {
+      writer.uint32(34).string(message.userId);
     }
     return writer;
   },
@@ -110,6 +117,14 @@ export const CreateUploadIntentRequest: MessageFns<CreateUploadIntentRequest> = 
           }
 
           message.sizeBytes = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.userId = reader.string();
           continue;
         }
       }
@@ -193,13 +208,16 @@ export const CreateUploadIntentResponse: MessageFns<CreateUploadIntentResponse> 
 };
 
 function createBaseCompleteUploadRequest(): CompleteUploadRequest {
-  return { photoId: "" };
+  return { photoId: "", userId: "" };
 }
 
 export const CompleteUploadRequest: MessageFns<CompleteUploadRequest> = {
   encode(message: CompleteUploadRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.photoId !== "") {
       writer.uint32(10).string(message.photoId);
+    }
+    if (message.userId !== "") {
+      writer.uint32(18).string(message.userId);
     }
     return writer;
   },
@@ -219,6 +237,14 @@ export const CompleteUploadRequest: MessageFns<CompleteUploadRequest> = {
           message.photoId = reader.string();
           continue;
         }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.userId = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -230,7 +256,7 @@ export const CompleteUploadRequest: MessageFns<CompleteUploadRequest> = {
 };
 
 function createBaseListPhotosRequest(): ListPhotosRequest {
-  return { pageSize: 0, pageToken: "" };
+  return { pageSize: 0, pageToken: "", userId: "" };
 }
 
 export const ListPhotosRequest: MessageFns<ListPhotosRequest> = {
@@ -240,6 +266,9 @@ export const ListPhotosRequest: MessageFns<ListPhotosRequest> = {
     }
     if (message.pageToken !== "") {
       writer.uint32(18).string(message.pageToken);
+    }
+    if (message.userId !== "") {
+      writer.uint32(26).string(message.userId);
     }
     return writer;
   },
@@ -265,6 +294,14 @@ export const ListPhotosRequest: MessageFns<ListPhotosRequest> = {
           }
 
           message.pageToken = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.userId = reader.string();
           continue;
         }
       }
@@ -335,6 +372,7 @@ function createBasePhotoAsset(): PhotoAsset {
     status: 0,
     createdAt: "",
     updatedAt: "",
+    userId: "",
   };
 }
 
@@ -363,6 +401,9 @@ export const PhotoAsset: MessageFns<PhotoAsset> = {
     }
     if (message.updatedAt !== "") {
       writer.uint32(66).string(message.updatedAt);
+    }
+    if (message.userId !== "") {
+      writer.uint32(74).string(message.userId);
     }
     return writer;
   },
@@ -436,6 +477,14 @@ export const PhotoAsset: MessageFns<PhotoAsset> = {
           }
 
           message.updatedAt = reader.string();
+          continue;
+        }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.userId = reader.string();
           continue;
         }
       }

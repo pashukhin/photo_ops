@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
 import { createDb } from '../db/client';
 import { photoAssets } from '../db/schema';
@@ -18,6 +18,7 @@ export class PhotoRepository implements PhotoRepositoryPort {
       .insert(photoAssets)
       .values({
         id,
+        userId: input.userId,
         filename: input.filename,
         contentType: input.contentType,
         sizeBytes: input.sizeBytes,
@@ -28,11 +29,11 @@ export class PhotoRepository implements PhotoRepositoryPort {
     return this.toRecord(created);
   }
 
-  async markUploaded(photoId: string): Promise<PhotoAssetRecord> {
+  async markUploadedForUser(userId: string, photoId: string): Promise<PhotoAssetRecord> {
     const [updated] = await this.db
       .update(photoAssets)
       .set({ status: 'uploaded', updatedAt: new Date() })
-      .where(eq(photoAssets.id, photoId))
+      .where(and(eq(photoAssets.id, photoId), eq(photoAssets.userId, userId)))
       .returning();
     if (!updated) {
       throw new Error('photo not found');
@@ -40,19 +41,20 @@ export class PhotoRepository implements PhotoRepositoryPort {
     return this.toRecord(updated);
   }
 
-  async findById(photoId: string): Promise<PhotoAssetRecord | null> {
-    const [row] = await this.db.select().from(photoAssets).where(eq(photoAssets.id, photoId)).limit(1);
+  async findByIdForUser(userId: string, photoId: string): Promise<PhotoAssetRecord | null> {
+    const [row] = await this.db.select().from(photoAssets).where(and(eq(photoAssets.id, photoId), eq(photoAssets.userId, userId))).limit(1);
     return row ? this.toRecord(row) : null;
   }
 
-  async list(limit: number): Promise<PhotoAssetRecord[]> {
-    const rows = await this.db.select().from(photoAssets).orderBy(desc(photoAssets.createdAt)).limit(limit);
+  async list(userId: string, limit: number): Promise<PhotoAssetRecord[]> {
+    const rows = await this.db.select().from(photoAssets).where(eq(photoAssets.userId, userId)).orderBy(desc(photoAssets.createdAt)).limit(limit);
     return rows.map((row) => this.toRecord(row));
   }
 
   private toRecord(row: typeof photoAssets.$inferSelect): PhotoAssetRecord {
     return {
       id: row.id,
+      userId: row.userId,
       filename: row.filename,
       contentType: row.contentType,
       sizeBytes: row.sizeBytes,

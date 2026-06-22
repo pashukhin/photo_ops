@@ -6,9 +6,9 @@ const JPEG_CONTENT_TYPES = new Set(['image/jpeg', 'image/jpg']);
 
 export interface PhotoRepositoryPort {
   createUploading(input: CreateUploadIntentInput): Promise<PhotoAssetRecord>;
-  markUploaded(photoId: string): Promise<PhotoAssetRecord>;
-  findById(photoId: string): Promise<PhotoAssetRecord | null>;
-  list(limit: number): Promise<PhotoAssetRecord[]>;
+  markUploadedForUser(userId: string, photoId: string): Promise<PhotoAssetRecord>;
+  findByIdForUser(userId: string, photoId: string): Promise<PhotoAssetRecord | null>;
+  list(userId: string, limit: number): Promise<PhotoAssetRecord[]>;
 }
 
 export interface ObjectStoragePort {
@@ -42,8 +42,8 @@ export class PhotoDomainService {
     };
   }
 
-  async completeUpload(photoId: string) {
-    const photo = await this.repository.findById(photoId);
+  async completeUpload(userId: string, photoId: string) {
+    const photo = await this.repository.findByIdForUser(userId, photoId);
     if (!photo) {
       throw new Error('photo not found');
     }
@@ -51,10 +51,10 @@ export class PhotoDomainService {
     if (!objectExists) {
       throw new Error('uploaded object not found');
     }
-    return this.repository.markUploaded(photoId);
+    return this.repository.markUploadedForUser(userId, photoId);
   }
 
-  async listPhotos(limit = 100) {
-    return this.repository.list(limit);
+  async listPhotos(userId: string, limit = 100) {
+    return this.repository.list(userId, limit);
   }
 }

@@ -4,8 +4,8 @@ import { PhotoDomainService } from './photo.service';
 function createService() {
   const repository = {
     createUploading: vi.fn(),
-    markUploaded: vi.fn(),
-    findById: vi.fn(),
+    markUploadedForUser: vi.fn(),
+    findByIdForUser: vi.fn(),
     list: vi.fn()
   };
   const storage = {
@@ -20,7 +20,7 @@ describe('PhotoDomainService', () => {
     const { service } = createService();
 
     await expect(
-      service.createUploadIntent({ filename: 'notes.txt', contentType: 'text/plain', sizeBytes: 10n })
+      service.createUploadIntent({ userId: 'user-1', filename: 'notes.txt', contentType: 'text/plain', sizeBytes: 10n })
     ).rejects.toThrow('unsupported content type');
   });
 
@@ -28,7 +28,7 @@ describe('PhotoDomainService', () => {
     const { service } = createService();
 
     await expect(
-      service.createUploadIntent({ filename: 'large.jpg', contentType: 'image/jpeg', sizeBytes: 26n * 1024n * 1024n })
+      service.createUploadIntent({ userId: 'user-1', filename: 'large.jpg', contentType: 'image/jpeg', sizeBytes: 26n * 1024n * 1024n })
     ).rejects.toThrow('file too large');
   });
 
@@ -36,6 +36,7 @@ describe('PhotoDomainService', () => {
     const { service, repository, storage } = createService();
     repository.createUploading.mockResolvedValue({
       id: '018f0000-0000-7000-8000-000000000001',
+      userId: 'user-1',
       filename: 'photo.jpg',
       contentType: 'image/jpeg',
       sizeBytes: 123n,
@@ -49,7 +50,7 @@ describe('PhotoDomainService', () => {
       expiresAt: new Date('2026-06-21T00:15:00.000Z')
     });
 
-    const result = await service.createUploadIntent({ filename: 'photo.jpg', contentType: 'image/jpeg', sizeBytes: 123n });
+    const result = await service.createUploadIntent({ userId: 'user-1', filename: 'photo.jpg', contentType: 'image/jpeg', sizeBytes: 123n });
 
     expect(result.photoId).toBe('018f0000-0000-7000-8000-000000000001');
     expect(result.uploadUrl).toContain('signature=test');
@@ -57,8 +58,9 @@ describe('PhotoDomainService', () => {
 
   it('refuses to complete upload when object is missing', async () => {
     const { service, repository, storage } = createService();
-    repository.findById.mockResolvedValue({
+    repository.findByIdForUser.mockResolvedValue({
       id: '018f0000-0000-7000-8000-000000000001',
+      userId: 'user-1',
       filename: 'photo.jpg',
       contentType: 'image/jpeg',
       sizeBytes: 123n,
@@ -67,9 +69,50 @@ describe('PhotoDomainService', () => {
       createdAt: new Date('2026-06-21T00:00:00.000Z'),
       updatedAt: new Date('2026-06-21T00:00:00.000Z')
     });
-    repository.markUploaded.mockResolvedValue(undefined);
+    repository.markUploadedForUser.mockResolvedValue(undefined);
     storage.objectExists.mockResolvedValue(false);
 
-    await expect(service.completeUpload('018f0000-0000-7000-8000-000000000001')).rejects.toThrow('uploaded object not found');
+    await expect(service.completeUpload('user-1', '018f0000-0000-7000-8000-000000000001')).rejects.toThrow('uploaded object not found');
+  });
+
+  it('lists only photos for the provided user id', async () => {
+    const { service, repository } = createService();
+    repository.list.mockResolvedValue([]);
+
+    await service.listPhotos('user-1');
+
+    expect(repository.list).toHaveBeenCalledWith('user-1', 100);
+  });
+
+  it('completes upload only for the owning user', async () => {
+    const { service, repository, storage } = createService();
+    repository.findByIdForUser.mockResolvedValue({
+      id: 'photo-1',
+      userId: 'user-1',
+      filename: 'photo.jpg',
+      contentType: 'image/jpeg',
+      sizeBytes: 123n,
+      objectKey: 'originals/photo-1/photo.jpg',
+      status: 'uploading',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+    repository.markUploadedForUser.mockResolvedValue({
+      id: 'photo-1',
+      userId: 'user-1',
+      filename: 'photo.jpg',
+      contentType: 'image/jpeg',
+      sizeBytes: 123n,
+      objectKey: 'originals/photo-1/photo.jpg',
+      status: 'uploaded',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+    storage.objectExists.mockResolvedValue(true);
+
+    await service.completeUpload('user-1', 'photo-1');
+
+    expect(repository.findByIdForUser).toHaveBeenCalledWith('user-1', 'photo-1');
+    expect(repository.markUploadedForUser).toHaveBeenCalledWith('user-1', 'photo-1');
   });
 });

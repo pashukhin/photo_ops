@@ -33,6 +33,7 @@ message CreateUploadIntentRequest {
   string filename = 1;
   string content_type = 2;
   string size_bytes = 3;
+  string user_id = 4;
 }
 
 message CreateUploadIntentResponse {
@@ -44,11 +45,13 @@ message CreateUploadIntentResponse {
 
 message CompleteUploadRequest {
   string photo_id = 1;
+  string user_id = 2;
 }
 
 message ListPhotosRequest {
   int32 page_size = 1;
   string page_token = 2;
+  string user_id = 3;
 }
 
 message ListPhotosResponse {
@@ -65,6 +68,7 @@ message PhotoAsset {
   PhotoStatus status = 6;
   string created_at = 7;
   string updated_at = 8;
+  string user_id = 9;
 }
 
 enum PhotoStatus {

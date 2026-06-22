@@ -2,6 +2,7 @@ export type PhotoStatus = 'uploading' | 'uploaded' | 'processing' | 'ready' | 'f
 
 export interface PhotoAssetRecord {
   id: string;
+  userId: string;
   filename: string;
   contentType: string;
   sizeBytes: bigint;
@@ -12,6 +13,7 @@ export interface PhotoAssetRecord {
 }
 
 export interface CreateUploadIntentInput {
+  userId: string;
   filename: string;
   contentType: string;
   sizeBytes: bigint;

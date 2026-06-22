@@ -12,8 +12,9 @@ export class PhotoGrpcController {
   }
 
   @GrpcMethod('PhotoService', 'CreateUploadIntent')
-  async createUploadIntent(request: { filename: string; contentType: string; sizeBytes: string }) {
+  async createUploadIntent(request: { filename: string; contentType: string; sizeBytes: string; userId: string }) {
     const result = await this.photoService.createUploadIntent({
+      userId: request.userId,
       filename: request.filename,
       contentType: request.contentType,
       sizeBytes: BigInt(request.sizeBytes)
@@ -27,13 +28,13 @@ export class PhotoGrpcController {
   }
 
   @GrpcMethod('PhotoService', 'CompleteUpload')
-  async completeUpload(request: { photoId: string }) {
-    return this.mapPhoto(await this.photoService.completeUpload(request.photoId));
+  async completeUpload(request: { photoId: string; userId: string }) {
+    return this.mapPhoto(await this.photoService.completeUpload(request.userId, request.photoId));
   }
 
   @GrpcMethod('PhotoService', 'ListPhotos')
-  async listPhotos(request: { pageSize?: number }) {
-    const photos = await this.photoService.listPhotos(request.pageSize || 100);
+  async listPhotos(request: { pageSize?: number; userId: string }) {
+    const photos = await this.photoService.listPhotos(request.userId, request.pageSize || 100);
     return { photos: photos.map((photo) => this.mapPhoto(photo)), nextPageToken: '' };
   }
 
@@ -47,6 +48,7 @@ export class PhotoGrpcController {
     } as const;
     return {
       id: photo.id,
+      userId: photo.userId,
       filename: photo.filename,
       contentType: photo.contentType,
       sizeBytes: photo.sizeBytes.toString(),
