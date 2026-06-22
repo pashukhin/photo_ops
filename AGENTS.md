@@ -43,6 +43,7 @@ The user-visible result must be: open UI, upload a JPEG through presigned MinIO 
 
 - Follow the implementation plan task-by-task.
 - Do not use git worktrees in this project; they conflict with the beads workflow. Use regular git feature branches with `git switch -c` instead.
+- Before implementation starts, write the manual e2e scenario for the target change and get it approved. This keeps the team explicit about what behavior is being built and reviewed.
 - Keep commits small and aligned with plan tasks.
 - Before each commit, inspect `git status`, `git diff`, and recent log.
 - Do not commit unrelated files.

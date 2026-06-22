@@ -2,7 +2,7 @@
 
 PhotoOps is a web platform for turning a personal photo bank into annotated photo publications.
 
-This repository currently implements the architecture frame, not the full MVP. The full MVP ends with a published public photo story. The first executable frame ends with upload/list.
+This repository currently implements the architecture frame, not the full MVP. The full MVP ends with a published public photo story. The current executable frame ends with authenticated upload/list.
 
 ## Local Quickstart
 
@@ -13,8 +13,6 @@ make proto
 make dev
 ```
 
-Open `http://localhost:3000`.
-
 In another terminal, apply the local service schemas after the containers are running:
 
 ```bash
@@ -22,12 +20,14 @@ make migrate-identity
 make migrate-photo
 ```
 
+Open `http://localhost:3000`, sign up with e-mail/password, upload a JPEG, and confirm it appears in the signed-in user's uploaded photos list with status `uploaded`.
+
 ## First Executable Slice
 
 The first working path is:
 
 ```text
-web -> api-gateway -> photo-service -> MinIO + photo-db -> web
+web -> api-gateway -> identity-service + photo-service -> MinIO + identity-db + photo-db -> web
 ```
 
 It supports signing up with e-mail/password, creating an upload intent, uploading a JPEG directly to MinIO with a presigned PUT URL, completing the upload, and listing only the signed-in user's uploaded photos.
@@ -43,16 +43,31 @@ Session 001: Architecture Frame
 - [x] Full MVP separated from first executable frame
 - [x] Architecture frame documented
 - [x] Upload/list implementation plan prepared
-- [ ] Executable repo scaffold
-- [ ] Upload/list vertical slice
+- [x] Executable repo scaffold
+- [x] Upload/list vertical slice
+
+Session 003: Identity And Ownership
+
+- [x] Domain model documented
+- [x] `identity-service` added as user/auth owner
+- [x] E-mail/password signup and login added
+- [x] HTTP-only session cookie flow added through `api-gateway`
+- [x] Photo assets scoped by authenticated `user_id`
+- [x] Two-user ownership smoke scenario added
 
 ## Key docs
 
 - `project_description.md` - original project description and MVP outline.
 - `docs/superpowers/specs/2026-06-21-photoops-architecture-frame-design.md` - accepted architecture frame.
 - `docs/superpowers/plans/2026-06-21-architecture-frame-upload-slice.md` - implementation plan for the first executable frame.
+- `docs/domain-model.md` - current and projected domain model with service ownership.
+- `docs/superpowers/specs/2026-06-22-identity-and-domain-model-design.md` - accepted identity and ownership design.
+- `docs/superpowers/plans/2026-06-22-identity-users-upload-ownership.md` - implementation plan for identity/users upload ownership.
+- `docs/e2e-auth-upload-ownership.md` - manual e2e scenarios for this branch.
 - `sessions/001_architecture_frame.md` - human-readable session brief.
+- `sessions/002_executable_project_scaffold.md` - executable scaffold session brief.
+- `sessions/003_identity_users_upload_ownership.md` - identity and ownership session brief.
 
 ## Verification
 
-See `docs/architecture-frame-verification.md` for the commands and manual checks used to verify the first executable frame.
+See `docs/architecture-frame-verification.md` and `docs/e2e-auth-upload-ownership.md` for the commands and manual checks used to verify the authenticated upload/list frame.
