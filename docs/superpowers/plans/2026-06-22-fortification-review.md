@@ -591,7 +591,7 @@ If issues were created, update `docs/fortification-review.md` `Follow-Up Issues`
 Run:
 
 ```bash
-grep -R "does not yet have `user_id`\|without `user_id`\|single-user mode" README.md docs AGENTS.md
+grep -R 'does not yet have `user_id`\|without `user_id`\|single-user mode' README.md docs AGENTS.md
 ```
 
 Expected: command exits with status `1` because those stale statements are no longer present in current-state docs. Historical accepted specs may still mention old scope only if grep is narrowed away from current docs; if the command finds historical specs only, do not rewrite accepted historical decisions.

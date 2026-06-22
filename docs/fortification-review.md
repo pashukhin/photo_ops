@@ -147,7 +147,10 @@ There is no production deployment definition, secret management, TLS plan, objec
 
 ## Cheap Fixes Applied
 
-- Pending workflow verification in this session.
+- Updated stale current-state documentation in `docs/domain-model.md` after identity ownership landed.
+- Updated `docs/architecture-frame-verification.md` to show the authenticated ownership path.
+- Updated `AGENTS.md` guardrails for future sessions.
+- Verified `scripts/test-smoke-upload-contract.sh` and `make test`; no workflow script change was needed.
 
 ## Retained Trade-Offs
 
@@ -158,4 +161,6 @@ There is no production deployment definition, secret management, TLS plan, objec
 
 ## Follow-Up Issues
 
-- Pending follow-up issue filing in this session.
+- `photo_ops-de6`: Add service readiness checks.
+- `photo_ops-1sn`: Choose migration runner workflow.
+- `photo_ops-cmb`: Document future production infrastructure shape.
