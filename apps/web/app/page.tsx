@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { FormEvent, useEffect, useState } from 'react';
 import { completeUpload, createUploadIntent, CurrentUser, getCurrentUser, listPhotos, login, logout, PhotoAsset, signUp, uploadFileToPresignedUrl } from '../lib/api';
 
@@ -125,6 +126,9 @@ export default function HomePage() {
       ) : (
         <section className="panel">
           <h2>Sign up or log in</h2>
+          <p role="alert" aria-live="polite">
+            {message}
+          </p>
           <form onSubmit={(event) => void onSignup(event)}>
             <h3>Create account</h3>
             <input name="displayName" placeholder="Display name" />
@@ -138,7 +142,6 @@ export default function HomePage() {
             <input name="password" placeholder="Password" type="password" />
             <button type="submit">Log in</button>
           </form>
-          <p>{message}</p>
         </section>
       )}
     </main>
