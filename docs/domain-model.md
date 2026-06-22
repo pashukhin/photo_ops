@@ -10,12 +10,12 @@ PhotoOps uses service-owned data. A service owns the entities it creates and cha
 
 ## Current Implemented Model
 
-The executable frame currently implements only upload/list.
+The executable frame currently implements authenticated upload/list with per-user ownership.
 
 Implemented path:
 
 ```text
-web -> api-gateway -> photo-service -> MinIO + photo-db -> web
+web -> api-gateway -> identity-service + photo-service -> MinIO + identity-db + photo-db -> web
 ```
 
 ### PhotoAsset
@@ -47,15 +47,16 @@ Statuses:
 
 Current behavior:
 
-- `CreateUploadIntent` creates a `PhotoAsset` with status `uploading`.
+- `identity-service` owns users, password credentials, and sessions.
+- `api-gateway` sets an HTTP-only session cookie and validates protected photo actions through `identity-service`.
+- `CreateUploadIntent` creates a `PhotoAsset` for the authenticated `user_id` with status `uploading`.
 - The browser uploads the original JPEG directly to MinIO through a presigned PUT URL.
-- `CompleteUpload` verifies the object exists and changes status to `uploaded`.
-- `ListPhotos` returns photo assets from `photo-service`.
+- `CompleteUpload` verifies the object exists and changes status to `uploaded` only for the owning `user_id`.
+- `ListPhotos` returns only photo assets owned by the authenticated `user_id`.
 
 Current limitation:
 
-- `PhotoAsset` does not yet have `user_id`.
-- The system does not yet enforce per-user ownership.
+- The system has authentication and ownership, but it does not yet implement e-mail verification, password reset, OAuth, roles, or admin flows.
 
 ## Projected Model
 
@@ -402,10 +403,10 @@ Rules:
 
 | Entity | Owning service | Database | Implemented now |
 | --- | --- | --- | --- |
-| `User` | `identity-service` | `identity-db` | No |
-| `PasswordCredential` | `identity-service` | `identity-db` | No |
-| `Session` | `identity-service` | `identity-db` | No |
-| `PhotoAsset` | `photo-service` | `photo-db` | Yes, without `user_id` |
+| `User` | `identity-service` | `identity-db` | Yes |
+| `PasswordCredential` | `identity-service` | `identity-db` | Yes |
+| `Session` | `identity-service` | `identity-db` | Yes |
+| `PhotoAsset` | `photo-service` | `photo-db` | Yes, with `user_id` ownership |
 | `PhotoVariant` | `photo-service` | `photo-db` | No |
 | `Location` | `photo-service` | `photo-db` | No |
 | `PhotoCluster` | `cluster-service` | `cluster-db` | No |
