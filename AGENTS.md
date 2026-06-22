@@ -1,15 +1,6 @@
 # AGENTS.md
 
-## Project State
-
-PhotoOps has completed:
-
-- Session 001: architecture frame.
-- Session 002: executable upload/list scaffold.
-- Session 003: identity, sessions, and authenticated upload ownership.
-- Session I: fortification review and guardrail consolidation.
-
-The current executable frame ends with authenticated upload/list. The full MVP still ends with a published public photo story.
+## Required Reading
 
 Before implementing, read:
 
@@ -20,34 +11,26 @@ Before implementing, read:
 - `docs/e2e-auth-upload-ownership.md`
 - the accepted spec and plan for the target session
 
-## Current Implementation Baseline
-
-The current working path is:
-
-```text
-web -> api-gateway -> identity-service + photo-service -> MinIO + identity-db + photo-db -> web
-```
-
-The user-visible baseline is: open UI, sign up or log in, upload a JPEG through presigned MinIO PUT, complete upload, and see only that user's photo listed with status `uploaded`.
-
-## Fortification Guardrails
+## Scope Guardrails
 
 - Do not add EXIF, previews, clustering, publication, usage ledger, connectors, or media processing unless the current approved session explicitly targets them.
+- Keep changes aligned with the accepted spec and plan for the active session.
+- Prefer simplification over sophistication.
 - Prefer one canonical workflow over multiple equivalent commands.
 - Document retained imperfections as trade-offs, deferred work, or follow-up issues.
 - Cheap fixes are allowed when they reduce development friction or risk without changing product scope.
-- If a change touches service ownership, database ownership, auth/session behavior, MinIO object privacy, or browser-to-service boundaries, treat it as architecture-sensitive and verify against the accepted specs.
+- Preserve the authenticated JPEG upload/list baseline unless the active session explicitly changes it.
 
 ## Architecture Rules
 
-- Keep the current frame scoped to authenticated upload/list; do not implement EXIF, previews, clustering, publication, usage aggregation, or connectors unless explicitly requested.
 - `web` talks only to `api-gateway`, except for presigned MinIO upload URLs.
 - `api-gateway` must not connect to any database.
 - `photo-service` owns `photo-db` and the photo upload/list domain.
+- `identity-service` owns `identity-db`, users, credentials, and sessions.
 - Data-owning services use separate databases. A service must connect only to its own DB.
 - Cross-service references use UUID v7.
-- Non-photo and non-identity services are health-only scaffolds in the current frame; their gRPC contracts may exist without wired servers.
-- Prefer preserving the authenticated JPEG upload/list baseline over polishing scaffolding.
+- Non-photo and non-identity services are health-only scaffolds until their approved sessions wire real behavior.
+- If a change touches service ownership, database ownership, auth/session behavior, MinIO object privacy, or browser-to-service boundaries, treat it as architecture-sensitive and verify against the accepted specs.
 
 ## Contract And Runtime Rules
 
@@ -58,16 +41,20 @@ The user-visible baseline is: open UI, sign up or log in, upload a JPEG through 
 
 ## Workflow Rules
 
-- Follow the implementation plan task-by-task.
-- Do not use git worktrees in this project; they conflict with the beads workflow. Use regular git feature branches with `git switch -c` instead.
-- Before implementation starts, write the manual e2e scenario for the target change and get it approved. This keeps the team explicit about what behavior is being built and reviewed.
+- Use `bd` for all task tracking. Do not use markdown TODO lists, TodoWrite, or TaskCreate for project task tracking.
+- Run `bd prime` for detailed beads workflow context at the start of a session.
+- Work in a regular git feature/session branch for each session.
+- Do not use git worktrees in this project; they conflict with the beads workflow.
+- Prefer running project commands through `Makefile` targets when a suitable target exists.
+- Before implementation starts, write the manual e2e scenario for the target change and get it approved.
+- Follow the accepted implementation plan task-by-task.
 - Keep commits small and aligned with plan tasks.
 - Before each commit, inspect `git status`, `git diff`, and recent log.
 - Do not commit unrelated files.
 - Verify claims with commands before reporting success.
 - If framework tooling disagrees with snippets in the plan, make the smallest working adjustment and keep the documented architecture boundary intact.
+- At session handoff, summarize what changed, verification results, follow-up issues, branch name, and push status.
 
-<!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:ca08a54f -->
 ## Beads Issue Tracker
 
 This project uses **bd (beads)** for issue tracking. Run `bd prime` to see full workflow context and commands.
@@ -83,33 +70,31 @@ bd close <id>         # Complete work
 
 ### Rules
 
-- Use `bd` for ALL task tracking — do NOT use TodoWrite, TaskCreate, or markdown TODO lists
-- Run `bd prime` for detailed command reference and session close protocol
-- Use `bd remember` for persistent knowledge — do NOT use MEMORY.md files
+- Use `bd` for ALL task tracking.
+- Run `bd prime` for detailed command reference and session close protocol.
+- Use `bd remember` for persistent knowledge; do not use MEMORY.md files.
 
 ## Session Completion
 
-**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
+When ending a work session, complete all steps below. Work is not complete until `git push` succeeds.
 
-**MANDATORY WORKFLOW:**
+1. File issues for remaining work.
+2. Run quality gates if code changed.
+3. Update issue status.
+4. Push beads and git state:
 
-1. **File issues for remaining work** - Create issues for anything that needs follow-up
-2. **Run quality gates** (if code changed) - Tests, linters, builds
-3. **Update issue status** - Close finished work, update in-progress items
-4. **PUSH TO REMOTE** - This is MANDATORY:
-   ```bash
-   git pull --rebase
-   bd dolt push
-   git push
-   git status  # MUST show "up to date with origin"
-   ```
-5. **Clean up** - Clear stashes, prune remote branches
-6. **Verify** - All changes committed AND pushed
-7. **Hand off** - Provide context for next session
+```bash
+git pull --rebase
+bd dolt push
+git push
+git status
+```
 
-**CRITICAL RULES:**
-- Work is NOT complete until `git push` succeeds
-- NEVER stop before pushing - that leaves work stranded locally
-- NEVER say "ready to push when you are" - YOU must push
-- If push fails, resolve and retry until it succeeds
-<!-- END BEADS INTEGRATION -->
+5. Verify all changes are committed and pushed.
+6. Hand off with concise context for the next session.
+
+Critical rules:
+
+- Never stop before pushing completed session work.
+- Never say "ready to push when you are"; push the work.
+- If push fails, resolve and retry until it succeeds.

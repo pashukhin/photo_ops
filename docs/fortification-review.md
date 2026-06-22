@@ -50,10 +50,10 @@ make test
 Run narrower package tests while iterating, for example:
 
 ```bash
-pnpm --filter @photoops/api-gateway test
-pnpm --filter @photoops/photo-service test
-pnpm --filter @photoops/identity-service test
-pnpm --filter @photoops/web test
+make test-api
+make test-identity
+make test-photo
+make test-web
 ```
 
 ### Migrate
@@ -61,15 +61,17 @@ pnpm --filter @photoops/web test
 After the Compose stack is running:
 
 ```bash
-make migrate-identity
-make migrate-photo
+make migrate
 ```
+
+Use `make migrate-identity` or `make migrate-photo` when only one service schema needs to be applied.
 
 ### Smoke-Test
 
 ```bash
 make smoke-upload
-scripts/smoke-auth-upload-ownership.sh
+make smoke-auth
+make smoke-contract
 ```
 
 ### Reset Local State
@@ -83,7 +85,7 @@ make down
 Delete this project stack's local database and object-storage volumes only when stale state blocks verification:
 
 ```bash
-docker compose -f infra/docker/docker-compose.yml --env-file .env down -v
+make reset
 ```
 
 Then rerun bootstrap, `make dev`, and both migration targets.
@@ -150,6 +152,7 @@ There is no production deployment definition, secret management, TLS plan, objec
 - Updated stale current-state documentation in `docs/domain-model.md` after identity ownership landed.
 - Updated `docs/architecture-frame-verification.md` to show the authenticated ownership path.
 - Updated `AGENTS.md` guardrails for future sessions.
+- Added canonical `Makefile` targets for focused tests, reset, aggregate migration, auth smoke, and smoke contract checks.
 - Verified `scripts/test-smoke-upload-contract.sh` and `make test`; no workflow script change was needed.
 
 ## Retained Trade-Offs
