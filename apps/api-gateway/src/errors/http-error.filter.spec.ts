@@ -36,4 +36,43 @@ describe('HttpErrorFilter', () => {
     expect(response.status).toHaveBeenCalledWith(409);
     expect(response.json).toHaveBeenCalledWith({ code: 'conflict', message: 'email already exists' });
   });
+
+  it('maps gRPC unauthenticated errors to an unauthorized response', () => {
+    const { host, response } = createHost();
+    const error = Object.assign(new Error('16 UNAUTHENTICATED: invalid credentials'), {
+      code: status.UNAUTHENTICATED,
+      details: 'invalid credentials'
+    });
+
+    new HttpErrorFilter().catch(error, host);
+
+    expect(response.status).toHaveBeenCalledWith(401);
+    expect(response.json).toHaveBeenCalledWith({ code: 'unauthorized', message: 'invalid credentials' });
+  });
+
+  it('maps gRPC not-found errors to a not-found response', () => {
+    const { host, response } = createHost();
+    const error = Object.assign(new Error('5 NOT_FOUND: photo not found'), {
+      code: status.NOT_FOUND,
+      details: 'photo not found'
+    });
+
+    new HttpErrorFilter().catch(error, host);
+
+    expect(response.status).toHaveBeenCalledWith(404);
+    expect(response.json).toHaveBeenCalledWith({ code: 'not_found', message: 'photo not found' });
+  });
+
+  it('maps gRPC invalid-argument errors to a bad-request response', () => {
+    const { host, response } = createHost();
+    const error = Object.assign(new Error('3 INVALID_ARGUMENT: password too short'), {
+      code: status.INVALID_ARGUMENT,
+      details: 'password too short'
+    });
+
+    new HttpErrorFilter().catch(error, host);
+
+    expect(response.status).toHaveBeenCalledWith(400);
+    expect(response.json).toHaveBeenCalledWith({ code: 'bad_request', message: 'password too short' });
+  });
 });

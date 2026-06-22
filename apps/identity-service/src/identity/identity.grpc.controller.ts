@@ -18,21 +18,26 @@ export class IdentityGrpcController {
     try {
       return this.mapAuth(await this.identity.signUp({ email: request.email, password: request.password, displayName: request.displayName }));
     } catch (error) {
-      if (error instanceof Error && error.message === 'email already exists') {
-        throw new RpcException({ code: status.ALREADY_EXISTS, message: error.message });
-      }
-      throw error;
+      throw this.mapDomainError(error);
     }
   }
 
   @GrpcMethod('IdentityService', 'Login')
   async login(request: { email: string; password: string }) {
-    return this.mapAuth(await this.identity.login({ email: request.email, password: request.password }));
+    try {
+      return this.mapAuth(await this.identity.login({ email: request.email, password: request.password }));
+    } catch (error) {
+      throw this.mapDomainError(error);
+    }
   }
 
   @GrpcMethod('IdentityService', 'ValidateSession')
   async validateSession(request: { sessionId: string }) {
-    return this.mapAuth(await this.identity.validateSession(request.sessionId));
+    try {
+      return this.mapAuth(await this.identity.validateSession(request.sessionId));
+    } catch (error) {
+      throw this.mapDomainError(error);
+    }
   }
 
   @GrpcMethod('IdentityService', 'Logout')
@@ -43,8 +48,27 @@ export class IdentityGrpcController {
 
   @GrpcMethod('IdentityService', 'GetCurrentUser')
   async getCurrentUser(request: { sessionId: string }) {
-    const auth = await this.identity.validateSession(request.sessionId);
-    return this.mapUser(auth.user);
+    try {
+      const auth = await this.identity.validateSession(request.sessionId);
+      return this.mapUser(auth.user);
+    } catch (error) {
+      throw this.mapDomainError(error);
+    }
+  }
+
+  private mapDomainError(error: unknown) {
+    if (error instanceof Error) {
+      if (error.message === 'email already exists') {
+        return new RpcException({ code: status.ALREADY_EXISTS, message: error.message });
+      }
+      if (error.message === 'password too short') {
+        return new RpcException({ code: status.INVALID_ARGUMENT, message: error.message });
+      }
+      if (error.message === 'invalid credentials' || error.message === 'user disabled' || error.message === 'invalid session') {
+        return new RpcException({ code: status.UNAUTHENTICATED, message: error.message });
+      }
+    }
+    return error;
   }
 
   private mapAuth(auth: AuthSessionRecord) {

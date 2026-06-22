@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
 import { createDb } from '../db/client';
@@ -8,13 +8,19 @@ import { IdentityRepositoryPort } from './identity.service';
 
 @Injectable()
 export class IdentityRepository implements IdentityRepositoryPort {
-  private readonly db = createDb();
+  private readonly db: ReturnType<typeof createDb>;
+
+  constructor(@Optional() @Inject('IDENTITY_DB') db?: ReturnType<typeof createDb>) {
+    this.db = db ?? createDb();
+  }
 
   async createUserWithPassword(input: { email: string; passwordHash: string; displayName: string }): Promise<UserRecord> {
     const id = uuidv7();
-    const [created] = await this.db.insert(users).values({ id, email: input.email, displayName: input.displayName, status: 'active' }).returning();
-    await this.db.insert(passwordCredentials).values({ userId: id, passwordHash: input.passwordHash });
-    return this.toUser(created);
+    return this.db.transaction(async (tx) => {
+      const [created] = await tx.insert(users).values({ id, email: input.email, displayName: input.displayName, status: 'active' }).returning();
+      await tx.insert(passwordCredentials).values({ userId: id, passwordHash: input.passwordHash });
+      return this.toUser(created);
+    });
   }
 
   async findUserByEmail(email: string): Promise<UserRecord | null> {

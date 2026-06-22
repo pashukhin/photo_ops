@@ -11,9 +11,12 @@ export class HttpErrorFilter implements ExceptionFilter {
       response.status(status).json({ code, message: exception.message });
       return;
     }
-    if (this.isGrpcError(exception) && exception.code === GrpcStatus.ALREADY_EXISTS) {
-      response.status(HttpStatus.CONFLICT).json({ code: 'conflict', message: exception.details || 'already exists' });
-      return;
+    if (this.isGrpcError(exception)) {
+      const mapped = this.mapGrpcError(exception);
+      if (mapped) {
+        response.status(mapped.status).json({ code: mapped.code, message: exception.details || mapped.message });
+        return;
+      }
     }
     const message = exception instanceof Error ? exception.message : 'internal error';
     response.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ code: 'internal_error', message });
@@ -21,5 +24,20 @@ export class HttpErrorFilter implements ExceptionFilter {
 
   private isGrpcError(exception: unknown): exception is { code: number; details?: string } {
     return typeof exception === 'object' && exception !== null && 'code' in exception && typeof (exception as { code?: unknown }).code === 'number';
+  }
+
+  private mapGrpcError(exception: { code: number }) {
+    switch (exception.code) {
+      case GrpcStatus.ALREADY_EXISTS:
+        return { status: HttpStatus.CONFLICT, code: 'conflict', message: 'already exists' };
+      case GrpcStatus.UNAUTHENTICATED:
+        return { status: HttpStatus.UNAUTHORIZED, code: 'unauthorized', message: 'authentication required' };
+      case GrpcStatus.NOT_FOUND:
+        return { status: HttpStatus.NOT_FOUND, code: 'not_found', message: 'not found' };
+      case GrpcStatus.INVALID_ARGUMENT:
+        return { status: HttpStatus.BAD_REQUEST, code: 'bad_request', message: 'bad request' };
+      default:
+        return undefined;
+    }
   }
 }

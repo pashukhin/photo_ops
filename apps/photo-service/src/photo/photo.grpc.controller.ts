@@ -1,5 +1,6 @@
 import { Controller } from '@nestjs/common';
-import { GrpcMethod } from '@nestjs/microservices';
+import { status } from '@grpc/grpc-js';
+import { GrpcMethod, RpcException } from '@nestjs/microservices';
 import { PhotoDomainService } from './photo.service';
 
 @Controller()
@@ -29,7 +30,11 @@ export class PhotoGrpcController {
 
   @GrpcMethod('PhotoService', 'CompleteUpload')
   async completeUpload(request: { photoId: string; userId: string }) {
-    return this.mapPhoto(await this.photoService.completeUpload(request.userId, request.photoId));
+    try {
+      return this.mapPhoto(await this.photoService.completeUpload(request.userId, request.photoId));
+    } catch (error) {
+      throw this.mapDomainError(error);
+    }
   }
 
   @GrpcMethod('PhotoService', 'ListPhotos')
@@ -57,5 +62,12 @@ export class PhotoGrpcController {
       createdAt: photo.createdAt.toISOString(),
       updatedAt: photo.updatedAt.toISOString()
     };
+  }
+
+  private mapDomainError(error: unknown) {
+    if (error instanceof Error && error.message === 'photo not found') {
+      return new RpcException({ code: status.NOT_FOUND, message: error.message });
+    }
+    return error;
   }
 }

@@ -58,7 +58,7 @@ if not any(photo.get("id") == photo_id and str(photo.get("status")).lower().ends
     raise SystemExit("user A uploaded photo not found")
 if any(photo.get("id") == photo_id for photo in photos_b):
     raise SystemExit("user B can list user A photo")
-if status_b not in {"404", "500"}:
+if status_b != "404":
     raise SystemExit(f"unexpected cross-user complete status {status_b}")
 print("auth upload ownership smoke ok")
 PY
