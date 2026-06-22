@@ -1,0 +1,50 @@
+import { Controller } from '@nestjs/common';
+import { GrpcMethod } from '@nestjs/microservices';
+import { AuthSessionRecord, UserRecord } from './identity.types';
+import { IdentityDomainService } from './identity.service';
+
+@Controller()
+export class IdentityGrpcController {
+  constructor(private readonly identity: IdentityDomainService) {}
+
+  @GrpcMethod('IdentityService', 'Health')
+  health() {
+    return { status: 'ok', service: 'identity-service' };
+  }
+
+  @GrpcMethod('IdentityService', 'SignUp')
+  async signUp(request: { email: string; password: string; displayName: string }) {
+    return this.mapAuth(await this.identity.signUp({ email: request.email, password: request.password, displayName: request.displayName }));
+  }
+
+  @GrpcMethod('IdentityService', 'Login')
+  async login(request: { email: string; password: string }) {
+    return this.mapAuth(await this.identity.login({ email: request.email, password: request.password }));
+  }
+
+  @GrpcMethod('IdentityService', 'ValidateSession')
+  async validateSession(request: { sessionId: string }) {
+    return this.mapAuth(await this.identity.validateSession(request.sessionId));
+  }
+
+  @GrpcMethod('IdentityService', 'Logout')
+  async logout(request: { sessionId: string }) {
+    await this.identity.logout(request.sessionId);
+    return {};
+  }
+
+  @GrpcMethod('IdentityService', 'GetCurrentUser')
+  async getCurrentUser(request: { sessionId: string }) {
+    const auth = await this.identity.validateSession(request.sessionId);
+    return this.mapUser(auth.user);
+  }
+
+  private mapAuth(auth: AuthSessionRecord) {
+    return { sessionId: auth.session.id, userId: auth.user.id, email: auth.user.email, displayName: auth.user.displayName, expiresAt: auth.session.expiresAt.toISOString() };
+  }
+
+  private mapUser(user: UserRecord) {
+    const statusMap = { active: 1, disabled: 2 } as const;
+    return { id: user.id, email: user.email, displayName: user.displayName, status: statusMap[user.status], createdAt: user.createdAt.toISOString(), updatedAt: user.updatedAt.toISOString() };
+  }
+}
