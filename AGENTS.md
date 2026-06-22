@@ -1,43 +1,32 @@
 # AGENTS.md
 
+This file defines how coding agents work on this project. It is a guardrail, not a project description. For what the project is and how it is built, read the documents below.
+
 ## Required Reading
 
 Before implementing, read:
 
 - `README.md`
 - `project_description.md`
-- `docs/fortification-review.md`
+- `docs/architecture.md`
 - `docs/domain-model.md`
-- `docs/e2e-auth-upload-ownership.md`
-- the accepted spec and plan for the target session
+- the accepted spec, plan, and e2e scenario for the active session
 
 ## Scope Guardrails
 
-- Do not add EXIF, previews, clustering, publication, usage ledger, connectors, or media processing unless the current approved session explicitly targets them.
+- Stay within what the current approved session targets; do not add product features beyond it.
 - Keep changes aligned with the accepted spec and plan for the active session.
+- Do not regress existing working behavior unless the active session explicitly changes it.
 - Prefer simplification over sophistication.
 - Prefer one canonical workflow over multiple equivalent commands.
 - Document retained imperfections as trade-offs, deferred work, or follow-up issues.
 - Cheap fixes are allowed when they reduce development friction or risk without changing product scope.
-- Preserve the authenticated JPEG upload/list baseline unless the active session explicitly changes it.
 
-## Architecture Rules
+## Architecture-Sensitive Changes
 
-- `web` talks only to `api-gateway`, except for presigned MinIO upload URLs.
-- `api-gateway` must not connect to any database.
-- `photo-service` owns `photo-db` and the photo upload/list domain.
-- `identity-service` owns `identity-db`, users, credentials, and sessions.
-- Data-owning services use separate databases. A service must connect only to its own DB.
-- Cross-service references use UUID v7.
-- Non-photo and non-identity services are health-only scaffolds until their approved sessions wire real behavior.
-- If a change touches service ownership, database ownership, auth/session behavior, MinIO object privacy, or browser-to-service boundaries, treat it as architecture-sensitive and verify against the accepted specs.
-
-## Contract And Runtime Rules
-
-- Sync service contracts are proto-first.
-- Use RabbitMQ for async workflows later; do not invent async contracts before they are needed.
-- Keep MinIO object keys server-generated and independent from raw filenames.
-- Originals are private; public delivery uses prepared variants in later stages.
+- The durable architecture and contract boundaries live in `docs/architecture.md`. Keep changes consistent with them.
+- If a change touches service ownership, database ownership, auth/session behavior, MinIO object privacy, browser-to-service boundaries, or service contracts, treat it as architecture-sensitive and verify against the accepted specs.
+- If framework tooling disagrees with snippets in the plan, make the smallest working adjustment and keep the documented architecture boundary intact.
 
 ## Workflow Rules
 
@@ -52,7 +41,6 @@ Before implementing, read:
 - Before each commit, inspect `git status`, `git diff`, and recent log.
 - Do not commit unrelated files.
 - Verify claims with commands before reporting success.
-- If framework tooling disagrees with snippets in the plan, make the smallest working adjustment and keep the documented architecture boundary intact.
 - At session handoff, summarize what changed, verification results, follow-up issues, branch name, and push status.
 
 ## Beads Issue Tracker
