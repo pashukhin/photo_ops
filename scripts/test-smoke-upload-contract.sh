@@ -16,11 +16,19 @@ import sys
 
 photo_id = "018f0000-0000-7000-8000-000000000001"
 uploaded = False
+session_cookie = "photoops_session=session-1"
 
 class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         global uploaded
+        if self.path == "/auth/signup":
+            self._json({"userId": "user-1", "email": "smoke@example.com", "displayName": "Smoke User"}, headers={"set-cookie": f"{session_cookie}; Path=/; HttpOnly; SameSite=Lax"})
+            return
         if self.path == "/photos/upload-intents":
+            if session_cookie not in self.headers.get("cookie", ""):
+                self.send_response(401)
+                self.end_headers()
+                return
             length = int(self.headers.get("content-length", "0"))
             body = json.loads(self.rfile.read(length))
             if body.get("contentType") != "image/jpeg":
@@ -34,6 +42,10 @@ class Handler(BaseHTTPRequestHandler):
             })
             return
         if self.path == f"/photos/{photo_id}/complete-upload":
+            if session_cookie not in self.headers.get("cookie", ""):
+                self.send_response(401)
+                self.end_headers()
+                return
             uploaded = True
             self._json({"photoId": photo_id, "status": "uploaded"})
             return
@@ -54,6 +66,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/photos":
+            if session_cookie not in self.headers.get("cookie", ""):
+                self.send_response(401)
+                self.end_headers()
+                return
             status = "uploaded" if uploaded else "pending_upload"
             self._json({"photos": [{"id": photo_id, "status": status, "filename": "smoke.jpg"}]})
             return
@@ -62,11 +78,13 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         return
 
-    def _json(self, payload):
+    def _json(self, payload, headers=None):
         body = json.dumps(payload).encode()
         self.send_response(200)
         self.send_header("content-type", "application/json")
         self.send_header("content-length", str(len(body)))
+        for key, value in (headers or {}).items():
+            self.send_header(key, value)
         self.end_headers()
         self.wfile.write(body)
 

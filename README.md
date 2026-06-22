@@ -15,6 +15,13 @@ make dev
 
 Open `http://localhost:3000`.
 
+In another terminal, apply the local service schemas after the containers are running:
+
+```bash
+make migrate-identity
+make migrate-photo
+```
+
 ## First Executable Slice
 
 The first working path is:
@@ -23,7 +30,7 @@ The first working path is:
 web -> api-gateway -> photo-service -> MinIO + photo-db -> web
 ```
 
-It supports creating an upload intent, uploading a JPEG directly to MinIO with a presigned PUT URL, completing the upload, and listing uploaded photos.
+It supports signing up with e-mail/password, creating an upload intent, uploading a JPEG directly to MinIO with a presigned PUT URL, completing the upload, and listing only the signed-in user's uploaded photos.
 
 The full MVP path is: upload photos, extract metadata, generate previews, cluster by time/place, create an annotated story, publish a public page, share a link, and see usage/cost estimates.
 

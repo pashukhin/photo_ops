@@ -3,6 +3,7 @@ set -eu
 
 API_BASE_URL="${API_BASE_URL:-http://localhost:3001}"
 TMP_DIR="${TMPDIR:-/tmp}/photoops-smoke"
+COOKIE_PATH="$TMP_DIR/session.cookie"
 JPEG_PATH="$TMP_DIR/smoke.jpg"
 INTENT_PATH="$TMP_DIR/intent.json"
 COMPLETE_PATH="$TMP_DIR/complete.json"
@@ -20,7 +21,14 @@ Path(sys.argv[1]).write_bytes(base64.b64decode(
 ))
 PY
 
+STAMP="$(date +%s)"
+curl -fsS -c "$COOKIE_PATH" \
+  -H 'content-type: application/json' \
+  -d "{\"email\":\"smoke-$STAMP@example.com\",\"password\":\"secret123\",\"displayName\":\"Smoke User\"}" \
+  "$API_BASE_URL/auth/signup" >/dev/null
+
 curl -fsS \
+  -b "$COOKIE_PATH" \
   -H 'content-type: application/json' \
   -d "{\"filename\":\"smoke.jpg\",\"contentType\":\"image/jpeg\",\"sizeBytes\":\"$(wc -c < "$JPEG_PATH" | tr -d ' ')\"}" \
   "$API_BASE_URL/photos/upload-intents" > "$INTENT_PATH"
@@ -38,8 +46,8 @@ PY
 )"
 
 curl -fsS -X PUT -H 'content-type: image/jpeg' --data-binary "@$JPEG_PATH" "$UPLOAD_URL" >/dev/null
-curl -fsS -X POST "$API_BASE_URL/photos/$PHOTO_ID/complete-upload" > "$COMPLETE_PATH"
-curl -fsS "$API_BASE_URL/photos" > "$LIST_PATH"
+curl -fsS -b "$COOKIE_PATH" -X POST "$API_BASE_URL/photos/$PHOTO_ID/complete-upload" > "$COMPLETE_PATH"
+curl -fsS -b "$COOKIE_PATH" "$API_BASE_URL/photos" > "$LIST_PATH"
 
 python3 - <<'PY' "$PHOTO_ID" "$LIST_PATH"
 import json, sys
