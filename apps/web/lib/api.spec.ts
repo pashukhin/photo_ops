@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { completeUpload, createUploadIntent, listPhotos, uploadFileToPresignedUrl } from './api';
+import { completeUpload, createUploadIntent, listPhotos, signUp, uploadFileToPresignedUrl } from './api';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -45,5 +45,16 @@ describe('web API helper', () => {
       headers: { 'content-type': 'image/jpeg' },
       body: file
     });
+  });
+
+  it('uses backend error messages for signup failures', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ code: 'conflict', message: 'email already exists' }), {
+        status: 409,
+        headers: { 'content-type': 'application/json' }
+      })
+    );
+
+    await expect(signUp({ email: 'person@example.com', password: 'secret123', displayName: 'Person' })).rejects.toThrow('email already exists');
   });
 });

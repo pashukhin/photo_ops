@@ -25,7 +25,7 @@ export async function signUp(input: { email: string; password: string; displayNa
     body: JSON.stringify(input)
   });
   if (!response.ok) {
-    throw new Error(`SignUp failed: ${response.status}`);
+    throw new Error(await readErrorMessage(response, `SignUp failed: ${response.status}`));
   }
   return response.json() as Promise<CurrentUser>;
 }
@@ -38,7 +38,7 @@ export async function login(input: { email: string; password: string }) {
     body: JSON.stringify(input)
   });
   if (!response.ok) {
-    throw new Error(`Login failed: ${response.status}`);
+    throw new Error(await readErrorMessage(response, `Login failed: ${response.status}`));
   }
   return response.json() as Promise<CurrentUser>;
 }
@@ -46,7 +46,7 @@ export async function login(input: { email: string; password: string }) {
 export async function logout() {
   const response = await fetch(`${API_BASE_URL}/auth/logout`, { method: 'POST', credentials: 'include' });
   if (!response.ok) {
-    throw new Error(`Logout failed: ${response.status}`);
+    throw new Error(await readErrorMessage(response, `Logout failed: ${response.status}`));
   }
 }
 
@@ -56,7 +56,7 @@ export async function getCurrentUser() {
     return null;
   }
   if (!response.ok) {
-    throw new Error(`GetCurrentUser failed: ${response.status}`);
+    throw new Error(await readErrorMessage(response, `GetCurrentUser failed: ${response.status}`));
   }
   return response.json() as Promise<CurrentUser>;
 }
@@ -69,7 +69,7 @@ export async function createUploadIntent(file: File) {
     body: JSON.stringify({ filename: file.name, contentType: file.type, sizeBytes: String(file.size) })
   });
   if (!response.ok) {
-    throw new Error(`CreateUploadIntent failed: ${response.status}`);
+    throw new Error(await readErrorMessage(response, `CreateUploadIntent failed: ${response.status}`));
   }
   return response.json() as Promise<{ photoId: string; uploadUrl: string }>;
 }
@@ -77,7 +77,7 @@ export async function createUploadIntent(file: File) {
 export async function completeUpload(photoId: string) {
   const response = await fetch(`${API_BASE_URL}/photos/${photoId}/complete-upload`, { method: 'POST', credentials: 'include' });
   if (!response.ok) {
-    throw new Error(`CompleteUpload failed: ${response.status}`);
+    throw new Error(await readErrorMessage(response, `CompleteUpload failed: ${response.status}`));
   }
   return response.json() as Promise<PhotoAsset>;
 }
@@ -85,7 +85,7 @@ export async function completeUpload(photoId: string) {
 export async function listPhotos() {
   const response = await fetch(`${API_BASE_URL}/photos`, { credentials: 'include', cache: 'no-store' });
   if (!response.ok) {
-    throw new Error(`ListPhotos failed: ${response.status}`);
+    throw new Error(await readErrorMessage(response, `ListPhotos failed: ${response.status}`));
   }
   const body = await response.json();
   return (body.photos ?? []) as PhotoAsset[];
@@ -99,5 +99,14 @@ export async function uploadFileToPresignedUrl(uploadUrl: string, file: File) {
   });
   if (!response.ok) {
     throw new Error(`MinIO upload failed: ${response.status}`);
+  }
+}
+
+async function readErrorMessage(response: Response, fallback: string) {
+  try {
+    const body = (await response.clone().json()) as { message?: unknown };
+    return typeof body.message === 'string' && body.message.trim() ? body.message : fallback;
+  } catch {
+    return fallback;
   }
 }

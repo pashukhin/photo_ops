@@ -1,5 +1,6 @@
+import { status } from '@grpc/grpc-js';
 import { Controller } from '@nestjs/common';
-import { GrpcMethod } from '@nestjs/microservices';
+import { GrpcMethod, RpcException } from '@nestjs/microservices';
 import { AuthSessionRecord, UserRecord } from './identity.types';
 import { IdentityDomainService } from './identity.service';
 
@@ -14,7 +15,14 @@ export class IdentityGrpcController {
 
   @GrpcMethod('IdentityService', 'SignUp')
   async signUp(request: { email: string; password: string; displayName: string }) {
-    return this.mapAuth(await this.identity.signUp({ email: request.email, password: request.password, displayName: request.displayName }));
+    try {
+      return this.mapAuth(await this.identity.signUp({ email: request.email, password: request.password, displayName: request.displayName }));
+    } catch (error) {
+      if (error instanceof Error && error.message === 'email already exists') {
+        throw new RpcException({ code: status.ALREADY_EXISTS, message: error.message });
+      }
+      throw error;
+    }
   }
 
   @GrpcMethod('IdentityService', 'Login')

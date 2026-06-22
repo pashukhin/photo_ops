@@ -25,27 +25,35 @@ export default function HomePage() {
 
   async function onSignup(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = event.currentTarget;
-    const email = (form.elements.namedItem('email') as HTMLInputElement).value;
-    const password = (form.elements.namedItem('password') as HTMLInputElement).value;
-    const displayName = (form.elements.namedItem('displayName') as HTMLInputElement).value;
-    const user = await signUp({ email, password, displayName });
-    setCurrentUser(user);
-    await refreshPhotos();
-    form.reset();
-    setMessage('Signed up');
+    try {
+      const form = event.currentTarget;
+      const email = (form.elements.namedItem('email') as HTMLInputElement).value;
+      const password = (form.elements.namedItem('password') as HTMLInputElement).value;
+      const displayName = (form.elements.namedItem('displayName') as HTMLInputElement).value;
+      const user = await signUp({ email, password, displayName });
+      setCurrentUser(user);
+      await refreshPhotos();
+      form.reset();
+      setMessage('Signed up');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Sign up failed');
+    }
   }
 
   async function onLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = event.currentTarget;
-    const email = (form.elements.namedItem('email') as HTMLInputElement).value;
-    const password = (form.elements.namedItem('password') as HTMLInputElement).value;
-    const user = await login({ email, password });
-    setCurrentUser(user);
-    await refreshPhotos();
-    form.reset();
-    setMessage('Logged in');
+    try {
+      const form = event.currentTarget;
+      const email = (form.elements.namedItem('email') as HTMLInputElement).value;
+      const password = (form.elements.namedItem('password') as HTMLInputElement).value;
+      const user = await login({ email, password });
+      setCurrentUser(user);
+      await refreshPhotos();
+      form.reset();
+      setMessage('Logged in');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Login failed');
+    }
   }
 
   async function onLogout() {
@@ -64,15 +72,19 @@ export default function HomePage() {
       setMessage('Choose a JPEG file first');
       return;
     }
-    setMessage('Creating upload intent');
-    const intent = await createUploadIntent(file);
-    setMessage('Uploading to object storage');
-    await uploadFileToPresignedUrl(intent.uploadUrl, file);
-    setMessage('Completing upload');
-    await completeUpload(intent.photoId);
-    await refreshPhotos();
-    form.reset();
-    setMessage('Upload complete');
+    try {
+      setMessage('Creating upload intent');
+      const intent = await createUploadIntent(file);
+      setMessage('Uploading to object storage');
+      await uploadFileToPresignedUrl(intent.uploadUrl, file);
+      setMessage('Completing upload');
+      await completeUpload(intent.photoId);
+      await refreshPhotos();
+      form.reset();
+      setMessage('Upload complete');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Upload failed');
+    }
   }
 
   return (
