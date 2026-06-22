@@ -4,17 +4,17 @@ import { Injectable } from '@nestjs/common';
 import { join } from 'node:path';
 
 export interface PhotoGatewayClient {
-  createUploadIntent(input: { filename: string; contentType: string; sizeBytes: string }): Promise<unknown>;
-  completeUpload(input: { photoId: string }): Promise<unknown>;
-  listPhotos(input: { pageSize: number }): Promise<unknown>;
+  createUploadIntent(input: { userId: string; filename: string; contentType: string; sizeBytes: string }): Promise<unknown>;
+  completeUpload(input: { userId: string; photoId: string }): Promise<unknown>;
+  listPhotos(input: { userId: string; pageSize: number }): Promise<unknown>;
 }
 
 type Callback<T> = (error: Error | null, value: T) => void;
 
 interface GrpcPhotoServiceClient {
-  CreateUploadIntent(input: { filename: string; contentType: string; sizeBytes: string }, callback: Callback<unknown>): void;
-  CompleteUpload(input: { photoId: string }, callback: Callback<unknown>): void;
-  ListPhotos(input: { pageSize: number }, callback: Callback<unknown>): void;
+  CreateUploadIntent(input: { userId: string; filename: string; contentType: string; sizeBytes: string }, callback: Callback<unknown>): void;
+  CompleteUpload(input: { userId: string; photoId: string }, callback: Callback<unknown>): void;
+  ListPhotos(input: { userId: string; pageSize: number }, callback: Callback<unknown>): void;
 }
 
 @Injectable()
@@ -38,15 +38,15 @@ export class PhotoClient implements PhotoGatewayClient {
     this.client = new loaded.photoops.photo.v1.PhotoService(target, credentials.createInsecure());
   }
 
-  async createUploadIntent(input: { filename: string; contentType: string; sizeBytes: string }) {
+  async createUploadIntent(input: { userId: string; filename: string; contentType: string; sizeBytes: string }) {
     return this.call((callback) => this.client.CreateUploadIntent(input, callback));
   }
 
-  async completeUpload(input: { photoId: string }) {
+  async completeUpload(input: { userId: string; photoId: string }) {
     return this.call((callback) => this.client.CompleteUpload(input, callback));
   }
 
-  async listPhotos(input: { pageSize: number }) {
+  async listPhotos(input: { userId: string; pageSize: number }) {
     return this.call((callback) => this.client.ListPhotos(input, callback));
   }
 

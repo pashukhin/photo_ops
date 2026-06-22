@@ -1,23 +1,30 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Post } from '@nestjs/common';
+import { AuthService } from '../auth/auth.service';
 import { PhotoClient } from '../grpc/photo.client';
 
 @Controller('photos')
 export class PhotoController {
-  constructor(private readonly photoClient: PhotoClient) {}
+  constructor(
+    private readonly photoClient: PhotoClient,
+    private readonly authService: AuthService
+  ) {}
 
   @Post('upload-intents')
-  createUploadIntent(@Body() body: { filename: string; contentType: string; sizeBytes: string }) {
-    return this.photoClient.createUploadIntent(body);
+  async createUploadIntent(@Headers('cookie') cookieHeader: string | undefined, @Body() body: { filename: string; contentType: string; sizeBytes: string }) {
+    const auth = await this.authService.requireSession(cookieHeader);
+    return this.photoClient.createUploadIntent({ userId: auth.userId, ...body });
   }
 
   @Post(':photoId/complete-upload')
-  async completeUpload(@Param('photoId') photoId: string) {
-    return this.mapPhoto(await this.photoClient.completeUpload({ photoId }));
+  async completeUpload(@Headers('cookie') cookieHeader: string | undefined, @Param('photoId') photoId: string) {
+    const auth = await this.authService.requireSession(cookieHeader);
+    return this.mapPhoto(await this.photoClient.completeUpload({ userId: auth.userId, photoId }));
   }
 
   @Get()
-  async listPhotos() {
-    const response = (await this.photoClient.listPhotos({ pageSize: 100 })) as { photos?: unknown[] };
+  async listPhotos(@Headers('cookie') cookieHeader: string | undefined) {
+    const auth = await this.authService.requireSession(cookieHeader);
+    const response = (await this.photoClient.listPhotos({ userId: auth.userId, pageSize: 100 })) as { photos?: unknown[] };
     return { ...response, photos: (response.photos ?? []).map((photo) => this.mapPhoto(photo)) };
   }
 
