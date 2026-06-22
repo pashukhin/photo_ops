@@ -1,4 +1,4 @@
-.PHONY: install proto build test lint dev down logs status migrate-photo smoke-upload
+.PHONY: install proto build test lint dev down logs status migrate-identity migrate-photo smoke-upload
 
 ifneq (,$(wildcard .env))
 include .env
@@ -31,6 +31,9 @@ logs:
 
 status:
 	docker compose -f infra/docker/docker-compose.yml --env-file .env ps
+
+migrate-identity:
+	docker compose -f infra/docker/docker-compose.yml --env-file .env exec -T postgres psql "$${IDENTITY_DATABASE_URL}" < apps/identity-service/migrations/0001_create_identity_tables.sql
 
 migrate-photo:
 	docker compose -f infra/docker/docker-compose.yml --env-file .env exec -T postgres psql "$${PHOTO_DATABASE_URL}" < apps/photo-service/migrations/0001_create_photo_assets.sql

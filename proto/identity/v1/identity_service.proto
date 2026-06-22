@@ -1,0 +1,90 @@
+syntax = "proto3";
+
+package photoops.identity.v1;
+
+import "common/v1/common.proto";
+import "google/api/annotations.proto";
+
+service IdentityService {
+  rpc Health(photoops.common.v1.HealthCheckRequest) returns (photoops.common.v1.HealthCheckResponse) {
+    option (google.api.http) = {get: "/v1/identity/health"};
+  }
+
+  rpc SignUp(SignUpRequest) returns (AuthSession) {
+    option (google.api.http) = {
+      post: "/v1/auth/signup"
+      body: "*"
+    };
+  }
+
+  rpc Login(LoginRequest) returns (AuthSession) {
+    option (google.api.http) = {
+      post: "/v1/auth/login"
+      body: "*"
+    };
+  }
+
+  rpc ValidateSession(ValidateSessionRequest) returns (AuthSession) {
+    option (google.api.http) = {
+      post: "/v1/auth/session:validate"
+      body: "*"
+    };
+  }
+
+  rpc Logout(LogoutRequest) returns (photoops.common.v1.Empty) {
+    option (google.api.http) = {
+      post: "/v1/auth/logout"
+      body: "*"
+    };
+  }
+
+  rpc GetCurrentUser(GetCurrentUserRequest) returns (User) {
+    option (google.api.http) = {get: "/v1/auth/me"};
+  }
+}
+
+message SignUpRequest {
+  string email = 1;
+  string password = 2;
+  string display_name = 3;
+}
+
+message LoginRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message ValidateSessionRequest {
+  string session_id = 1;
+}
+
+message LogoutRequest {
+  string session_id = 1;
+}
+
+message GetCurrentUserRequest {
+  string session_id = 1;
+}
+
+message AuthSession {
+  string session_id = 1;
+  string user_id = 2;
+  string email = 3;
+  string display_name = 4;
+  string expires_at = 5;
+}
+
+message User {
+  string id = 1;
+  string email = 2;
+  string display_name = 3;
+  UserStatus status = 4;
+  string created_at = 5;
+  string updated_at = 6;
+}
+
+enum UserStatus {
+  USER_STATUS_UNSPECIFIED = 0;
+  USER_STATUS_ACTIVE = 1;
+  USER_STATUS_DISABLED = 2;
+}

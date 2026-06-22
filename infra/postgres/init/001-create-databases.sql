@@ -1,3 +1,6 @@
+CREATE USER identity_user WITH PASSWORD 'identity_pass';
+CREATE DATABASE identity_db OWNER identity_user;
+
 CREATE USER photo_user WITH PASSWORD 'photo_pass';
 CREATE DATABASE photo_db OWNER photo_user;
 

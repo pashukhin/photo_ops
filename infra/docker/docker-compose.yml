@@ -56,6 +56,21 @@ services:
       timeout: 3s
       retries: 20
 
+  identity-service:
+    build:
+      context: ../..
+      dockerfile: apps/identity-service/Dockerfile
+    environment:
+      IDENTITY_DATABASE_URL: ${IDENTITY_DATABASE_URL}
+      IDENTITY_SERVICE_HTTP_PORT: ${IDENTITY_SERVICE_HTTP_PORT}
+      IDENTITY_SERVICE_GRPC_PORT: ${IDENTITY_SERVICE_GRPC_PORT}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3005:3005"
+      - "50055:50055"
+
   photo-service:
     build:
       context: ../..
@@ -86,8 +101,12 @@ services:
       dockerfile: apps/api-gateway/Dockerfile
     environment:
       API_GATEWAY_PORT: ${API_GATEWAY_PORT}
+      IDENTITY_SERVICE_GRPC_URL: identity-service:${IDENTITY_SERVICE_GRPC_PORT}
+      IDENTITY_SESSION_COOKIE_NAME: ${IDENTITY_SESSION_COOKIE_NAME}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE}
       PHOTO_SERVICE_GRPC_URL: photo-service:${PHOTO_SERVICE_GRPC_PORT}
     depends_on:
+      - identity-service
       - photo-service
     ports:
       - "3001:3001"
