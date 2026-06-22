@@ -7,7 +7,7 @@ The first executable frame ends with upload/list, not the full MVP.
 Verified path:
 
 ```text
-web -> api-gateway -> photo-service -> MinIO + photo-db -> web
+web -> api-gateway -> identity-service + photo-service -> MinIO + identity-db + photo-db -> web
 ```
 
 ## Commands
