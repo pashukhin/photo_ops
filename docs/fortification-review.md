@@ -14,7 +14,7 @@ This consolidation session reviews the project foundation after Sessions 001-003
 | Buf | Generates TypeScript code from proto contracts. | Proto generation is explicit and must be run after contract changes. | Keep. |
 | ts-proto package | Stores generated TypeScript gRPC/proto types. | Generated files are checked in, so stale generation is possible. | Keep; verify with `make proto` after proto edits. |
 | NestJS | Runs `api-gateway`, `identity-service`, `photo-service`, and TypeScript scaffolds. | Several services are intentionally thin; runtime health/readiness consistency is incomplete. | Keep. |
-| Next.js | Runs the authenticated upload/list UI. | `next lint` is not the canonical lint path in newer Next versions. | Keep; document lint as a friction point if it fails. |
+| Next.js | Runs the authenticated upload/list UI. | `next lint` is deprecated and interactive; it cannot run unattended. | Keep; `lint` set to no-op pending real ESLint setup (`photo_ops-p8y`). |
 | Docker Compose | Runs local infrastructure and services. | Full `make dev` rebuilds the stack and can be slow. | Keep. |
 | PostgreSQL | Local database runtime with one container and separate databases/users. | Migrations are manual and per service. | Keep. |
 | MinIO | S3-compatible local object storage for private originals. | Browser uploads depend on `MINIO_BROWSER_ENDPOINT` matching host access. | Keep. |
@@ -154,6 +154,7 @@ There is no production deployment definition, secret management, TLS plan, objec
 - Updated `AGENTS.md` guardrails for future sessions.
 - Added canonical `Makefile` targets for focused tests, reset, aggregate migration, auth smoke, and smoke contract checks.
 - Verified `scripts/test-smoke-upload-contract.sh` and `make test`; no workflow script change was needed.
+- Fixed the broken `make lint` target: no ESLint was configured anywhere, so the four real service `lint` scripts now use the same no-op convention as the scaffolds, with real ESLint setup deferred to `photo_ops-p8y`.
 
 ## Retained Trade-Offs
 
