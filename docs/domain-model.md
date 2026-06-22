@@ -22,6 +22,8 @@ web -> api-gateway -> photo-service -> MinIO + photo-db -> web
 
 Owner: `photo-service`
 
+Description: an original uploaded photo file tracked by the system. It represents the private source object in storage and the upload/processing state visible to the owner.
+
 Physical storage: `photo-db.photo_assets`
 
 Fields:
@@ -61,6 +63,8 @@ Current limitation:
 
 Owner: `identity-service`
 
+Description: a human account that owns photos, clusters, publications, usage, and connector state. A user is the main tenant boundary in PhotoOps.
+
 Physical storage: `identity-db.users`
 
 Fields:
@@ -87,6 +91,8 @@ Rules:
 
 Owner: `identity-service`
 
+Description: the password-based login credential for a user. It stores only the password hash and supports the initial e-mail/password authentication flow.
+
 Physical storage: `identity-db.password_credentials`
 
 Fields:
@@ -104,6 +110,8 @@ Rules:
 ### Session
 
 Owner: `identity-service`
+
+Description: an authenticated browser session for a user. It is referenced by an HTTP-only cookie and validated by `identity-service` before protected actions.
 
 Physical storage: `identity-db.sessions`
 
@@ -124,6 +132,8 @@ Rules:
 ### PhotoAsset
 
 Owner: `photo-service`
+
+Description: an original uploaded photo file owned by a user. It remains private and is the source for later metadata extraction, generated variants, clustering, and publication workflows.
 
 Physical storage: `photo-db.photo_assets`
 
@@ -159,6 +169,8 @@ Rules:
 
 Owner: `photo-service`
 
+Description: a generated derivative of a photo, such as a thumbnail, preview, or publish-ready image. Variants are used for UI browsing and public delivery instead of exposing originals.
+
 Projected fields:
 
 - `id`
@@ -186,6 +198,8 @@ Rules:
 
 Owner: `photo-service` for MVP-stage metadata caching
 
+Description: normalized place information derived from photo GPS metadata. It gives photos and clusters human-readable geography while preserving raw provider data for traceability.
+
 Projected fields:
 
 - `id`
@@ -207,6 +221,8 @@ Rules:
 ### PhotoCluster
 
 Owner: `cluster-service`
+
+Description: a deterministic grouping of photos by time and place. It helps turn a large photo bank into reviewable trip or event segments.
 
 Projected fields:
 
@@ -232,6 +248,8 @@ Rules:
 
 Owner: `cluster-service`
 
+Description: the membership and ordering of one photo inside a generated cluster.
+
 Projected fields:
 
 - `cluster_id`
@@ -246,6 +264,8 @@ Rules:
 ### Post
 
 Owner: `publication-service`
+
+Description: an annotated photo story drafted from a cluster and eventually published as a public or unlisted page.
 
 Projected fields:
 
@@ -287,6 +307,8 @@ Rules:
 
 Owner: `publication-service`
 
+Description: one photo selected for a post, including its order and human-written caption within that story.
+
 Projected fields:
 
 - `post_id`
@@ -302,6 +324,8 @@ Rules:
 ### Note
 
 Owner: deferred
+
+Description: a user-written note attached to another domain entity, such as a cluster or publication. Notes are private authoring context, not public comments.
 
 Projected fields from the product description:
 
@@ -322,6 +346,8 @@ Decision:
 ### BillingEvent
 
 Owner: `usage-service`
+
+Description: an append-only usage ledger entry recording resource consumption or product actions that may later feed cost estimates and monetization.
 
 Projected fields:
 
@@ -347,6 +373,8 @@ Rules:
 ### PublicationAttempt
 
 Owner: `connector-service`
+
+Description: an attempt to distribute or announce a published post through an external target, such as a future Telegram connector.
 
 Projected fields:
 
