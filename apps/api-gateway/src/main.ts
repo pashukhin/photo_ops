@@ -4,7 +4,7 @@ import { HttpErrorFilter } from './errors/http-error.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  app.enableCors({ origin: true });
+  app.enableCors({ origin: true, credentials: true });
   app.useGlobalFilters(new HttpErrorFilter());
   await app.listen(process.env.API_GATEWAY_PORT ?? 3001);
 }
