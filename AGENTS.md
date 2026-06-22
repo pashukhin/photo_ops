@@ -2,35 +2,52 @@
 
 ## Project State
 
-PhotoOps is at the architecture frame stage. The full MVP ends with a published public photo story, but the first executable frame ends with upload/list only.
+PhotoOps has completed:
+
+- Session 001: architecture frame.
+- Session 002: executable upload/list scaffold.
+- Session 003: identity, sessions, and authenticated upload ownership.
+- Session I: fortification review and guardrail consolidation.
+
+The current executable frame ends with authenticated upload/list. The full MVP still ends with a published public photo story.
 
 Before implementing, read:
 
 - `README.md`
 - `project_description.md`
-- `docs/superpowers/specs/2026-06-21-photoops-architecture-frame-design.md`
-- `docs/superpowers/plans/2026-06-21-architecture-frame-upload-slice.md`
+- `docs/fortification-review.md`
+- `docs/domain-model.md`
+- `docs/e2e-auth-upload-ownership.md`
+- the accepted spec and plan for the target session
 
-## Current Implementation Target
+## Current Implementation Baseline
 
-The next implementation target is the first executable frame:
+The current working path is:
 
 ```text
-web -> api-gateway -> photo-service -> MinIO + photo-db -> web
+web -> api-gateway -> identity-service + photo-service -> MinIO + identity-db + photo-db -> web
 ```
 
-The user-visible result must be: open UI, upload a JPEG through presigned MinIO PUT, complete upload, and see the photo listed with status `uploaded`.
+The user-visible baseline is: open UI, sign up or log in, upload a JPEG through presigned MinIO PUT, complete upload, and see only that user's photo listed with status `uploaded`.
+
+## Fortification Guardrails
+
+- Do not add EXIF, previews, clustering, publication, usage ledger, connectors, or media processing unless the current approved session explicitly targets them.
+- Prefer one canonical workflow over multiple equivalent commands.
+- Document retained imperfections as trade-offs, deferred work, or follow-up issues.
+- Cheap fixes are allowed when they reduce development friction or risk without changing product scope.
+- If a change touches service ownership, database ownership, auth/session behavior, MinIO object privacy, or browser-to-service boundaries, treat it as architecture-sensitive and verify against the accepted specs.
 
 ## Architecture Rules
 
-- Keep the first frame scoped to upload/list; do not implement EXIF, previews, clustering, publication, usage aggregation, or connectors unless explicitly requested.
+- Keep the current frame scoped to authenticated upload/list; do not implement EXIF, previews, clustering, publication, usage aggregation, or connectors unless explicitly requested.
 - `web` talks only to `api-gateway`, except for presigned MinIO upload URLs.
 - `api-gateway` must not connect to any database.
 - `photo-service` owns `photo-db` and the photo upload/list domain.
 - Data-owning services use separate databases. A service must connect only to its own DB.
 - Cross-service references use UUID v7.
-- Non-photo services are health-only scaffolds in the first frame; their gRPC contracts may exist without wired servers.
-- Prefer getting the first JPEG into the uploaded list over polishing scaffolding.
+- Non-photo and non-identity services are health-only scaffolds in the current frame; their gRPC contracts may exist without wired servers.
+- Prefer preserving the authenticated JPEG upload/list baseline over polishing scaffolding.
 
 ## Contract And Runtime Rules
 
