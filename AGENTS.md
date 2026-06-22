@@ -42,6 +42,7 @@ The user-visible result must be: open UI, upload a JPEG through presigned MinIO 
 ## Workflow Rules
 
 - Follow the implementation plan task-by-task.
+- Do not use git worktrees in this project; they conflict with the beads workflow. Use regular git feature branches with `git switch -c` instead.
 - Keep commits small and aligned with plan tasks.
 - Before each commit, inspect `git status`, `git diff`, and recent log.
 - Do not commit unrelated files.
