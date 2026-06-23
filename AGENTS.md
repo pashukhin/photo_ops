@@ -38,10 +38,30 @@ Before implementing, read:
 - Before implementation starts, write the manual e2e scenario for the target change and get it approved.
 - Follow the accepted implementation plan task-by-task.
 - Keep commits small and aligned with plan tasks.
+- When you change a unit of code, re-verify and update that unit's `CLAUDE.md`
+  in the same commit. There is no automated staleness check; keeping nested
+  context accurate is a discipline, not a gate.
 - Before each commit, inspect `git status`, `git diff`, and recent log.
 - Do not commit unrelated files.
 - Verify claims with commands before reporting success.
 - At session handoff, summarize what changed, verification results, follow-up issues, branch name, and push status.
+
+## Knowledge Placement
+
+Write durable knowledge in the right place so the next agent can find it:
+
+| Kind of knowledge | Lives in |
+| --- | --- |
+| Agent working rules & guardrails (canonical, cross-tool) | `AGENTS.md` (this file) |
+| Claude Code specifics + pointer | root `CLAUDE.md` |
+| Local code context + local invariants | nested `CLAUDE.md` (`## Local context` / `## Local invariants`) |
+| Durable facts/decisions not tied to a file | `bd remember` (search with `bd memories <kw>`) |
+| Decisions with rationale / per-session design | `docs/adr`, `docs/superpowers/specs` & `plans` |
+
+Nested `CLAUDE.md` files exist for real services and key directories
+(`apps/api-gateway`, `apps/identity-service`, `apps/photo-service`, `apps/web`,
+`proto/`, `infra/docker/`, `packages/proto-ts`). Scaffold services carry a
+one-line stub until they gain real behavior.
 
 ## Beads Issue Tracker
 
