@@ -47,6 +47,31 @@ Before implementing, read:
 - At session handoff, summarize what changed, verification results, follow-up issues, branch name, and push status.
 - Session briefs are numbered sequentially under `sessions/`; name each brief so its purpose is clear (see `sessions/README.md`).
 
+## Agent Ergonomics
+
+Conventions distilled from instrumented session logs (see
+`docs/agent-ergonomics.md`). They exist to stop re-deriving the same
+one-liners and to avoid wasting the Bash budget.
+
+- Run `make gate` as the canonical local pre-push check; do not re-type the
+  five sub-targets (`proto-check typecheck lint build test`). CI runs the same
+  targets.
+- After a commit, do **not** run `git log -1` / `git rev-parse HEAD` /
+  `echo "exit: $?"` to confirm — trust the tool result.
+- Every commit must end with the `Co-Authored-By` trailer. This is a
+  convention, not a hook: the `prepare-commit-msg` slot is owned by beads
+  (`.beads/hooks/*` are marker-managed — do not edit them).
+- Capture a new issue id with `bd create --json | jq -r .id`, not by grepping
+  the human output.
+- Use `scripts/sdd` (repo-root-safe) for SDD brief/package/ledger work; never
+  `cd` into the plugin-cache dir to run the bundled scripts (cwd footgun).
+- Rely on the Bash tool's built-in output truncation; add `| tail`/`head` only
+  for genuinely unbounded streams.
+- Verify tree assumptions with a command over the whole repo, not by eye on a
+  partial subtree (e.g. tests and `package.json` may live outside `src/`).
+- Do not hand-firefight `.beads/issues.jsonl` reorder churn; it is cosmetic and
+  `.gitattributes` handles it. Only stage it when `(id, status)` actually changed.
+
 ## Knowledge Placement
 
 Write durable knowledge in the right place so the next agent can find it:
@@ -88,7 +113,7 @@ bd close <id>         # Complete work
 When ending a work session, complete all steps below. Work is not complete until `git push` succeeds.
 
 1. File issues for remaining work.
-2. Run quality gates if code changed.
+2. Run `make gate` if code changed.
 3. Update issue status.
 4. Push beads and git state:
 
