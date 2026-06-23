@@ -7,6 +7,7 @@
 - Session cookie is HTTP-only (name from `IDENTITY_SESSION_COOKIE_NAME`, default `photoops_session`); set/cleared in `src/auth/session-cookie.ts` via `serializeSessionCookie` / `serializeClearedSessionCookie`; `AuthService` (`src/auth/auth.service.ts`) validates the session on each authenticated request.
 - CORS origin(s) from `WEB_ORIGIN` (comma-separated) configured in `src/cors.ts`; HTTP and gRPC errors mapped to JSON responses by `HttpErrorFilter` in `src/errors/http-error.filter.ts`.
 - Tests: `vitest run` (`make test-api`).
+- Typecheck: `tsc --noEmit` (`make typecheck` runs it across all services).
 
 ## Local invariants
 

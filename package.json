@@ -4,6 +4,7 @@
   "packageManager": "pnpm@9.15.4",
   "scripts": {
     "build": "pnpm -r build",
+    "typecheck": "pnpm -r --if-present typecheck",
     "test": "sh scripts/test-smoke-upload-contract.sh && pnpm --filter './apps/*' --if-present test",
     "lint": "pnpm -r lint",
     "proto": "cd proto && buf generate --template buf.gen.yaml"

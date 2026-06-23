@@ -5,6 +5,7 @@
     "build": "nest build",
     "start": "nest start",
     "test": "vitest run",
+    "typecheck": "tsc --noEmit",
     "lint": "node -e \"process.exit(0)\""
   },
   "dependencies": {

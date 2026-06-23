@@ -7,6 +7,7 @@
 - List photos scoped by `userId`: `PhotoGrpcController.listPhotos` → `PhotoDomainService.listPhotos` → `PhotoRepository.list` queries `photo_assets` filtered and ordered by `created_at` desc; `userId` is always caller-supplied from the validated session in api-gateway.
 - Schema: `migrations/` applied via `make migrate-photo`.
 - Tests: `vitest run` (`make test-photo`).
+- Typecheck: `tsc --noEmit` (`make typecheck` runs it across all services).
 
 ## Local invariants
 
