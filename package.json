@@ -6,10 +6,15 @@
     "build": "pnpm -r build",
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "sh scripts/test-smoke-upload-contract.sh && pnpm --filter './apps/*' --if-present test",
-    "lint": "pnpm -r lint",
+    "lint": "eslint .",
     "proto": "cd proto && buf generate --template buf.gen.yaml"
   },
   "devDependencies": {
-    "@bufbuild/buf": "^1.50.0"
+    "@bufbuild/buf": "^1.50.0",
+    "@eslint/js": "^10.0.1",
+    "@next/eslint-plugin-next": "^16.2.9",
+    "eslint": "^10.5.0",
+    "globals": "^17.7.0",
+    "typescript-eslint": "^8.62.0"
   }
 }
