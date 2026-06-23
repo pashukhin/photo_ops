@@ -1,4 +1,4 @@
-# Session 007: Async Media-Processing Skeleton (Planned)
+# Session 008: Async Media-Processing Skeleton (Planned)
 
 Status: **Planned — not started.** This is a forward-looking stub; the full
 brief, accepted spec, and plan are written when the session begins.

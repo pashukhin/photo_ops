@@ -7,7 +7,7 @@ Children: `photo_ops-yl7` (typecheck), `photo_ops-7jh` (CI), `photo_ops-9h5` (pr
 ## Goal
 
 Put a single green quality gate — runnable locally and in CI — over the existing
-TypeScript slice **before** session 007 introduces the first async workflow and
+TypeScript slice **before** session 008 introduces the first async workflow and
 the first real polyglot (Python) service. Catching type, build, and proto-drift
 regressions automatically is cheap now and pays off on every later session, when
 async + Python widen the surface to debug.
@@ -43,17 +43,17 @@ observability beyond what CI needs.
 
 - **ESLint (`p8y`)** — **reversed mid-session: included in this branch** (see the
   ESLint Addendum below). It was initially deferred, but the type-aware
-  promise-safety rules guard exactly the async failure modes session 007
-  introduces, and session 007 already has its own goals, so folding ESLint in here
+  promise-safety rules guard exactly the async failure modes session 008
+  introduces, and session 008 already has its own goals, so folding ESLint in here
   is the right timing. The fix burden is bounded on the small TS slice.
 - **Proto drift (`9h5`)** — **included now** as a CI step. Cheap (buf is already a
   pnpm devDependency, so `pnpm proto` is hermetic), protects the proto-first
-  contract boundary that matters more once 007 adds async contracts.
+  contract boundary that matters more once 008 adds async contracts.
 - **mise / `.tool-versions` (ADR-0002)** — **deferred**. CI pins Node in-workflow
   and resolves pnpm from the `packageManager` field. Full mise covers go/python
   toolchains for services not built yet; implementing it now would violate the
   "defer until those services exist" prioritization principle. Local dev stays
-  unchanged. Pick up mise when Go/Python land (007+).
+  unchanged. Pick up mise when Go/Python land (008+).
 
 ## Design
 
@@ -115,7 +115,7 @@ observability beyond what CI needs.
 
 ## Out of Scope
 
-- No product features, no async / media-processing work (session 007).
+- No product features, no async / media-processing work (session 008).
 - No real ESLint (`p8y`), no mise implementation.
 - No structured logging / observability beyond what CI needs.
 - Go/Python service CI steps — wired later when those services gain behavior.
@@ -143,8 +143,8 @@ observability beyond what CI needs.
 
 The ESLint deferral was reversed and folded into this branch. Rationale: the
 type-aware promise-safety rules catch un-awaited / misused promises — the most
-common defect class once session 007 adds async workflows and a queue consumer —
-so landing them before 007 means async code is born under the rule. Session 007
+common defect class once session 008 adds async workflows and a queue consumer —
+so landing them before 008 means async code is born under the rule. Session 008
 already has its own scope, so a separate ESLint session is not warranted.
 
 ### Ruleset (decided with the user)

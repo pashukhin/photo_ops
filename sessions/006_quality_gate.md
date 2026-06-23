@@ -2,7 +2,7 @@
 
 This is a tooling session, not a product feature session. The goal was to stand
 up a single green quality gate — runnable locally and in CI — over the existing
-TypeScript slice **before** session 007 introduces the first async workflow and
+TypeScript slice **before** session 008 introduces the first async workflow and
 the first real polyglot (Python) service. No product features, no async/media
 work.
 
@@ -30,13 +30,13 @@ on GitHub Actions.
 - A `make proto-check` target runs `pnpm proto` then
   `git diff --exit-code -- packages/proto-ts`, failing if the checked-in ts-proto
   output drifts from the `.proto` sources. Protects the proto-first contract
-  boundary that matters more once 007 adds async contracts.
+  boundary that matters more once 008 adds async contracts.
 
 ### ESLint (`photo_ops-p8y`, decision reversed mid-session)
 
 - The ESLint deferral was reversed at the user's request and folded into this
-  branch: session 007 already has its own scope, and the type-aware
-  promise-safety rules guard exactly the async failure modes 007 introduces.
+  branch: session 008 already has its own scope, and the type-aware
+  promise-safety rules guard exactly the async failure modes 008 introduces.
 - Root `eslint.config.mjs` (flat config, ESLint 10 + typescript-eslint 8):
   `typescript-eslint recommended` (incl. `no-explicit-any` at default `error` —
   the slice has zero violations) plus four type-aware rules as `error` via
@@ -142,6 +142,6 @@ was written into the spec and approved before any code was written.
 ## Next Step
 
 With the gate green (types + lint + build + tests + proto-drift) and merged into
-`main`, session 007 (first async workflow + Python media-worker) builds on it.
+`main`, session 008 (first async workflow + Python media-worker) builds on it.
 The promise-safety lint rules are deliberately in place before that async work
 lands.
