@@ -94,6 +94,15 @@ Result: **PASS** — all 39 unit tests across `apps/api-gateway` (15 tests, 5 fi
 - [x] Session brief (`sessions/005_agent_working_conditions.md`)
 - [x] `README.md` updated
 
+## Session Extension (in-session ergonomics improvements)
+
+After the core deliverables, the session was extended with further agent-ergonomics work:
+
+- **Settings & junk hygiene** — `.claude/settings.json` reduced to reusable project permissions (`bd:*`, safe `make` targets, smoke scripts) + `bd prime` hooks; `.claude/settings.local.json` and `.vscode/` gitignored; empty `.worktrees/` removed.
+- **Flat session numbering** — the three-scheme (`NNN`/`00i`/`00a`) numbering introduced earlier this session was reversed to one flat chronological sequence (`00i`→`004`, `00a`→`005`); the `photoops-session-numbering` memory was forgotten as self-evident.
+- **Claude Code practices** — researched official best practices; recorded adoption decisions in `docs/claude-code-practices.md`. Key reframing: slash commands are a *user* convenience, not an *agent*-ergonomics lever, so repeatable workflows are encoded as CLAUDE.md/AGENTS.md instructions instead (proto-drift habit added to `proto/CLAUDE.md`).
+- **Deferred follow-ups filed** — `photo_ops-0wa` (evaluate custom subagents) and `photo_ops-8d5` (PostToolUse quality-gate hook, blocked on `photo_ops-p8y`).
+
 ## Next Step
 
 Return to the product path — the next meaningful layer (EXIF/metadata extraction or preview generation) in a separate product session, without disturbing the service boundaries and guardrails established in this and prior sessions.

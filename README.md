@@ -79,6 +79,8 @@ Session 005: Agent Working Conditions
 - [x] ADR-0002: toolchain pinning with mise
 - [x] Three `bd remember` seeds for durable project decisions
 - [x] Agent-tooling research report; pilot issues filed for codebase-memory-mcp and Serena
+- [x] Claude Code best-practices reference (`docs/claude-code-practices.md`) with adoption decisions
+- [x] Claude settings/junk hygiene; flat session-numbering convention
 
 ## Key docs
 
@@ -97,6 +99,7 @@ Session 005: Agent Working Conditions
 - `sessions/004_fortification_review.md` - fortification review session brief.
 - `docs/superpowers/specs/2026-06-23-agent-working-conditions-design.md` - accepted agent working-conditions design.
 - `docs/agent-tooling-research.md` - agent-tooling evaluation (research only).
+- `docs/claude-code-practices.md` - Claude Code best practices and this project's adoption decisions.
 - `sessions/README.md` - session brief numbering convention.
 - `sessions/005_agent_working_conditions.md` - agent working-conditions session brief.
 
