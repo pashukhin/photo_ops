@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# Repo-root-safe helper for subagent-driven-development sessions.
+# All paths resolve from this script's own location (repo root), never the
+# caller's cwd -- so it works even if invoked from a plugin-cache directory,
+# the cwd footgun that broke review-package twice in session 006.
+#
+# Usage:
+#   scripts/sdd base                     print short HEAD (record BASE before dispatch)
+#   scripts/sdd brief   <plan> <N>       extract Task N -> .superpowers/sdd/task-N-brief.md
+#   scripts/sdd package <BASE> <HEAD>    review package -> .superpowers/sdd/review-<b>..<h>.diff
+#   scripts/sdd done    <N> "<status>"   set status on the '- Task N ...:' ledger line
+set -euo pipefail
+
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+WS="$ROOT/.superpowers/sdd"
+LEDGER="$WS/progress.md"
+g() { git -C "$ROOT" "$@"; }
+usage() { sed -n '2,13p' "$0" >&2; exit 2; }
+
+cmd=${1:-}; shift || true
+mkdir -p "$WS"
+
+case "$cmd" in
+  base)
+    g rev-parse --short HEAD
+    ;;
+
+  brief)
+    [ $# -ge 2 ] || usage
+    plan=$1; n=$2
+    [ -f "$plan" ] || { echo "no such plan file: $plan" >&2; exit 2; }
+    out=${3:-"$WS/task-${n}-brief.md"}
+    awk -v n="$n" '
+      /^```/ { infence = !infence }
+      !infence && /^#+[ \t]+Task[ \t]+[0-9]+/ {
+        intask = ($0 ~ ("^#+[ \t]+Task[ \t]+" n "([^0-9]|$)"))
+      }
+      intask { print }
+    ' "$plan" > "$out"
+    [ -s "$out" ] || { echo "task ${n} not found in ${plan} (no 'Task ${n}' heading)" >&2; rm -f "$out"; exit 3; }
+    echo "$out"
+    ;;
+
+  package)
+    [ $# -ge 2 ] || usage
+    base=$1; head=$2
+    g rev-parse --verify --quiet "$base" >/dev/null || { echo "bad BASE: $base" >&2; exit 2; }
+    g rev-parse --verify --quiet "$head" >/dev/null || { echo "bad HEAD: $head" >&2; exit 2; }
+    out=${3:-"$WS/review-$(g rev-parse --short "$base")..$(g rev-parse --short "$head").diff"}
+    {
+      echo "# Review package: ${base}..${head}"
+      echo
+      echo "## Commits"
+      g log --oneline "${base}..${head}"
+      echo
+      echo "## Files changed"
+      g diff --stat "${base}..${head}"
+      echo
+      echo "## Diff"
+      g diff -U10 "${base}..${head}"
+    } > "$out"
+    echo "$out"
+    ;;
+
+  done)
+    [ $# -ge 2 ] || usage
+    n=$1; status=$2
+    [ -f "$LEDGER" ] || { echo "no ledger at $LEDGER" >&2; exit 2; }
+    tmp=$(mktemp)
+    awk -v n="$n" -v s="$status" '
+      !marked && $0 ~ ("^- *[Tt]ask[ \t]+" n "([^0-9]|:)") {
+        c = index($0, ":")
+        if (c > 0) { print substr($0, 1, c) " " s; marked=1; next }
+      }
+      { print }
+    ' "$LEDGER" > "$tmp" && mv "$tmp" "$LEDGER"
+    grep -nE "^- *[Tt]ask[ \t]+$n([^0-9]|:)" "$LEDGER" || true
+    ;;
+
+  *) usage ;;
+esac
