@@ -11,8 +11,8 @@ function createService(now = new Date('2026-06-22T00:00:00.000Z')) {
     revokeSession: vi.fn()
   };
   const passwords = {
-    hash: vi.fn(async (password: string) => `hash:${password}`),
-    verify: vi.fn(async (hash: string, password: string) => hash === `hash:${password}`)
+    hash: vi.fn((password: string) => Promise.resolve(`hash:${password}`)),
+    verify: vi.fn((hash: string, password: string) => Promise.resolve(hash === `hash:${password}`))
   };
   return { service: new IdentityDomainService(repository, passwords, () => now), repository, passwords };
 }

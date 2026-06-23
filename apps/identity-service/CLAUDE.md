@@ -7,6 +7,7 @@
 - Sessions are stored in the `sessions` table in `identity-db` (Drizzle schema in `src/db/schema.ts`); `IdentityRepository.createSession` writes a new row with a 14-day TTL; lookup joins `sessions` and `users` to return an `AuthSessionRecord`; revocation sets `revoked_at`.
 - Schema: `migrations/` applied via `make migrate-identity`.
 - Tests: `vitest run` (`make test-identity`).
+- Typecheck: `tsc --noEmit` (`make typecheck` runs it across all services).
 
 ## Local invariants
 

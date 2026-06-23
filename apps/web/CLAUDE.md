@@ -6,6 +6,7 @@
 - Calls api-gateway via `NEXT_PUBLIC_API_BASE_URL` (default `http://localhost:3001`); all HTTP calls are in `lib/api.ts`.
 - Upload flow: browser calls `POST /photos/upload-intents` on api-gateway to get a presigned `uploadUrl`, then does a direct `PUT` to that MinIO URL (`uploadFileToPresignedUrl`), then calls `POST /photos/{id}/complete-upload` on api-gateway to finalize.
 - Tests: `vitest run` (`make test-web`).
+- Typecheck: `tsc --noEmit` (`make typecheck` runs it across all services).
 
 ## Local invariants
 
