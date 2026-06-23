@@ -17,12 +17,18 @@ observability beyond what CI needs.
 
 ## Current State
 
-- Workspace packages with a `package.json` (covered by `pnpm -r`): `api-gateway`,
-  `identity-service`, `photo-service`, `web`, `proto-ts`.
-- Scaffold dirs (`media-worker`, `cluster-service`, `connector-service`,
-  `publication-service`, `usage-service`) have no `package.json`, so the workspace
-  globbing and `pnpm -r` already skip them. Three of them carry an orphan
-  `tsconfig.json` but no package — also skipped.
+- Workspace packages with a `package.json` (covered by `pnpm -r`): the four real
+  services `api-gateway`, `identity-service`, `photo-service`, `web`, the generated
+  `proto-ts`, plus three scaffold stubs `connector-service`, `publication-service`,
+  `usage-service`.
+- The scaffold stubs `connector-service`, `publication-service`, `usage-service`
+  each carry a `package.json` with a stub `build` (`tsc -p tsconfig.json`) and
+  no-op `test`/`lint`, so `pnpm -r build` compiles them and `pnpm -r test` runs
+  their no-ops. None has a `typecheck` script, so `pnpm typecheck`
+  (`--if-present`) covers only the four real services — but a type error in a
+  scaffold is still caught by the `build` step.
+- Only `media-worker` and `cluster-service` have no `package.json`; the workspace
+  globbing skips those two entirely.
 - No service has a `typecheck` script; type errors surface only at full `build`.
 - `lint` is a no-op (`node -e "process.exit(0)"`) in every service.
 - No `.github/` directory exists.
@@ -60,8 +66,10 @@ observability beyond what CI needs.
     type-only check.
 - Root `package.json`: `"typecheck": "pnpm -r --if-present typecheck"`.
 - `Makefile`: add a `typecheck` target → `pnpm typecheck` (and to `.PHONY`).
-- `proto-ts` (generated, no tsconfig) and scaffold dirs are skipped automatically
-  by `--if-present` and workspace globbing — no script added there.
+- No `typecheck` script is added to `proto-ts` (generated) or to the scaffold
+  stubs; `pnpm -r --if-present typecheck` therefore runs only on the four real
+  services. The scaffold stubs are still compiled by `pnpm -r build`, so the gate
+  as a whole still catches type errors in them.
 
 ### 2. Proto drift check (`9h5`)
 

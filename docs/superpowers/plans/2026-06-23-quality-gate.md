@@ -11,7 +11,7 @@
 ## Global Constraints
 
 - No product features, no async/media work, no ESLint, no mise — tooling only (spec "Out of Scope").
-- Real TS workspace packages: `api-gateway`, `identity-service`, `photo-service`, `web` (and `proto-ts`, generated). Scaffold dirs have no `package.json` and must stay excluded.
+- The four real TS services are `api-gateway`, `identity-service`, `photo-service`, `web`; only these get a `typecheck` script. `proto-ts` is generated. The scaffold stubs `connector-service`, `publication-service`, `usage-service` are also workspace members (stub `build`, no-op `test`) and are compiled by `pnpm -r build`, but get no `typecheck` script. Only `media-worker` and `cluster-service` have no `package.json`.
 - Node 22; pnpm resolved from the root `package.json` `packageManager` field (`pnpm@9.15.4`). Do not pin toolchain via mise.
 - Prefer running project commands through `Makefile` targets (AGENTS.md).
 - When a unit of code changes, update its nested `CLAUDE.md` in the same commit (AGENTS.md freshness discipline).
