@@ -1,10 +1,10 @@
-# Session 00a: Agent Working Conditions
+# Session 005: Agent Working Conditions
 
-This is an agent working-conditions session (scheme `00a`), not a product feature session. The goal was to make it cheaper for a future AI agent to develop and maintain the project — by putting durable knowledge next to the code and defining an explicit model for where each kind of knowledge lives. No product features were added.
+This is an agent working-conditions session, not a product feature session. The goal was to make it cheaper for a future AI agent to develop and maintain the project — by putting durable knowledge next to the code and defining an explicit model for where each kind of knowledge lives. No product features were added.
 
 ## Goal
 
-After Sessions 001–003 (architecture frame, executable upload/list scaffold, identity and authenticated upload ownership) and Session I (fortification review), the codebase lacked a systematic answer to: _where does an agent look for project knowledge, and where does it write new knowledge?_ This session created that answer.
+After Sessions 001–003 (architecture frame, executable upload/list scaffold, identity and authenticated upload ownership) and Session 004 (fortification review), the codebase lacked a systematic answer to: _where does an agent look for project knowledge, and where does it write new knowledge?_ This session created that answer.
 
 The secondary goal was to research external agent-tooling options (code-navigation MCP servers) and file pilot issues — without adopting anything yet.
 
@@ -42,7 +42,7 @@ Five scaffold services received minimal stub `CLAUDE.md` files (shape only, no l
 
 ### `sessions/README.md` — session-numbering doc
 
-`sessions/README.md` was created documenting the three session-numbering schemes: `NNN` (product), `00i` (review/consolidation), `00a` (agent working conditions).
+`sessions/README.md` was created documenting the flat, sequential session-numbering convention (`001`, `002`, … in chronological order; the descriptive filename carries the session's purpose). An earlier three-scheme proposal (`NNN`/`00i`/`00a`) was made and then reversed within this session — it broke chronological ordering and added rules for no real gain; the prior review brief was renumbered `00i` → `004` accordingly.
 
 ### ADR-0002: toolchain pinning with mise
 
@@ -50,12 +50,13 @@ Five scaffold services received minimal stub `CLAUDE.md` files (shape only, no l
 
 ### `bd remember` seeds
 
-Four durable decisions were seeded into the beads knowledge store:
+Three durable decisions were seeded into the beads knowledge store:
 
 1. `photoops-knowledge-placement` — knowledge-placement model (which kind of knowledge lives where: `AGENTS.md`, root `CLAUDE.md`, nested `CLAUDE.md` files, `bd remember`, `docs/`, `sessions/`).
-2. `photoops-session-numbering` — session-numbering scheme: `NNN` (product), `00i` (review/consolidation), `00a` (agent working conditions).
-3. `photoops-toolchain-mise` — mise toolchain-pinning decision (ADR-0002): pin node/pnpm/go/python via mise; buf stays a pnpm devDependency.
-4. `photoops-prioritization-now-vs-deferred` — now-vs-deferred prioritization principle: finish the current increment before deferring.
+2. `photoops-toolchain-mise` — mise toolchain-pinning decision (ADR-0002): pin node/pnpm/go/python via mise; buf stays a pnpm devDependency.
+3. `photoops-prioritization-now-vs-deferred` — now-vs-deferred prioritization principle: finish the current increment before deferring.
+
+(An earlier `photoops-session-numbering` seed was created and then removed when the three-scheme numbering was reversed in favor of flat sequential numbering — the convention is now self-evident from `sessions/README.md` and does not need a memory.)
 
 ### Agent-tooling research report
 
@@ -74,7 +75,7 @@ Result: **PASS** — all 39 unit tests across `apps/api-gateway` (15 tests, 5 fi
 
 ## Branch
 
-`session-00a-agent-working-conditions`
+`session-005-agent-working-conditions`
 
 ## Deliverables Checklist
 
@@ -85,12 +86,12 @@ Result: **PASS** — all 39 unit tests across `apps/api-gateway` (15 tests, 5 fi
 - [x] Nested `CLAUDE.md` stubs for five scaffold services
 - [x] `sessions/README.md` — session-numbering doc
 - [x] `docs/adr/0002-toolchain-pinning-with-mise.md` — ADR-0002
-- [x] Four `bd remember` seeds
+- [x] Three `bd remember` seeds
 - [x] `docs/agent-tooling-research.md` — agent-tooling evaluation report
 - [x] `photo_ops-cdk` follow-up pilot issue filed
 - [x] `photo_ops-02q` follow-up pilot issue filed
 - [x] `make test` passes (PASS, 39 tests)
-- [x] Session brief (`sessions/00a_agent_working_conditions.md`)
+- [x] Session brief (`sessions/005_agent_working_conditions.md`)
 - [x] `README.md` updated
 
 ## Next Step

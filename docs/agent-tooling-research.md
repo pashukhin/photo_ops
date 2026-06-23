@@ -3,7 +3,7 @@
 Date: 2026-06-23
 Scope: evaluate agent-coding support tooling for the PhotoOps stack
 (pnpm TypeScript monorepo + gRPC/proto + polyglot Go/Python). Research only;
-no adoption in session 00a.
+no adoption in this session.
 
 ## Candidates
 

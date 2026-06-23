@@ -60,7 +60,7 @@ Session 003: Identity And Ownership
 - [x] Photo assets scoped by authenticated `user_id`
 - [x] Two-user ownership smoke scenario added
 
-Session I: Fortification Review
+Session 004: Fortification Review
 
 - [x] Tooling inventory and keep/defer decisions recorded
 - [x] Canonical local dev workflow documented
@@ -69,7 +69,7 @@ Session I: Fortification Review
 - [x] `AGENTS.md` focused on agent working rules
 - [x] Follow-up issues filed for readiness checks, migration runner, and production shape
 
-Session 00a: Agent Working Conditions
+Session 005: Agent Working Conditions
 
 - [x] Knowledge-placement policy and freshness discipline rule added to `AGENTS.md`
 - [x] Root `CLAUDE.md` slimmed; `AGENTS.md` made canonical agent-rules source
@@ -77,7 +77,7 @@ Session 00a: Agent Working Conditions
 - [x] Nested `CLAUDE.md` stubs for five scaffold services
 - [x] `sessions/README.md` — session-numbering doc created
 - [x] ADR-0002: toolchain pinning with mise
-- [x] Four `bd remember` seeds for durable project decisions
+- [x] Three `bd remember` seeds for durable project decisions
 - [x] Agent-tooling research report; pilot issues filed for codebase-memory-mcp and Serena
 
 ## Key docs
@@ -94,11 +94,11 @@ Session 00a: Agent Working Conditions
 - `sessions/001_architecture_frame.md` - human-readable session brief.
 - `sessions/002_executable_project_scaffold.md` - executable scaffold session brief.
 - `sessions/003_identity_users_upload_ownership.md` - identity and ownership session brief.
-- `sessions/00i_fortification_review.md` - fortification review session brief.
+- `sessions/004_fortification_review.md` - fortification review session brief.
 - `docs/superpowers/specs/2026-06-23-agent-working-conditions-design.md` - accepted agent working-conditions design.
 - `docs/agent-tooling-research.md` - agent-tooling evaluation (research only).
-- `sessions/README.md` - session-numbering schemes.
-- `sessions/00a_agent_working_conditions.md` - agent working-conditions session brief.
+- `sessions/README.md` - session brief numbering convention.
+- `sessions/005_agent_working_conditions.md` - agent working-conditions session brief.
 
 ## Verification
 

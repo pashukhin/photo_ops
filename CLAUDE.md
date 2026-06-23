@@ -13,6 +13,6 @@ for this project live in `AGENTS.md` — read it first.
 
 - Nested `CLAUDE.md` files are auto-loaded when working in their subdirectory;
   read the one nearest the code you are changing.
-- Session-numbering schemes are documented in `sessions/README.md`.
+- Session briefs are numbered sequentially under `sessions/` (see `sessions/README.md`).
 - This project uses `bd` (beads) for task tracking and `bd remember` for
   durable cross-session knowledge — not TodoWrite or markdown TODO lists.

@@ -1,4 +1,4 @@
-# Agent Working Conditions — Design (Session 00a)
+# Agent Working Conditions — Design (Session 005)
 
 Date: 2026-06-23
 Status: Accepted
@@ -6,11 +6,15 @@ Beads epic: photo_ops-90c
 
 ## Session Type
 
-This is a **00a** session: the third session-numbering scheme in this project.
+This is session **005**: an agent working-conditions session — it improves how
+effectively an AI agent can develop and maintain the project, and adds no
+product features and no quality/observability backlog items.
 
-- `NNN` (001, 002, 003, …) — product feature sessions that advance the MVP path.
-- `00i` — review/consolidation sessions (e.g. fortification review) that harden the foundation without adding product features.
-- `00a` — **agent working-conditions** sessions: they improve how effectively an AI agent can develop and maintain the project. They add no product features and no quality/observability backlog items.
+Sessions are numbered with one flat, chronological sequence; the descriptive
+filename carries the session's purpose. (During this session a three-scheme
+numbering proposal — `NNN`/`00i`/`00a` — was made and then reversed: it broke
+chronological ordering and added rules for no real gain. See
+`sessions/README.md`.)
 
 ## Goal
 
@@ -28,7 +32,7 @@ In scope:
 4. Freshness discipline rule in `AGENTS.md` (no automation).
 5. Seed `bd remember` with durable decisions.
 6. ADR-0002: toolchain pinning with mise.
-7. `sessions/README.md` documenting the three session-numbering schemes.
+7. `sessions/README.md` documenting the flat, sequential session-numbering convention.
 8. Agent-tooling research report (evaluation only, with follow-up issues; no adoption).
 
 Out of scope (YAGNI):
@@ -71,8 +75,9 @@ Explicit policy so a future agent knows where to look and where to write:
 Capture durable, file-independent decisions from recent sessions:
 
 - Toolchain is pinned with **mise** (`.tool-versions`); JS toolchain is hermetic via pnpm; runtime/infra runs in Docker; mise pins polyglot/binary tools without polluting the host.
-- Session-numbering scheme: `NNN` feature / `00i` review / `00a` agent-conditions.
 - Prioritization principle: invest in what pays off on the existing TS slice now; defer anything that depends on not-yet-built Go/Python services.
+
+(The session-numbering scheme was initially also seeded as a memory, then removed when the numbering was flattened — a sequential convention is self-evident and does not need a memory.)
 
 (A handful of focused memories; update in place rather than duplicating.)
 

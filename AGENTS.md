@@ -45,7 +45,7 @@ Before implementing, read:
 - Do not commit unrelated files.
 - Verify claims with commands before reporting success.
 - At session handoff, summarize what changed, verification results, follow-up issues, branch name, and push status.
-- Session-numbering schemes (`NNN` feature, `00i` review, `00a` agent-conditions) are documented in `sessions/README.md`.
+- Session briefs are numbered sequentially under `sessions/`; name each brief so its purpose is clear (see `sessions/README.md`).
 
 ## Knowledge Placement
 
