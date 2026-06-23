@@ -46,16 +46,16 @@ Five scaffold services received minimal stub `CLAUDE.md` files (shape only, no l
 
 ### ADR-0002: toolchain pinning with mise
 
-`docs/adr/0002-toolchain-pinning-with-mise.md` records the decision to use mise for toolchain version pinning (Node, pnpm, Go, Python, Buf, protoc-gen-go) as the standard approach going forward.
+`docs/adr/0002-toolchain-pinning-with-mise.md` records the decision to use mise for toolchain version pinning: pin node, pnpm, go, python via mise; buf stays a pnpm devDependency.
 
 ### `bd remember` seeds
 
 Four durable decisions were seeded into the beads knowledge store:
 
-1. Knowledge-placement policy (where each kind of knowledge lives).
-2. Proto-first contract rule (protos are contracts; never edit generated TypeScript directly).
-3. Ownership boundaries (service ↔ database ownership policy).
-4. Session-numbering schemes.
+1. `photoops-knowledge-placement` — knowledge-placement model (which kind of knowledge lives where: `AGENTS.md`, root `CLAUDE.md`, nested `CLAUDE.md` files, `bd remember`, `docs/`, `sessions/`).
+2. `photoops-session-numbering` — session-numbering scheme: `NNN` (product), `00i` (review/consolidation), `00a` (agent working conditions).
+3. `photoops-toolchain-mise` — mise toolchain-pinning decision (ADR-0002): pin node/pnpm/go/python via mise; buf stays a pnpm devDependency.
+4. `photoops-prioritization-now-vs-deferred` — now-vs-deferred prioritization principle: finish the current increment before deferring.
 
 ### Agent-tooling research report
 

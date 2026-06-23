@@ -9,8 +9,8 @@ no adoption in session 00a.
 
 | Tool | Category | Maintained? | Value on this stack | Integration cost | Recommendation |
 | --- | --- | --- | --- | --- | --- |
-| Serena | LSP/MCP code navigation | Yes — v1.5.3 May 2026, 23K stars | Symbol-level navigation across TS (NestJS), Go, Python; protobuf not listed but buf LSP can be added | Low — install via `uv`, one config line in Claude Code | **Pilot** |
-| codebase-memory-mcp | Repo-map / knowledge graph MCP | Yes — v0.8.1 June 2026, 11.9K stars | 158 languages incl. TS, Go, Python, proto; single binary, 14 MCP tools, sub-ms queries | Very low — single static binary, auto-configures Claude Code | **Pilot** |
+| Serena | LSP/MCP code navigation | Yes — v1.5.3 May 2026, 23K stars (as of research date 2026-06-23, point-in-time) | Symbol-level navigation across TS (NestJS), Go, Python; protobuf not listed but buf LSP can be added | Low — install via `uv`, one config line in Claude Code | **Pilot** |
+| codebase-memory-mcp | Repo-map / knowledge graph MCP | Yes — v0.8.1 June 2026, 11.9K stars (as of research date 2026-06-23, point-in-time) | 158 languages incl. TS, Go, Python, proto; single binary, 14 MCP tools, sub-ms queries; paper benchmark: ~10x fewer tokens, 2.1x fewer tool calls (project self-reports 99% token reduction as headline) | Very low — single static binary, auto-configures Claude Code | **Pilot** |
 | CodeGraph (codegraph-ai/CodeGraph) | Code-graph MCP server | Uncertain — solo dev, 28 stars | 38 languages, TS/Go/Python yes, no proto; semantic graph + memory layer | Medium — needs indexing setup; solo maintainer risk | **Defer** |
 | CodeGraphContext (CGC) | Code-graph MCP server | Yes — v0.4.7 May 2026, 3.8K stars | 23 languages incl. TS, Go; no proto listed; call-graph / dependency traces | Medium — Python-based server, 1555 commits | **Defer** |
 | CocoIndex Code | Repo-map / semantic search MCP | Yes — Apache 2.0, active | TS, Go, Python yes; proto not mentioned; ~70% token reduction on retrieval | Low — one-liner Claude Code install | **Defer** |
@@ -21,7 +21,7 @@ no adoption in session 00a.
 
 ### Serena
 
-Serena is an open-source MCP server that exposes LSP semantics to AI coding agents. It launches language servers (ts-language-server for TypeScript, gopls for Go, pyright for Python) and translates their answers into MCP tool results. All code addresses are by symbol path (e.g. `PhotoService/uploadMedia`) rather than line number, making multi-step edits composable. As of v1.5.3 (May 26, 2026) the repo has 2,960 commits and 23K stars. A paid JetBrains plugin backend adds refactorings and interactive debug, but the free LSP backend covers this stack.
+Serena is an open-source MCP server that exposes LSP semantics to AI coding agents. It launches language servers (ts-language-server for TypeScript, gopls for Go, pyright for Python) and translates their answers into MCP tool results. All code addresses are by symbol path (e.g. `PhotoService/uploadMedia`) rather than line number, making multi-step edits composable. As of v1.5.3 (May 26, 2026) the repo has 2,960 commits and 23K stars (as of research date 2026-06-23, point-in-time). A paid JetBrains plugin backend adds refactorings and interactive debug, but the free LSP backend covers this stack.
 
 Protobuf note: `.proto` files are not in Serena's listed language set, but the Buf CLI ships its own LSP server (buf beta lsp, announced on buf.build), so proto navigation can be added separately. The NestJS + Next.js services are the highest-complexity target and they benefit most from symbol-level navigation.
 
@@ -32,7 +32,7 @@ Sources:
 
 ### codebase-memory-mcp
 
-A compiled Go binary (single static binary, zero deps) that indexes any codebase into a persistent SQLite-backed knowledge graph using a two-pass pipeline: Tree-sitter for 158 languages syntactically, then Hybrid LSP for type-aware passes on top. MCP tools exposed include symbol search, dependency tracing, impact analysis, dead code detection, cross-service HTTP linking, and ADR management. Benchmarked across 31 real-world repos: 83% answer quality, 10x fewer tokens, 2.1x fewer tool calls versus file-by-file exploration. v0.8.1 shipped June 12, 2026 (35 total releases, 11.9K stars, 874 forks). Protobuf is listed among supported languages.
+A compiled Go binary (single static binary, zero deps) that indexes any codebase into a persistent SQLite-backed knowledge graph using a two-pass pipeline: Tree-sitter for 158 languages syntactically, then Hybrid LSP for type-aware passes on top. MCP tools exposed include symbol search, dependency tracing, impact analysis, dead code detection, cross-service HTTP linking, and ADR management. Benchmarked across 31 real-world repos: 83% answer quality, ~10x fewer tokens, 2.1x fewer tool calls versus file-by-file exploration (paper figures; the project's self-reported headline is 99% token reduction — a more aggressive claim than the paper's conservative ~10x). v0.8.1 shipped June 12, 2026 (35 total releases, 11.9K stars, 874 forks — as of research date 2026-06-23, point-in-time). Protobuf is listed among supported languages.
 
 On this stack: the polyglot nature (TS + Go + Python + proto) is exactly the scenario codebase-memory-mcp is built for. Cross-service HTTP linking is a direct match for tracing gRPC calls across service boundaries. Auto-detection of Claude Code on install means no manual configuration.
 
