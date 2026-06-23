@@ -69,6 +69,17 @@ Session I: Fortification Review
 - [x] `AGENTS.md` focused on agent working rules
 - [x] Follow-up issues filed for readiness checks, migration runner, and production shape
 
+Session 00a: Agent Working Conditions
+
+- [x] Knowledge-placement policy and freshness discipline rule added to `AGENTS.md`
+- [x] Root `CLAUDE.md` slimmed; `AGENTS.md` made canonical agent-rules source
+- [x] Nested `CLAUDE.md` (two-section) for seven real service units
+- [x] Nested `CLAUDE.md` stubs for five scaffold services
+- [x] `sessions/README.md` — session-numbering doc created
+- [x] ADR-0002: toolchain pinning with mise
+- [x] Four `bd remember` seeds for durable project decisions
+- [x] Agent-tooling research report; pilot issues filed for codebase-memory-mcp and Serena
+
 ## Key docs
 
 - `project_description.md` - original project description and MVP outline.
@@ -84,6 +95,10 @@ Session I: Fortification Review
 - `sessions/002_executable_project_scaffold.md` - executable scaffold session brief.
 - `sessions/003_identity_users_upload_ownership.md` - identity and ownership session brief.
 - `sessions/00i_fortification_review.md` - fortification review session brief.
+- `docs/superpowers/specs/2026-06-23-agent-working-conditions-design.md` - accepted agent working-conditions design.
+- `docs/agent-tooling-research.md` - agent-tooling evaluation (research only).
+- `sessions/README.md` - session-numbering schemes.
+- `sessions/00a_agent_working_conditions.md` - agent working-conditions session brief.
 
 ## Verification
 
