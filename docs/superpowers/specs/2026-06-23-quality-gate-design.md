@@ -41,11 +41,11 @@ observability beyond what CI needs.
 
 ## Resolved Forks
 
-- **ESLint (`p8y`)** — **deferred** to a separate later step. This session ships a
-  green gate (typecheck + build + vitest + contract smoke). A real flat-config
-  ESLint setup means both choosing config and fixing existing violations — meaty
-  work that risks an initially-red gate and scope creep. CI structure needs no
-  rework to add it later.
+- **ESLint (`p8y`)** — **reversed mid-session: included in this branch** (see the
+  ESLint Addendum below). It was initially deferred, but the type-aware
+  promise-safety rules guard exactly the async failure modes session 007
+  introduces, and session 007 already has its own goals, so folding ESLint in here
+  is the right timing. The fix burden is bounded on the small TS slice.
 - **Proto drift (`9h5`)** — **included now** as a CI step. Cheap (buf is already a
   pnpm devDependency, so `pnpm proto` is hermetic), protects the proto-first
   contract boundary that matters more once 007 adds async contracts.
@@ -138,3 +138,57 @@ observability beyond what CI needs.
   session's scope (the point of the gate is to make the slice provably green).
 - CI depends on `python3`/`curl` for the contract smoke; both are stock on
   `ubuntu-latest`. If that ever changes, add an explicit setup step.
+
+## ESLint Addendum (`p8y`, added mid-session)
+
+The ESLint deferral was reversed and folded into this branch. Rationale: the
+type-aware promise-safety rules catch un-awaited / misused promises — the most
+common defect class once session 007 adds async workflows and a queue consumer —
+so landing them before 007 means async code is born under the rule. Session 007
+already has its own scope, so a separate ESLint session is not warranted.
+
+### Ruleset (decided with the user)
+
+`typescript-eslint recommended` (syntactic base) **plus** a curated set of
+type-aware rules as `error`:
+
+- `@typescript-eslint/no-floating-promises`
+- `@typescript-eslint/no-misused-promises`
+- `@typescript-eslint/require-await`
+- `@typescript-eslint/await-thenable`
+
+Full `recommendedTypeChecked` was rejected as too large/unpredictable a fix
+burden for a green gate.
+
+### Config shape
+
+- One root flat config `eslint.config.mjs` (ESLint 9 + typescript-eslint 8).
+- `ignores`: `**/dist`, `**/.next`, `packages/proto-ts/**` (generated), `node_modules`,
+  `**/*.tsbuildinfo`.
+- `eslint` JS recommended + `tseslint` recommended on all `.ts`/`.tsx`.
+- Type-aware block (the four rules above) via `languageOptions.parserOptions.projectService`
+  + `tsconfigRootDir`, applied to TS files that belong to a service `tsconfig`.
+- `tseslint.configs.disableTypeChecked` override for `**/*.{js,mjs,cjs}`
+  (`apps/web/next.config.js`, `eslint.config.mjs` itself).
+- `@next/eslint-plugin-next` (flat recommended) scoped to `apps/web/**`.
+
+### Wiring
+
+- Root `package.json` `lint` becomes `eslint .` (single pass from the repo root);
+  `make lint` already delegates to `pnpm lint`.
+- A `Lint` step is added to `.github/workflows/ci.yml` after `Typecheck`
+  (`pnpm lint`).
+
+### Bounded-burden rule
+
+Promise-safety rules stay `error` (the whole point). If a `recommended` rule —
+most likely `@typescript-eslint/no-explicit-any` — produces broad legacy noise on
+the current code, it may be downgraded to `warn` with a one-line rationale comment
+and recorded here as a trade-off; the gate (CI `eslint .`) fails only on `error`,
+so warnings don't block green. Any such downgrade is listed in the session report.
+
+### Verification (added to the scenario)
+
+5. `make lint` green locally; `pnpm lint` green in CI (new `Lint` step).
+6. Inject a floating promise (e.g. drop an `await` on a real async call) →
+   `make lint` fails with `no-floating-promises`; revert → green.

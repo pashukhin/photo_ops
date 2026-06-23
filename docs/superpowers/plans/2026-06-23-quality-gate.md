@@ -325,6 +325,30 @@ Confirm the CI run on the latest pushed commit is green before declaring the ses
 
 ---
 
+### Task 5: ESLint flat-config gate (`photo_ops-p8y`, added mid-session)
+
+**Files:**
+- Create: `eslint.config.mjs` (root flat config)
+- Modify: root `package.json` (devDeps + `lint` script), `apps/*/src/**` as needed to fix violations
+- Modify: `.github/workflows/ci.yml` (add a `Lint` step after `Typecheck`)
+- Modify: `Makefile` only if a `lint` target is missing (it already exists → `pnpm lint`)
+
+**Interfaces:**
+- Produces: `make lint` / `pnpm lint` (`eslint .`) and a CI `Lint` step. Promise-safety rules as `error`.
+
+See the spec's **ESLint Addendum** for the full ruleset, config shape, wiring, and the bounded-burden rule. Summary of acceptance:
+
+- [ ] **Step 1:** Add devDeps: `eslint`, `typescript-eslint`, `@next/eslint-plugin-next` (root). Use current major versions (ESLint 9, typescript-eslint 8).
+- [ ] **Step 2:** Write `eslint.config.mjs` per the addendum (ignores; js+ts recommended; the 4 type-aware promise-safety rules via `projectService`; `disableTypeChecked` for `*.{js,mjs,cjs}`; Next plugin for `apps/web/**`).
+- [ ] **Step 3:** Set root `package.json` `"lint": "eslint ."`.
+- [ ] **Step 4:** Run `make lint`. Fix all `error`-level violations in service code. If a `recommended` rule (likely `no-explicit-any`) yields broad legacy noise, downgrade that one rule to `warn` with a rationale comment and note it in the report; keep promise-safety at `error`.
+- [ ] **Step 5:** Confirm the rest of the gate stays green: `make typecheck`, `make build`, `make test`.
+- [ ] **Step 6:** Add the `Lint` step to `ci.yml` after `Typecheck` (`run: pnpm lint`). Validate YAML parses.
+- [ ] **Step 7:** Red-path probe: drop an `await` on a real async call → `make lint` fails with `no-floating-promises`; revert → green. Never commit the probe.
+- [ ] **Step 8:** Commit (message ends with the required trailer). Then `bd close photo_ops-p8y`.
+
+---
+
 ## Notes on adapting TDD here
 
 This is tooling work, so each task's "test" is running the gate command and observing the expected red→green transition (command absent/failing → implemented → passing), plus an explicit red-path probe that is reverted, never committed. No new unit tests are added; the existing vitest suites and contract smoke are the behavioral tests the gate runs.
