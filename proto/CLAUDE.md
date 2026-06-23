@@ -8,4 +8,4 @@
 ## Local invariants
 
 - Contracts are proto-first: edit `.proto` here, then regenerate. Do not hand-edit generated output.
-- Run `make proto` after any contract change so `packages/proto-ts` stays in sync.
+- Run `make proto` after any contract change, then verify with `git status` that the regenerated `packages/proto-ts` is staged in the same change — generated code must never drift from the `.proto` sources.
