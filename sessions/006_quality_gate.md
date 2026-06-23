@@ -32,6 +32,22 @@ on GitHub Actions.
   output drifts from the `.proto` sources. Protects the proto-first contract
   boundary that matters more once 007 adds async contracts.
 
+### ESLint (`photo_ops-p8y`, decision reversed mid-session)
+
+- The ESLint deferral was reversed at the user's request and folded into this
+  branch: session 007 already has its own scope, and the type-aware
+  promise-safety rules guard exactly the async failure modes 007 introduces.
+- Root `eslint.config.mjs` (flat config, ESLint 10 + typescript-eslint 8):
+  `typescript-eslint recommended` (incl. `no-explicit-any` at default `error` —
+  the slice has zero violations) plus four type-aware rules as `error` via
+  `projectService`: `no-floating-promises`, `no-misused-promises`,
+  `require-await`, `await-thenable`. `@next/eslint-plugin-next` for `apps/web/**`;
+  generated `proto-ts`, `dist`, `.next`, `next-env.d.ts` ignored.
+- Root `lint` is now `eslint .`; a `Lint` step runs in CI after `Typecheck`.
+- The whole TS slice is clean (0 errors, 0 warnings across 52 files); the only
+  source fix was removing unnecessary `async` wrappers in an identity-service
+  spec mock (`require-await`).
+
 ### CI workflow (`photo_ops-7jh`)
 
 - `.github/workflows/ci.yml` runs on `push` and `pull_request` (with
@@ -44,8 +60,8 @@ on GitHub Actions.
 
 ### Resolved forks (decided at brainstorming, with the user)
 
-- **ESLint (`p8y`)** — **deferred** to a separate later step. Lint remains a no-op
-  everywhere; this gate enforces types + build + tests + proto-drift, not lint.
+- **ESLint (`p8y`)** — **initially deferred, then reversed mid-session** and built
+  in this branch (see the ESLint section above). The gate now also enforces lint.
 - **Proto drift (`9h5`)** — **included now** as a CI step (cheap, protects the
   contract boundary).
 - **mise / `.tool-versions` (ADR-0002)** — **deferred**. CI pins Node in-workflow
@@ -68,12 +84,13 @@ was written into the spec and approved before any code was written.
 
 ## Verification
 
-- **Local gate — PASS.** `make typecheck`, `make proto-check`, `make build`, and
-  `make test` (39 unit tests across the 4 services + contract smoke) all green at
-  HEAD with a clean working tree.
+- **Local gate — PASS.** `make proto-check`, `make typecheck`, `make lint`,
+  `make build`, and `make test` (39 unit tests across the 4 services + contract
+  smoke) all green at HEAD with a clean working tree.
 - **Red-path checks — PASS.** A deliberate type error made `make typecheck` fail
   (Task 1); a hand-edit under `packages/proto-ts` made `make proto-check` fail
-  (Task 2). Both probes were reverted, never committed.
+  (Task 2); a dropped `await` made `make lint` fail with `no-floating-promises`
+  (Task 5). All probes were reverted, never committed.
 - **CI — GREEN.** GitHub Actions `Quality gate` job passed every step on
   `session-006-quality-gate` (runs `28012990377` and tip `28014344784`).
 
@@ -85,7 +102,10 @@ was written into the spec and approved before any code was written.
   not the fast `typecheck` step. A type error in a scaffold is still caught by the
   gate (at the build step). `media-worker` and `cluster-service` have no
   `package.json` and are out of the workspace entirely.
-- **No lint in the gate.** ESLint is still a no-op (deferred `p8y`).
+- **Lint scope.** ESLint runs on the 4 real services + `web`; the type-aware
+  promise-safety rules are `error`, the rest is `typescript-eslint recommended`.
+  Scaffold stubs keep their no-op `lint`; the root `eslint .` covers all authored
+  TS. No stylistic/formatter layer (e.g. Prettier) — out of scope.
 - **Proto-check ignores untracked files** (filed as `photo_ops-1yb.1`); the
   in-scope drift case — editing a `.proto` without regenerating tracked output —
   is caught.
@@ -98,8 +118,6 @@ was written into the spec and approved before any code was written.
 
 - `photo_ops-1yb.1` (P3) — Harden proto drift check against untracked generated
   files (use `git status --porcelain` or `git add -N` before the diff).
-- `photo_ops-p8y` (P2) — Set up real ESLint linting across services (still open;
-  see the assessment in the session handoff).
 
 ## Branch
 
@@ -109,6 +127,7 @@ was written into the spec and approved before any code was written.
 
 - [x] `typecheck` script in the 4 real services + root aggregate + `make typecheck`
 - [x] `make proto-check` proto drift target
+- [x] ESLint flat-config gate (`eslint.config.mjs`) + root `eslint .` + CI `Lint` step
 - [x] `.github/workflows/ci.yml` quality gate on push/PR
 - [x] Nested `CLAUDE.md` freshness updates for the 4 services
 - [x] `*.tsbuildinfo` gitignored
@@ -116,13 +135,13 @@ was written into the spec and approved before any code was written.
 - [x] `docs/architecture.md` and `README.md` notes
 - [x] Local gate green + both red-paths exercised
 - [x] CI observed green on GitHub Actions
-- [x] Epic `photo_ops-1yb` + children `yl7`/`9h5`/`7jh` closed
+- [x] Epic `photo_ops-1yb` + children `yl7`/`9h5`/`7jh`/`p8y` closed
 - [x] Follow-up `photo_ops-1yb.1` filed
 - [x] Session report (this file)
 
 ## Next Step
 
-Land this branch into `main` so the gate protects `main` (pending decision), then
-session 007 (first async workflow + Python media-worker) builds on a green gate.
-ESLint (`p8y`) is the natural next quality increment — see the session handoff for
-the effort assessment.
+With the gate green (types + lint + build + tests + proto-drift) and merged into
+`main`, session 007 (first async workflow + Python media-worker) builds on it.
+The promise-safety lint rules are deliberately in place before that async work
+lands.

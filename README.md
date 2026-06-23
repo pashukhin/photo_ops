@@ -107,4 +107,4 @@ Session 005: Agent Working Conditions
 
 See `docs/architecture-frame-verification.md` and `docs/e2e-auth-upload-ownership.md` for the commands and manual checks used to verify the authenticated upload/list frame.
 
-- Quality gate: `make typecheck`, `make proto-check`, `make build`, and `make test` run locally and in CI (`.github/workflows/ci.yml`) on every push/PR.
+- Quality gate: `make proto-check`, `make typecheck`, `make lint`, `make build`, and `make test` run locally and in CI (`.github/workflows/ci.yml`) on every push/PR.
