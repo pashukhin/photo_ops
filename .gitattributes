@@ -1,0 +1,9 @@
+# Beads exports its tracker to .beads/issues.jsonl. The line order is not
+# stable across `bd` commands -- memory (_type:memory) records get reshuffled
+# with no semantic change -- which otherwise shows up as permanent "dirty"
+# git status churn. `bd export` has no sort/order flag today, so the reorder
+# itself must be fixed upstream (see the tracked follow-up issue).
+#
+#   merge=union           avoid spurious merge conflicts on append-mostly JSONL
+#   linguist-generated    collapse it in diff/review UIs (it is generated)
+.beads/issues.jsonl merge=union linguist-generated=true
