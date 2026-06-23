@@ -2,6 +2,9 @@ name: CI
 
 on:
   push:
+    # Tracker-only commits (beads export) must not burn a gate run.
+    paths-ignore:
+      - '.beads/**'
   pull_request:
 
 concurrency:
@@ -35,13 +38,13 @@ jobs:
         run: make proto-check
 
       - name: Typecheck
-        run: pnpm typecheck
+        run: make typecheck
 
       - name: Lint
-        run: pnpm lint
+        run: make lint
 
       - name: Build
-        run: pnpm build
+        run: make build
 
       - name: Test (vitest + contract smoke)
-        run: pnpm test
+        run: make test

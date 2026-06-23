@@ -1,4 +1,4 @@
-.PHONY: install proto proto-check build typecheck test lint test-api test-identity test-photo test-web dev down reset logs status migrate migrate-identity migrate-photo smoke-upload smoke-auth smoke-contract
+.PHONY: install proto proto-check build typecheck test lint gate test-api test-identity test-photo test-web dev down reset logs status migrate migrate-identity migrate-photo smoke-upload smoke-auth smoke-contract
 
 ifneq (,$(wildcard .env))
 include .env
@@ -26,6 +26,12 @@ test:
 
 lint:
 	pnpm lint
+
+# Canonical quality gate: the exact set CI runs, in CI order. Run this locally
+# before pushing instead of re-typing the five sub-targets. CI invokes the same
+# targets so local and CI run identical commands.
+gate: proto-check typecheck lint build test
+	@echo "gate: all checks passed"
 
 test-api:
 	pnpm --filter @photoops/api-gateway test
