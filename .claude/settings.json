@@ -1,25 +1,41 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(bd:*)",
+      "Bash(make test:*)",
+      "Bash(make lint:*)",
+      "Bash(make proto:*)",
+      "Bash(make build:*)",
+      "Bash(make smoke:*)",
+      "Bash(make migrate:*)",
+      "Bash(make status:*)",
+      "Bash(make logs:*)",
+      "Bash(sh scripts/test-smoke-upload-contract.sh)",
+      "Bash(scripts/smoke-upload.sh)",
+      "Bash(scripts/smoke-auth-upload-ownership.sh)"
+    ]
+  },
   "hooks": {
     "PreCompact": [
       {
+        "matcher": "",
         "hooks": [
           {
-            "command": "bd prime",
-            "type": "command"
+            "type": "command",
+            "command": "bd prime"
           }
-        ],
-        "matcher": ""
+        ]
       }
     ],
     "SessionStart": [
       {
+        "matcher": "",
         "hooks": [
           {
-            "command": "bd prime",
-            "type": "command"
+            "type": "command",
+            "command": "bd prime"
           }
-        ],
-        "matcher": ""
+        ]
       }
     ]
   }

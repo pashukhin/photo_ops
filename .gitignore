@@ -19,3 +19,12 @@ __pycache__/
 bin/
 tmp/
 data/
+
+# subagent-driven-development scratch
+.superpowers/
+
+# Claude Code local (user/machine-specific) settings
+.claude/settings.local.json
+
+# Editor settings (user-specific)
+.vscode/
