@@ -26,3 +26,4 @@ This section reflects the present state of the frame and changes as sessions lan
 
 - Implemented services: `api-gateway`, `identity-service`, `photo-service`, `web`.
 - Other services are health-only scaffolds until their approved sessions wire real behavior.
+- CI (`.github/workflows/ci.yml`) gates `push`/`pull_request` on proto-drift, typecheck, build, and tests across the TS slice.
