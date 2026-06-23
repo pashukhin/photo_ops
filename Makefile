@@ -1,4 +1,4 @@
-.PHONY: install proto build typecheck test lint test-api test-identity test-photo test-web dev down reset logs status migrate migrate-identity migrate-photo smoke-upload smoke-auth smoke-contract
+.PHONY: install proto proto-check build typecheck test lint test-api test-identity test-photo test-web dev down reset logs status migrate migrate-identity migrate-photo smoke-upload smoke-auth smoke-contract
 
 ifneq (,$(wildcard .env))
 include .env
@@ -10,6 +10,10 @@ install:
 
 proto:
 	pnpm proto
+
+proto-check:
+	pnpm proto
+	git diff --exit-code -- packages/proto-ts
 
 build:
 	pnpm build
