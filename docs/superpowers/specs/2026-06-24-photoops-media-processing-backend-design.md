@@ -15,10 +15,11 @@ preview). Those are a UI showcase of backend capabilities that do not exist
 yet.
 
 This session builds the backend foundation those stories require. The rich UI
-that consumes it is split into session 009
-(`sessions/009_rich_photo_gallery_ui.md`). This session deliberately builds all
-the **data and delivery** the UI needs, but not the **query ergonomics**
-(sort/filter/pagination), which are designed against the concrete UI in 009.
+that consumes it is split into session 011
+(`sessions/011_rich_photo_gallery_ui.md`, renumbered from 009). This session
+deliberately builds all the **data and delivery** the UI needs, but not the
+**query ergonomics** (sort/filter/pagination), which are designed against the
+concrete UI in 011.
 
 This is the first async workflow in the system and the first real behavior in
 the Python `media-worker`. It is architecture-sensitive: it introduces a new

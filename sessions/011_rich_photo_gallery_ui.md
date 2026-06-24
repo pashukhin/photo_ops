@@ -1,10 +1,12 @@
-# Session 009: Rich Photo Gallery UI (Planned)
+# Session 011: Rich Photo Gallery UI (Planned)
 
 Status: **Planned — not started.** Forward-looking stub; the full brief,
-accepted spec, and plan are written when the session begins. **Depends on
-session 008** (`sessions/008_media_processing_async_skeleton.md`), which lands
-the statuses, extracted attributes, variant delivery, and detail API this UI
-consumes.
+accepted spec, and plan are written when the session begins. Renumbered
+009→011: session 009 became the polyglot-gate/ergonomics sweep and 010 is the
+structured-logging baseline (`zg6`), both of which land before this UI work.
+**Depends on session 008** (`sessions/008_media_processing_async_skeleton.md`),
+which lands the statuses, extracted attributes, variant delivery, and detail
+API this UI consumes.
 
 ## Goal
 

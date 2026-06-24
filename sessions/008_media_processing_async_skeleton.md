@@ -95,4 +95,4 @@ duplicate variants, and failures surface as `failed`.
 
 - `project_description.md` §3.3, §4.3; `docs/roadmap.md` (stage 3); `docs/domain-model.md`.
 - Architecture boundaries: `docs/architecture.md` (DB ownership, MinIO privacy, async-later).
-- Follow-up UI session: `sessions/009_rich_photo_gallery_ui.md`.
+- Follow-up UI session: `sessions/011_rich_photo_gallery_ui.md`.
