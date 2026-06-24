@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import deque
 from typing import Callable
 
-from src.media_worker.messaging.port import BusMessage, MessageConsumer, MessagePublisher
+from .port import BusMessage, MessageConsumer, MessagePublisher
 
 MAX_ATTEMPTS = 3
 
@@ -37,5 +37,4 @@ class InMemoryBus(MessagePublisher, MessageConsumer):
                     handler(message)
                     break  # success → ack, stop retrying
                 except Exception:
-                    if attempt == MAX_ATTEMPTS:
-                        pass  # drop after MAX_ATTEMPTS total attempts
+                    pass  # swallow; retry next attempt, drop after MAX_ATTEMPTS
