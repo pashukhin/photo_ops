@@ -67,11 +67,13 @@ export class PhotoRepository implements PhotoRepositoryPort {
     return this.toJobRecord(created);
   }
 
-  async markProcessingForUser(userId: string, photoId: string): Promise<void> {
-    await this.db
+  async markProcessingForUser(userId: string, photoId: string): Promise<boolean> {
+    const rows = await this.db
       .update(photoAssets)
       .set({ status: 'processing', updatedAt: new Date() })
-      .where(and(eq(photoAssets.id, photoId), eq(photoAssets.userId, userId), eq(photoAssets.status, 'uploaded')));
+      .where(and(eq(photoAssets.id, photoId), eq(photoAssets.userId, userId), eq(photoAssets.status, 'uploaded')))
+      .returning({ id: photoAssets.id });
+    return rows.length === 1;
   }
 
   async finalizeJob(jobId: string, outcome: 'succeeded' | 'failed', errorMessage?: string): Promise<boolean> {

@@ -17,7 +17,7 @@ export interface PhotoRepositoryPort {
   findByIdForUser(userId: string, photoId: string): Promise<PhotoAssetRecord | null>;
   list(userId: string, limit: number): Promise<PhotoAssetRecord[]>;
   createProcessingJob(input: { photoId: string; userId: string; type: 'initial' | 'reprocess'; correlationId: string }): Promise<ProcessingJobRecord>;
-  markProcessingForUser(userId: string, photoId: string): Promise<void>;
+  markProcessingForUser(userId: string, photoId: string): Promise<boolean>;
   finalizeJob(jobId: string, outcome: 'succeeded' | 'failed', errorMessage?: string): Promise<boolean>;
   upsertVariant(v: { photoId: string; variantType: 'thumbnail' | 'preview'; objectKey: string; width: number; height: number; sizeBytes: bigint; contentType: string }): Promise<void>;
   applyAttributes(photoId: string, attrs: { width: number | null; height: number | null; takenAtLocal: Date | null; takenAtUtc: Date | null; takenAtTzSource: string | null; cameraMake: string | null; cameraModel: string | null; orientation: number | null; lat: number | null; lon: number | null; metadataJson: unknown }): Promise<void>;
@@ -70,28 +70,32 @@ export class PhotoDomainService {
 
     const uploaded = await this.repository.markUploadedForUser(userId, photoId);
 
-    // Kick off async processing: move uploaded -> processing, record the run,
-    // and publish the job. The correlation id is threaded through to the worker
-    // and back via the result for end-to-end tracing.
-    const correlationId = uuidv7();
-    await this.repository.markProcessingForUser(userId, photoId);
-    const job = await this.repository.createProcessingJob({
-      photoId,
-      userId,
-      type: 'initial',
-      correlationId
-    });
-    await this.publisher.publish(PROCESS_JOB_DESTINATION, {
-      body: encodeJob({
-        jobId: job.id,
+    // Kick off async processing: move uploaded -> processing, and only if this
+    // call won that guarded transition, record the run and publish the job.
+    // This makes a duplicate/concurrent completeUpload a no-op rather than a
+    // second billable run (charge-once at the publish side). The correlation id
+    // is threaded to the worker and back via the result for end-to-end tracing.
+    const transitioned = await this.repository.markProcessingForUser(userId, photoId);
+    if (transitioned) {
+      const correlationId = uuidv7();
+      const job = await this.repository.createProcessingJob({
         photoId,
         userId,
-        objectKey: uploaded.objectKey,
         type: 'initial',
         correlationId
-      }),
-      correlationId
-    });
+      });
+      await this.publisher.publish(PROCESS_JOB_DESTINATION, {
+        body: encodeJob({
+          jobId: job.id,
+          photoId,
+          userId,
+          objectKey: uploaded.objectKey,
+          type: 'initial',
+          correlationId
+        }),
+        correlationId
+      });
+    }
 
     return { ...uploaded, status: 'processing' as const };
   }

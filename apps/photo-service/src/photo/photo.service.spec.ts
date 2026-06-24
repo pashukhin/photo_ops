@@ -21,8 +21,9 @@ function createService() {
     objectExists: vi.fn()
   };
   const publisher = { publish: vi.fn() };
-  // Sensible default so completeUpload's processing kickoff doesn't crash in
-  // tests that don't exercise it directly.
+  // Sensible defaults so completeUpload's processing kickoff runs in tests that
+  // don't exercise it directly (won the uploaded->processing transition).
+  repository.markProcessingForUser.mockResolvedValue(true);
   repository.createProcessingJob.mockResolvedValue({ id: 'job-default' });
   return { service: new PhotoDomainService(repository, storage, publisher), repository, storage, publisher };
 }
@@ -143,7 +144,7 @@ describe('PhotoDomainService', () => {
     };
     repository.findByIdForUser.mockResolvedValue({ ...photoRecord, status: 'uploading' });
     repository.markUploadedForUser.mockResolvedValue(photoRecord);
-    repository.markProcessingForUser.mockResolvedValue(undefined);
+    repository.markProcessingForUser.mockResolvedValue(true);
     repository.createProcessingJob.mockResolvedValue({ id: 'job-1' });
     storage.objectExists.mockResolvedValue(true);
 
@@ -157,6 +158,37 @@ describe('PhotoDomainService', () => {
       'photo.process',
       expect.objectContaining({ body: expect.any(Uint8Array), correlationId: expect.any(String) })
     );
+    // The same correlation id must thread through the job record and the message.
+    const jobCorrelationId = repository.createProcessingJob.mock.calls[0][0].correlationId;
+    const messageCorrelationId = publisher.publish.mock.calls[0][1].correlationId;
+    expect(jobCorrelationId).toBe(messageCorrelationId);
     expect(result.status).toBe('processing');
+  });
+
+  it('does not create a job or publish when the photo did not transition (duplicate complete)', async () => {
+    const { service, repository, storage, publisher } = createService();
+    repository.findByIdForUser.mockResolvedValue({
+      id: 'photo-1',
+      userId: 'user-1',
+      objectKey: 'originals/photo-1/photo.jpg',
+      status: 'processing',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+    repository.markUploadedForUser.mockResolvedValue({
+      id: 'photo-1',
+      userId: 'user-1',
+      objectKey: 'originals/photo-1/photo.jpg',
+      status: 'uploaded',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+    repository.markProcessingForUser.mockResolvedValue(false); // already past uploaded
+    storage.objectExists.mockResolvedValue(true);
+
+    await service.completeUpload('user-1', 'photo-1');
+
+    expect(repository.createProcessingJob).not.toHaveBeenCalled();
+    expect(publisher.publish).not.toHaveBeenCalled();
   });
 });
