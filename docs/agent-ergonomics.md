@@ -88,9 +88,11 @@ any abstraction.
 
 ### T1 — high payoff, low cost
 
-- **`make gate`** = `proto-check typecheck lint build test`, in CI order. The single
-  canonical pre-push check (AGENTS.md: "one canonical workflow"). CI steps call the
-  same `make` targets so local and CI run identical commands by construction.
+- **`make gate`** = `proto-check typecheck lint build test gate-media` — verifies the
+  whole polyglot repo (TS workspaces + Python media-worker). The single canonical
+  pre-push check (AGENTS.md: "one canonical workflow"). CI runs the TS and media-worker
+  halves as two separate jobs; `make gate` is the single local equivalent. (s008 folded
+  the media-worker in — `photo_ops-uil`.)
 - **CI `paths-ignore: ['.beads/**']`** — tracker-only pushes no longer run the gate.
 - **Permission cleanup** — ephemeral one-shot entries removed; a small set of broad,
   reusable rules live in the shared `.claude/settings.json`.
@@ -151,11 +153,22 @@ shift surfaced new frictions, tracked as standalone backlog issues:
 
 | Friction | Issue |
 | --- | --- |
-| `make gate` is TS-only; nothing verifies the whole polyglot repo | `photo_ops-uil` |
-| `docker compose …` diagnostics prefix retyped (no convenience targets) | `photo_ops-g3u` |
-| `media-worker` targets recreate `.venv` every run | `photo_ops-jam` |
-| Live-stack validation is high-value but high-friction (a clean gate **and** a clean review missed three real bugs only `make smoke-media` caught) | `photo_ops-0ro` |
+| ~~`make gate` is TS-only; nothing verifies the whole polyglot repo~~ — **done**: `gate` now runs `gate-media` (lint+test media-worker) | `photo_ops-uil` ✅ |
+| ~~`docker compose …` diagnostics prefix retyped (no convenience targets)~~ — **done**: `$(DC)` var + `ps-all` / `logs-svc` / `sh` / `restart-svc` / `up-svc` (svc=…) targets | `photo_ops-g3u` ✅ |
+| ~~`media-worker` targets recreate `.venv` every run~~ — **done**: `test-`/`lint-media-worker` depend on a pyproject-keyed stamp; install runs only when deps change | `photo_ops-jam` ✅ |
+| ~~Live-stack validation is high-value but high-friction (a clean gate **and** a clean review missed three real bugs only `make smoke-media` caught)~~ — **done**: `make smoke-stack` (`scripts/smoke-stack.sh`) builds the media-path services, brings them up clean, migrates, runs the smoke, and tears down — full build output to a log file, df pre-check, honest exit code | `photo_ops-0ro` ✅ |
 
 The headline from 008: a green gate plus a clean review is **necessary but not
 sufficient** — running the real stack found three bugs nothing else did, which is
 the case for making live-stack validation a cheap, first-class command.
+
+Building `smoke-stack` proved the point a fourth time: its **first** green-looking
+run actually failed an upload-intent with a transient 500, and a `; echo` in the
+verification wrapper masked the real non-zero exit. Root cause was a readiness
+race, not a code bug — the gateway's `/health` is static and answers before its
+gRPC channels to identity/photo are connected, so the smoke fired into the
+warm-up window. The fix is in the harness, not the app: migrate **before** the
+app services start, then gate the smoke on a real round-trip across the mesh
+(signup → list, i.e. gateway → identity + photo gRPC) rather than on `/health`.
+A genuine `/ready` that checks downstream connectivity is `photo_ops-de6`; until
+then the functional probe is the reliable gate.
