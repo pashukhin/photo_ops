@@ -29,3 +29,7 @@ select = ["E", "F", "W", "I"]
 python_version = "3.12"
 warn_unused_configs = true
 exclude = ["src/photoops_proto"]
+# Runtime deps (pika, minio, piexif, ...) and the excluded generated proto
+# stubs ship no type info; without this, `mypy src` breaks the moment Phase-2
+# code imports them. Worker is small; a blanket ignore is the pragmatic guard.
+ignore_missing_imports = true
