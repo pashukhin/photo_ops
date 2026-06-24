@@ -33,3 +33,7 @@ exclude = ["src/photoops_proto"]
 # stubs ship no type info; without this, `mypy src` breaks the moment Phase-2
 # code imports them. Worker is small; a blanket ignore is the pragmatic guard.
 ignore_missing_imports = true
+# Tests import via `src.media_worker.*` (pythonpath = ["."]) while the package
+# is also installed as `media_worker`; explicit_package_bases tells mypy to root
+# module names at the working directory, resolving the duplicate-module error.
+explicit_package_bases = true
