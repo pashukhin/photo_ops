@@ -13,7 +13,7 @@ proto:
 
 proto-check:
 	pnpm proto
-	git diff --exit-code -- packages/proto-ts
+	git diff --exit-code -- packages/proto-ts apps/media-worker/src/photoops_proto
 
 build:
 	pnpm build
