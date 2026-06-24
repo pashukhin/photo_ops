@@ -1,5 +1,12 @@
 import { Injectable } from '@nestjs/common';
+import { uuidv7 } from 'uuidv7';
+import { MessagePublisher } from '../messaging/messaging.port';
 import { CreateUploadIntentInput, PhotoAssetRecord, PhotoVariantRecord, ProcessingJobRecord } from './photo.types';
+import { encodeJob } from './processing.codec';
+
+// Logical destination name for the processing job flow (broker topology lives
+// in the adapter, not here).
+export const PROCESS_JOB_DESTINATION = 'photo.process';
 
 const MAX_UPLOAD_BYTES = 25n * 1024n * 1024n;
 const JPEG_CONTENT_TYPES = new Set(['image/jpeg', 'image/jpg']);
@@ -28,7 +35,8 @@ export interface ObjectStoragePort {
 export class PhotoDomainService {
   constructor(
     private readonly repository: PhotoRepositoryPort,
-    private readonly storage: ObjectStoragePort
+    private readonly storage: ObjectStoragePort,
+    private readonly publisher: MessagePublisher
   ) {}
 
   async createUploadIntent(input: CreateUploadIntentInput) {
@@ -59,7 +67,33 @@ export class PhotoDomainService {
     if (!objectExists) {
       throw new Error('uploaded object not found');
     }
-    return this.repository.markUploadedForUser(userId, photoId);
+
+    const uploaded = await this.repository.markUploadedForUser(userId, photoId);
+
+    // Kick off async processing: move uploaded -> processing, record the run,
+    // and publish the job. The correlation id is threaded through to the worker
+    // and back via the result for end-to-end tracing.
+    const correlationId = uuidv7();
+    await this.repository.markProcessingForUser(userId, photoId);
+    const job = await this.repository.createProcessingJob({
+      photoId,
+      userId,
+      type: 'initial',
+      correlationId
+    });
+    await this.publisher.publish(PROCESS_JOB_DESTINATION, {
+      body: encodeJob({
+        jobId: job.id,
+        photoId,
+        userId,
+        objectKey: uploaded.objectKey,
+        type: 'initial',
+        correlationId
+      }),
+      correlationId
+    });
+
+    return { ...uploaded, status: 'processing' as const };
   }
 
   async listPhotos(userId: string, limit = 100) {

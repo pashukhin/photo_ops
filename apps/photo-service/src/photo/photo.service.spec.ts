@@ -20,7 +20,11 @@ function createService() {
     createPresignedPutUrl: vi.fn(),
     objectExists: vi.fn()
   };
-  return { service: new PhotoDomainService(repository, storage), repository, storage };
+  const publisher = { publish: vi.fn() };
+  // Sensible default so completeUpload's processing kickoff doesn't crash in
+  // tests that don't exercise it directly.
+  repository.createProcessingJob.mockResolvedValue({ id: 'job-default' });
+  return { service: new PhotoDomainService(repository, storage, publisher), repository, storage, publisher };
 }
 
 describe('PhotoDomainService', () => {
@@ -122,5 +126,37 @@ describe('PhotoDomainService', () => {
 
     expect(repository.findByIdForUser).toHaveBeenCalledWith('user-1', 'photo-1');
     expect(repository.markUploadedForUser).toHaveBeenCalledWith('user-1', 'photo-1');
+  });
+
+  it('on complete upload: marks processing, records a job, and publishes a ProcessPhotoJob', async () => {
+    const { service, repository, storage, publisher } = createService();
+    const photoRecord = {
+      id: 'photo-1',
+      userId: 'user-1',
+      filename: 'photo.jpg',
+      contentType: 'image/jpeg',
+      sizeBytes: 123n,
+      objectKey: 'originals/photo-1/photo.jpg',
+      status: 'uploaded',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    repository.findByIdForUser.mockResolvedValue({ ...photoRecord, status: 'uploading' });
+    repository.markUploadedForUser.mockResolvedValue(photoRecord);
+    repository.markProcessingForUser.mockResolvedValue(undefined);
+    repository.createProcessingJob.mockResolvedValue({ id: 'job-1' });
+    storage.objectExists.mockResolvedValue(true);
+
+    const result = await service.completeUpload('user-1', 'photo-1');
+
+    expect(repository.markProcessingForUser).toHaveBeenCalledWith('user-1', 'photo-1');
+    expect(repository.createProcessingJob).toHaveBeenCalledWith(
+      expect.objectContaining({ photoId: 'photo-1', userId: 'user-1', type: 'initial' })
+    );
+    expect(publisher.publish).toHaveBeenCalledWith(
+      'photo.process',
+      expect.objectContaining({ body: expect.any(Uint8Array), correlationId: expect.any(String) })
+    );
+    expect(result.status).toBe('processing');
   });
 });
