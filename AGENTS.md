@@ -54,8 +54,11 @@ Conventions distilled from instrumented session logs (see
 one-liners and to avoid wasting the Bash budget.
 
 - Run `make gate` as the canonical local pre-push check; do not re-type the
-  five sub-targets (`proto-check typecheck lint build test`). CI runs the same
-  targets.
+  sub-targets. It verifies the whole polyglot repo — the TS workspaces
+  (`proto-check typecheck lint build test`) plus the Python media-worker
+  (`gate-media` = `lint-media-worker test-media-worker`). CI runs the TS and
+  media-worker halves as two separate jobs; `make gate` is the single local
+  equivalent.
 - After a commit, do **not** run `git log -1` / `git rev-parse HEAD` /
   `echo "exit: $?"` to confirm — trust the tool result.
 - Every commit must end with the `Co-Authored-By` trailer. This is a

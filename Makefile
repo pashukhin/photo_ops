@@ -1,4 +1,4 @@
-.PHONY: install proto proto-check build typecheck test lint gate test-api test-identity test-photo test-web test-media-worker lint-media-worker dev down reset logs status migrate migrate-identity migrate-photo smoke-upload smoke-auth smoke-contract smoke-media
+.PHONY: install proto proto-check build typecheck test lint gate gate-media test-api test-identity test-photo test-web test-media-worker lint-media-worker dev down reset logs status migrate migrate-identity migrate-photo smoke-upload smoke-auth smoke-contract smoke-media
 
 ifneq (,$(wildcard .env))
 include .env
@@ -27,11 +27,19 @@ test:
 lint:
 	pnpm lint
 
-# Canonical quality gate: the exact set CI runs, in CI order. Run this locally
-# before pushing instead of re-typing the five sub-targets. CI invokes the same
-# targets so local and CI run identical commands.
-gate: proto-check typecheck lint build test
-	@echo "gate: all checks passed"
+# Canonical quality gate: verifies the WHOLE polyglot repo in one command —
+# the TS workspaces (proto-check typecheck lint build test, mirroring CI's
+# `quality` job) plus the Python media-worker (gate-media, mirroring CI's
+# `media-worker` job). CI runs these as two separate jobs; locally this single
+# target is the equivalent. Run it before pushing instead of re-typing the
+# sub-targets or remembering to verify the media-worker by hand (s008: media
+# checks were run ad-hoc OUTSIDE the gate — see photo_ops-uil).
+gate: proto-check typecheck lint build test gate-media
+	@echo "gate: all checks passed (TS + media-worker)"
+
+# Python half of the gate: lint + tests for the media-worker. Kept as a named
+# target so it composes into `gate` and can also be run on its own.
+gate-media: lint-media-worker test-media-worker
 
 test-api:
 	pnpm --filter @photoops/api-gateway test
