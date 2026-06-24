@@ -1,4 +1,4 @@
-import { HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Injectable } from '@nestjs/common';
 import { ObjectStoragePort } from '../photo/photo.service';
@@ -29,6 +29,11 @@ export class MinioStorageService implements ObjectStoragePort {
     const command = new PutObjectCommand({ Bucket: this.bucket, Key: objectKey, ContentType: contentType });
     const uploadUrl = await getSignedUrl(this.uploadClient, command, { expiresIn: 900 });
     return { uploadUrl, expiresAt: new Date(Date.now() + 900_000) };
+  }
+
+  async createPresignedGetUrl(objectKey: string, expiresIn = 3600): Promise<string> {
+    const command = new GetObjectCommand({ Bucket: this.bucket, Key: objectKey });
+    return getSignedUrl(this.uploadClient, command, { expiresIn });
   }
 
   async objectExists(objectKey: string): Promise<boolean> {

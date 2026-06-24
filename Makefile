@@ -1,4 +1,4 @@
-.PHONY: install proto proto-check build typecheck test lint gate test-api test-identity test-photo test-web dev down reset logs status migrate migrate-identity migrate-photo smoke-upload smoke-auth smoke-contract
+.PHONY: install proto proto-check build typecheck test lint gate test-api test-identity test-photo test-web test-media-worker lint-media-worker dev down reset logs status migrate migrate-identity migrate-photo smoke-upload smoke-auth smoke-contract smoke-media
 
 ifneq (,$(wildcard .env))
 include .env
@@ -13,7 +13,7 @@ proto:
 
 proto-check:
 	pnpm proto
-	git diff --exit-code -- packages/proto-ts
+	git diff --exit-code -- packages/proto-ts apps/media-worker/src/photoops_proto
 
 build:
 	pnpm build
@@ -69,6 +69,7 @@ migrate-identity:
 migrate-photo:
 	docker compose -f infra/docker/docker-compose.yml --env-file .env exec -T postgres psql -U "$${POSTGRES_SUPERUSER}" -d postgres < infra/postgres/init/001-create-databases.sql
 	docker compose -f infra/docker/docker-compose.yml --env-file .env exec -T postgres psql "$${PHOTO_DATABASE_URL}" < apps/photo-service/migrations/0001_create_photo_assets.sql
+	docker compose -f infra/docker/docker-compose.yml --env-file .env exec -T postgres psql "$${PHOTO_DATABASE_URL}" < apps/photo-service/migrations/0002_media_processing.sql
 
 smoke-upload:
 	scripts/smoke-upload.sh
@@ -78,3 +79,14 @@ smoke-auth:
 
 smoke-contract:
 	sh scripts/test-smoke-upload-contract.sh
+
+# Local-only — requires `make dev` + `make migrate` to be running.
+# Do NOT add to `gate` or CI targets.
+smoke-media:
+	scripts/smoke-media-processing.sh
+
+test-media-worker:
+	cd apps/media-worker && python3 -m venv .venv && .venv/bin/pip install -q -e ".[dev]" && .venv/bin/python -m pytest -q
+
+lint-media-worker:
+	cd apps/media-worker && python3 -m venv .venv && .venv/bin/pip install -q -e ".[dev]" && .venv/bin/ruff check src tests && .venv/bin/mypy src

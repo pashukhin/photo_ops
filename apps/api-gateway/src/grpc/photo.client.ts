@@ -7,6 +7,7 @@ export interface PhotoGatewayClient {
   createUploadIntent(input: { userId: string; filename: string; contentType: string; sizeBytes: string }): Promise<unknown>;
   completeUpload(input: { userId: string; photoId: string }): Promise<unknown>;
   listPhotos(input: { userId: string; pageSize: number }): Promise<unknown>;
+  getPhoto(input: { userId: string; photoId: string }): Promise<unknown>;
 }
 
 type Callback<T> = (error: Error | null, value: T) => void;
@@ -15,6 +16,7 @@ interface GrpcPhotoServiceClient {
   CreateUploadIntent(input: { userId: string; filename: string; contentType: string; sizeBytes: string }, callback: Callback<unknown>): void;
   CompleteUpload(input: { userId: string; photoId: string }, callback: Callback<unknown>): void;
   ListPhotos(input: { userId: string; pageSize: number }, callback: Callback<unknown>): void;
+  GetPhoto(input: { userId: string; photoId: string }, callback: Callback<unknown>): void;
 }
 
 @Injectable()
@@ -48,6 +50,10 @@ export class PhotoClient implements PhotoGatewayClient {
 
   async listPhotos(input: { userId: string; pageSize: number }) {
     return this.call((callback) => this.client.ListPhotos(input, callback));
+  }
+
+  async getPhoto(input: { userId: string; photoId: string }) {
+    return this.call((callback) => this.client.GetPhoto(input, callback));
   }
 
   private call<T>(invoke: (callback: Callback<T>) => void): Promise<T> {

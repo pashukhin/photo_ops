@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
 import { createDb } from '../db/client';
-import { photoAssets } from '../db/schema';
-import { CreateUploadIntentInput, PhotoAssetRecord } from './photo.types';
+import { photoAssets, photoVariants, processingJobs } from '../db/schema';
+import { CreateUploadIntentInput, PhotoAssetRecord, PhotoVariantRecord, ProcessingJobRecord } from './photo.types';
 import { PhotoRepositoryPort } from './photo.service';
 
 @Injectable()
@@ -51,6 +51,94 @@ export class PhotoRepository implements PhotoRepositoryPort {
     return rows.map((row) => this.toRecord(row));
   }
 
+  async createProcessingJob(input: { photoId: string; userId: string; type: 'initial' | 'reprocess'; correlationId: string }): Promise<ProcessingJobRecord> {
+    const [created] = await this.db
+      .insert(processingJobs)
+      .values({
+        id: uuidv7(),
+        photoId: input.photoId,
+        userId: input.userId,
+        type: input.type,
+        status: 'queued',
+        correlationId: input.correlationId,
+        startedAt: new Date()
+      })
+      .returning();
+    return this.toJobRecord(created);
+  }
+
+  async markProcessingForUser(userId: string, photoId: string): Promise<boolean> {
+    const rows = await this.db
+      .update(photoAssets)
+      .set({ status: 'processing', updatedAt: new Date() })
+      .where(and(eq(photoAssets.id, photoId), eq(photoAssets.userId, userId), eq(photoAssets.status, 'uploaded')))
+      .returning({ id: photoAssets.id });
+    return rows.length === 1;
+  }
+
+  async finalizeJob(jobId: string, outcome: 'succeeded' | 'failed', errorMessage?: string): Promise<boolean> {
+    const rows = await this.db
+      .update(processingJobs)
+      .set({ status: outcome, errorMessage: errorMessage ?? null, finishedAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(processingJobs.id, jobId), eq(processingJobs.status, 'queued')))
+      .returning({ id: processingJobs.id });
+    return rows.length === 1;
+  }
+
+  async upsertVariant(v: { photoId: string; variantType: 'thumbnail' | 'preview'; objectKey: string; width: number; height: number; sizeBytes: bigint; contentType: string }): Promise<void> {
+    await this.db
+      .insert(photoVariants)
+      .values({ id: uuidv7(), ...v })
+      .onConflictDoUpdate({
+        target: [photoVariants.photoId, photoVariants.variantType],
+        set: {
+          objectKey: v.objectKey,
+          width: v.width,
+          height: v.height,
+          sizeBytes: v.sizeBytes,
+          contentType: v.contentType,
+          updatedAt: new Date()
+        }
+      });
+  }
+
+  async applyAttributes(photoId: string, attrs: { width: number | null; height: number | null; takenAtLocal: string | null; takenAtUtc: Date | null; takenAtTzSource: string | null; cameraMake: string | null; cameraModel: string | null; orientation: number | null; lat: number | null; lon: number | null; metadataJson: unknown }): Promise<void> {
+    await this.db
+      .update(photoAssets)
+      .set({ ...attrs, updatedAt: new Date() })
+      .where(eq(photoAssets.id, photoId));
+  }
+
+  async setStatus(photoId: string, status: 'ready' | 'failed' | 'processing'): Promise<void> {
+    await this.db
+      .update(photoAssets)
+      .set({ status, updatedAt: new Date() })
+      .where(eq(photoAssets.id, photoId));
+  }
+
+  async findByIdWithVariantsForUser(userId: string, photoId: string): Promise<{ photo: PhotoAssetRecord; variants: PhotoVariantRecord[] } | null> {
+    const [row] = await this.db
+      .select()
+      .from(photoAssets)
+      .where(and(eq(photoAssets.id, photoId), eq(photoAssets.userId, userId)))
+      .limit(1);
+    if (!row) return null;
+    const variantRows = await this.db
+      .select()
+      .from(photoVariants)
+      .where(eq(photoVariants.photoId, photoId));
+    return { photo: this.toRecord(row), variants: variantRows.map((v) => this.toVariantRecord(v)) };
+  }
+
+  async listVariantsForPhotos(photoIds: string[]): Promise<PhotoVariantRecord[]> {
+    if (photoIds.length === 0) return [];
+    const rows = await this.db
+      .select()
+      .from(photoVariants)
+      .where(inArray(photoVariants.photoId, photoIds));
+    return rows.map((v) => this.toVariantRecord(v));
+  }
+
   private toRecord(row: typeof photoAssets.$inferSelect): PhotoAssetRecord {
     return {
       id: row.id,
@@ -60,6 +148,48 @@ export class PhotoRepository implements PhotoRepositoryPort {
       sizeBytes: row.sizeBytes,
       objectKey: row.objectKey,
       status: row.status as PhotoAssetRecord['status'],
+      width: row.width,
+      height: row.height,
+      takenAtLocal: row.takenAtLocal,
+      takenAtUtc: row.takenAtUtc,
+      takenAtTzSource: row.takenAtTzSource,
+      cameraMake: row.cameraMake,
+      cameraModel: row.cameraModel,
+      orientation: row.orientation,
+      lat: row.lat,
+      lon: row.lon,
+      metadataJson: row.metadataJson,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt
+    };
+  }
+
+  private toVariantRecord(row: typeof photoVariants.$inferSelect): PhotoVariantRecord {
+    return {
+      id: row.id,
+      photoId: row.photoId,
+      variantType: row.variantType as PhotoVariantRecord['variantType'],
+      objectKey: row.objectKey,
+      width: row.width,
+      height: row.height,
+      sizeBytes: row.sizeBytes,
+      contentType: row.contentType,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt
+    };
+  }
+
+  private toJobRecord(row: typeof processingJobs.$inferSelect): ProcessingJobRecord {
+    return {
+      id: row.id,
+      photoId: row.photoId,
+      userId: row.userId,
+      type: row.type as ProcessingJobRecord['type'],
+      status: row.status as ProcessingJobRecord['status'],
+      correlationId: row.correlationId,
+      errorMessage: row.errorMessage,
+      startedAt: row.startedAt,
+      finishedAt: row.finishedAt,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt
     };

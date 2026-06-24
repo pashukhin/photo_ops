@@ -1,0 +1,8 @@
+version: v2
+managed:
+  enabled: true
+plugins:
+  - remote: buf.build/protocolbuffers/python
+    out: ../apps/media-worker/src/photoops_proto
+  - remote: buf.build/protocolbuffers/pyi
+    out: ../apps/media-worker/src/photoops_proto

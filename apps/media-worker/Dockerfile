@@ -1,4 +1,5 @@
-FROM python:3.12-alpine
+FROM python:3.12-slim
 WORKDIR /app
 COPY apps/media-worker /app
-CMD ["python", "src/main.py"]
+RUN pip install --no-cache-dir -e .
+CMD ["python", "-m", "src.main"]

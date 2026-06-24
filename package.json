@@ -7,7 +7,7 @@
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "sh scripts/test-smoke-upload-contract.sh && pnpm --filter './apps/*' --if-present test",
     "lint": "eslint .",
-    "proto": "cd proto && buf generate --template buf.gen.yaml"
+    "proto": "cd proto && buf generate --template buf.gen.yaml && buf generate --template buf.gen.python.yaml --path photo/v1/processing.proto"
   },
   "devDependencies": {
     "@bufbuild/buf": "^1.50.0",

@@ -1,0 +1,69 @@
+syntax = "proto3";
+
+package photoops.photo.v1;
+
+// Async media-processing message contracts. These messages are the payload
+// schema for the RabbitMQ job/result flows (serialized into the AMQP body);
+// they are not gRPC service methods. Transport is owned by a broker-agnostic
+// port; this file is the cross-language (TS + Python) schema contract.
+
+// How a processing run was initiated.
+enum ProcessingType {
+  PROCESSING_TYPE_UNSPECIFIED = 0;
+  PROCESSING_TYPE_INITIAL = 1;
+  // Seam only; not emitted in session 008. Reserved for user-initiated reprocess.
+  PROCESSING_TYPE_REPROCESS = 2;
+}
+
+// Terminal outcome of a processing run.
+enum ProcessingOutcome {
+  PROCESSING_OUTCOME_UNSPECIFIED = 0;
+  PROCESSING_OUTCOME_SUCCEEDED = 1;
+  PROCESSING_OUTCOME_FAILED = 2;
+}
+
+// Job published by photo-service when an upload completes; consumed by media-worker.
+message ProcessPhotoJob {
+  string job_id = 1;          // UUID v7, == ProcessingJob.id (idempotency key)
+  string photo_id = 2;
+  string user_id = 3;
+  string object_key = 4;      // original's MinIO object key
+  ProcessingType type = 5;
+  string correlation_id = 6;  // threaded through logs/trace; not an idempotency key
+}
+
+// Extracted image attributes. Dimensions are oriented (as displayed).
+message ImageAttributes {
+  uint32 width = 1;
+  uint32 height = 2;
+  string taken_at_local = 3;       // ISO local wall-clock, no tz; "" if absent
+  string taken_at_utc = 4;         // ISO instant; "" if unresolved
+  string taken_at_tz_source = 5;   // "exif_offset" | "gps_time" | "unknown"
+  string camera_make = 6;
+  string camera_model = 7;
+  uint32 orientation = 8;          // EXIF orientation 1..8; 0 = absent
+  optional double lat = 9;
+  optional double lon = 10;
+}
+
+// One generated variant produced by a processing run.
+message VariantResult {
+  string variant_type = 1;    // "thumbnail" | "preview"
+  string object_key = 2;
+  uint32 width = 3;
+  uint32 height = 4;
+  uint64 size_bytes = 5;
+  string content_type = 6;
+}
+
+// Result published by media-worker; consumed by photo-service to finalize.
+message PhotoProcessingResult {
+  string job_id = 1;
+  string photo_id = 2;
+  string correlation_id = 3;
+  ProcessingOutcome outcome = 4;
+  string error_message = 5;            // when FAILED
+  ImageAttributes attributes = 6;      // when SUCCEEDED
+  repeated VariantResult variants = 7;
+  string metadata_json = 8;            // sanitized raw EXIF as a JSON string
+}
