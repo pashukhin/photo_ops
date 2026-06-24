@@ -195,3 +195,19 @@ class TestHandlerFailure:
         result = _decode_result(msg)
         assert result.outcome == processing_pb2.PROCESSING_OUTCOME_FAILED
         assert result.error_message
+
+    def test_malformed_body_yields_failed_result_and_does_not_raise(self) -> None:
+        """A corrupt/truncated protobuf body must publish FAILED without raising."""
+        store = FakeObjectStore()
+        bus = InMemoryBus()
+        handler = JobHandler(store=store, publisher=bus)
+
+        # Must NOT raise — decode failure is caught and published as FAILED
+        handler.handle(BusMessage(body=b"not-a-valid-protobuf", correlation_id="c"))
+
+        published = _drain_results(bus)
+        assert len(published) == 1
+        _, msg = published[0]
+        result = _decode_result(msg)
+        assert result.outcome == processing_pb2.PROCESSING_OUTCOME_FAILED
+        assert result.error_message, "error_message must not be empty on decode failure"

@@ -7,6 +7,7 @@ import logging
 from src.photoops_proto.photo.v1.processing_pb2 import (
     PROCESSING_OUTCOME_FAILED,
     PROCESSING_OUTCOME_SUCCEEDED,
+    ProcessPhotoJob,
 )
 
 from .codec import VariantResult, decode_job, encode_result
@@ -37,13 +38,43 @@ class JobHandler:
         On any exception the failure is caught, a FAILED result is published,
         and the method returns normally — one photo's failure must not propagate.
         """
-        job = decode_job(message.body)
+        # Decode first — a malformed body must also be caught and published as FAILED.
+        try:
+            job = decode_job(message.body)
+        except Exception as exc:
+            log.error(
+                json.dumps(
+                    {
+                        "level": "error",
+                        "correlation_id": message.correlation_id,
+                        "job_id": "",
+                        "photo_id": "",
+                        "outcome": "failed",
+                        "error": str(exc),
+                    }
+                )
+            )
+            body = encode_result(
+                job_id="",
+                photo_id="",
+                correlation_id=message.correlation_id,
+                outcome=PROCESSING_OUTCOME_FAILED,
+                attributes=None,
+                variants=[],
+                metadata_json="",
+                error_message=str(exc),
+            )
+            self._publisher.publish(
+                self._result_dest,
+                BusMessage(body=body, correlation_id=message.correlation_id),
+            )
+            return
 
         try:
             self._process(job)
         except Exception as exc:
             # Structured failure log
-            print(
+            log.error(
                 json.dumps(
                     {
                         "level": "error",
@@ -70,11 +101,11 @@ class JobHandler:
                 BusMessage(body=body, correlation_id=job.correlation_id),
             )
 
-    def _process(self, job: object) -> None:  # type: ignore[override]
+    def _process(self, job: ProcessPhotoJob) -> None:
         """Core processing — raises on any error (caught by handle())."""
         # Deterministic object keys for variants
         keys: dict[str, str] = {
-            vt: f"variants/{job.photo_id}/{vt}.jpg"  # type: ignore[attr-defined]
+            vt: f"variants/{job.photo_id}/{vt}.jpg"
             for vt in RENDITIONS
         }
 
@@ -83,7 +114,7 @@ class JobHandler:
             vt: self._store.head(k) for vt, k in keys.items()
         }
         claimed = all(
-            h is not None and h.get("job-id") == job.job_id  # type: ignore[attr-defined]
+            h is not None and h.get("job-id") == job.job_id
             for h in heads.values()
         )
 
@@ -106,11 +137,11 @@ class JobHandler:
                 )
         else:
             # Normal path: download original, render each rendition, upload
-            original = self._store.download(job.object_key)  # type: ignore[attr-defined]
+            original = self._store.download(job.object_key)
             for vt, box in RENDITIONS.items():
                 rv = render_variant(original, box)
                 meta: dict[str, str] = {
-                    "job-id": job.job_id,  # type: ignore[attr-defined]
+                    "job-id": job.job_id,
                     "width": str(rv.width),
                     "height": str(rv.height),
                     "size": str(len(rv.data)),
@@ -133,17 +164,17 @@ class JobHandler:
         # (cheap EXIF re-read of the already-in-memory original on normal path
         # is handled above; claim path needs its own download).
         if claimed:
-            original = self._store.download(job.object_key)  # type: ignore[attr-defined]
+            original = self._store.download(job.object_key)
             attrs = extract_attributes(original)
 
         # Structured success log
-        print(
+        log.info(
             json.dumps(
                 {
                     "level": "info",
-                    "correlation_id": job.correlation_id,  # type: ignore[attr-defined]
-                    "job_id": job.job_id,  # type: ignore[attr-defined]
-                    "photo_id": job.photo_id,  # type: ignore[attr-defined]
+                    "correlation_id": job.correlation_id,
+                    "job_id": job.job_id,
+                    "photo_id": job.photo_id,
                     "outcome": "succeeded",
                     "variants": [v.variant_type for v in variants],
                 }
@@ -151,9 +182,9 @@ class JobHandler:
         )
 
         body = encode_result(
-            job_id=job.job_id,  # type: ignore[attr-defined]
-            photo_id=job.photo_id,  # type: ignore[attr-defined]
-            correlation_id=job.correlation_id,  # type: ignore[attr-defined]
+            job_id=job.job_id,
+            photo_id=job.photo_id,
+            correlation_id=job.correlation_id,
             outcome=PROCESSING_OUTCOME_SUCCEEDED,
             attributes=attrs,
             variants=variants,
@@ -161,5 +192,5 @@ class JobHandler:
         )
         self._publisher.publish(
             self._result_dest,
-            BusMessage(body=body, correlation_id=job.correlation_id),  # type: ignore[attr-defined]
+            BusMessage(body=body, correlation_id=job.correlation_id),
         )
