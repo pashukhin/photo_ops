@@ -60,6 +60,17 @@ export class PhotoRepository implements PhotoRepositoryPort {
       sizeBytes: row.sizeBytes,
       objectKey: row.objectKey,
       status: row.status as PhotoAssetRecord['status'],
+      width: row.width,
+      height: row.height,
+      takenAtLocal: row.takenAtLocal,
+      takenAtUtc: row.takenAtUtc,
+      takenAtTzSource: row.takenAtTzSource,
+      cameraMake: row.cameraMake,
+      cameraModel: row.cameraModel,
+      orientation: row.orientation,
+      lat: row.lat,
+      lon: row.lon,
+      metadataJson: row.metadataJson,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt
     };
