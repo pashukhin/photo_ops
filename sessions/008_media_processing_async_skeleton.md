@@ -1,8 +1,14 @@
 # Session 008: Media-Processing Backend (async + EXIF/GPS + variant delivery)
 
-Status: **In planning.** Design is being brainstormed; the accepted spec and
-plan land under `docs/superpowers/specs` and `docs/superpowers/plans` before
-implementation. The UI that consumes this backend is split into **session 009**.
+Status: **Done — landed on `session-008-media-processing-backend`.** All 22
+plan tasks implemented (TDD + per-task review), full `make gate` + Python
+`make test-media-worker` green, whole-branch review = ready to merge, and the
+live end-to-end smoke (`make smoke-media`) passed against the Docker stack
+(upload → processing → ready with real variants + EXIF/GPS). Spec:
+`docs/superpowers/specs/2026-06-24-photoops-media-processing-backend-design.md`;
+plan: `docs/superpowers/plans/2026-06-24-media-processing-backend.md`. Epic
+`photo_ops-861` closed; follow-up `photo_ops-di8` (broker adapter hardening).
+The UI that consumes this backend is **session 009**.
 
 ## Why this shape
 
