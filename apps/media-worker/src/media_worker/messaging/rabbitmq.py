@@ -27,9 +27,11 @@ message straight to the DLQ.  This is a deliberate simplification of the
 from __future__ import annotations
 
 import logging
+import time
 from typing import Callable
 
 import pika  # type: ignore[import-untyped]
+import pika.exceptions  # type: ignore[import-untyped]
 import pika.spec  # type: ignore[import-untyped]
 
 from .port import BusMessage
@@ -44,10 +46,34 @@ class RabbitMqBus:
     explicit Protocol import to keep the runtime dependency minimal).
     """
 
-    def __init__(self, url: str) -> None:
-        self._connection = pika.BlockingConnection(pika.URLParameters(url))
+    def __init__(self, url: str, *, connect_attempts: int = 15, connect_delay: float = 2.0) -> None:
+        self._connection = self._connect(url, connect_attempts, connect_delay)
         self._channel = self._connection.channel()
         self._declared: set[str] = set()
+
+    @staticmethod
+    def _connect(url: str, attempts: int, delay: float) -> pika.BlockingConnection:
+        """Open the broker connection, retrying transient failures.
+
+        At stack startup RabbitMQ may report healthy a moment before its AMQP
+        listener accepts connections; a single attempt would crash the worker.
+        Retry a bounded number of times before giving up.
+        """
+        params = pika.URLParameters(url)
+        for attempt in range(1, attempts + 1):
+            try:
+                return pika.BlockingConnection(params)
+            except pika.exceptions.AMQPConnectionError:
+                if attempt == attempts:
+                    raise
+                log.warning(
+                    "rabbitmq connect failed (attempt %d/%d); retrying in %.1fs",
+                    attempt,
+                    attempts,
+                    delay,
+                )
+                time.sleep(delay)
+        raise AssertionError("unreachable")  # pragma: no cover
 
     # ------------------------------------------------------------------
     # Topology

@@ -33,6 +33,24 @@ function logBrokerEvent(event: string, detail?: unknown): void {
   );
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function connectWithRetry(url: string, attempts: number, delayMs: number): Promise<AmqpConnection> {
+  // At stack startup RabbitMQ may report healthy a moment before its AMQP
+  // listener accepts connections; a single attempt would crash the service.
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await amqp.connect(url);
+    } catch (err) {
+      if (attempt >= attempts) throw err;
+      logBrokerEvent('connect-retry', `attempt ${attempt}/${attempts}`);
+      await sleep(delayMs);
+    }
+  }
+}
+
 export class RabbitMqBus implements MessagePublisher, MessageConsumer {
   private readonly declared = new Set<string>();
 
@@ -41,8 +59,8 @@ export class RabbitMqBus implements MessagePublisher, MessageConsumer {
     private readonly channel: amqp.Channel
   ) {}
 
-  static async create(url: string): Promise<RabbitMqBus> {
-    const connection = await amqp.connect(url);
+  static async create(url: string, attempts = 15, delayMs = 2000): Promise<RabbitMqBus> {
+    const connection = await connectWithRetry(url, attempts, delayMs);
     const channel = await connection.createChannel();
     // Surface broker disconnects as a clear log line rather than an opaque
     // unhandled 'error' crash. No automatic reconnect in this slice — a dropped
