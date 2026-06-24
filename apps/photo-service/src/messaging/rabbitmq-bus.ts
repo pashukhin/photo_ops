@@ -21,15 +21,36 @@ import * as amqp from 'amqplib';
 
 import type { BusMessage, MessageConsumer, MessagePublisher } from './messaging.port';
 
+type AmqpConnection = Awaited<ReturnType<typeof amqp.connect>>;
+
+function logBrokerEvent(event: string, detail?: unknown): void {
+  console.error(
+    JSON.stringify({
+      level: 'error',
+      msg: `rabbitmq.connection.${event}`,
+      detail: detail instanceof Error ? detail.message : detail
+    })
+  );
+}
+
 export class RabbitMqBus implements MessagePublisher, MessageConsumer {
   private readonly declared = new Set<string>();
 
-  private constructor(private readonly channel: amqp.Channel) {}
+  private constructor(
+    private readonly connection: AmqpConnection,
+    private readonly channel: amqp.Channel
+  ) {}
 
   static async create(url: string): Promise<RabbitMqBus> {
     const connection = await amqp.connect(url);
     const channel = await connection.createChannel();
-    return new RabbitMqBus(channel);
+    // Surface broker disconnects as a clear log line rather than an opaque
+    // unhandled 'error' crash. No automatic reconnect in this slice — a dropped
+    // connection stops consumption until the process is restarted (tracked as a
+    // follow-up hardening task).
+    connection.on('error', (err) => logBrokerEvent('error', err));
+    connection.on('close', () => logBrokerEvent('closed'));
+    return new RabbitMqBus(connection, channel);
   }
 
   // ---------------------------------------------------------------------------
@@ -118,6 +139,11 @@ export class RabbitMqBus implements MessagePublisher, MessageConsumer {
       await this.channel.close();
     } catch {
       // ignore errors on already-closed channel
+    }
+    try {
+      await this.connection.close();
+    } catch {
+      // ignore errors on already-closed connection
     }
   }
 }
