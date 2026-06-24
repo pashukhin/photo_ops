@@ -28,6 +28,12 @@ export class PhotoController {
     return { ...response, photos: (response.photos ?? []).map((photo) => this.mapPhoto(photo)) };
   }
 
+  @Get(':photoId')
+  async getPhoto(@Headers('cookie') cookieHeader: string | undefined, @Param('photoId') photoId: string) {
+    const auth = await this.authService.requireSession(cookieHeader);
+    return this.mapPhoto(await this.photoClient.getPhoto({ userId: auth.userId, photoId }));
+  }
+
   private mapPhoto(photo: unknown) {
     if (!photo || typeof photo !== 'object') {
       return photo;
@@ -44,7 +50,20 @@ export class PhotoController {
       PHOTO_STATUS_READY: 'ready',
       PHOTO_STATUS_FAILED: 'failed'
     };
-    const asset = photo as { status?: unknown };
+    const asset = photo as {
+      status?: unknown;
+      width?: unknown;
+      height?: unknown;
+      takenAtLocal?: unknown;
+      takenAtUtc?: unknown;
+      takenAtTzSource?: unknown;
+      cameraMake?: unknown;
+      cameraModel?: unknown;
+      orientation?: unknown;
+      lat?: unknown;
+      lon?: unknown;
+      variants?: unknown[];
+    };
     const status = statusMap[String(asset.status)] ?? asset.status;
     return { ...asset, status };
   }
