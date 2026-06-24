@@ -123,9 +123,15 @@ port stays ours. No second real adapter (NATS/Kafka) is built now.
 - **Durable** queues + **persistent** messages — jobs survive a broker restart.
 - **Ack after successful handling** (at-least-once); duplicates are handled by
   idempotency, not avoided.
-- **Bounded retry → dead-letter.** On handler failure, retry up to **N = 3**,
-  then dead-letter the message and mark the photo `failed`. The DLQ is the
-  manual-inspection / future-reprocess surface.
+- **Bounded retry → dead-letter.** The DLQ is the manual-inspection /
+  future-reprocess surface. *As implemented:* the in-memory test bus retries a
+  throwing handler up to **N = 3** then drops; the real RabbitMQ adapters
+  `nack(requeue=false)` straight to the DLQ on an escaped exception. This is a
+  deliberate simplification — the worker's `JobHandler` already catches every
+  *expected* failure and self-publishes a `FAILED` result, so an exception that
+  escapes to the broker is an unexpected/crash case where immediate dead-letter
+  (plus idempotent claim-based redelivery on crash) is the honest behavior. Both
+  language adapters share this policy.
 
 ## Message Contracts (proto)
 
