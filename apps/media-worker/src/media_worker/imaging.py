@@ -29,7 +29,9 @@ def render_variant(original: bytes, box: int) -> RenderedVariant:
     Returns oriented, post-resize dimensions.
     """
     img: Image.Image = Image.open(io.BytesIO(original))
-    img = ImageOps.exif_transpose(img)
+    # exif_transpose returns None on older Pillow when there is no orientation
+    # tag; `or img` keeps the original in that case.
+    img = ImageOps.exif_transpose(img) or img
     img = img.convert("RGB")
     img.thumbnail((box, box))
 
