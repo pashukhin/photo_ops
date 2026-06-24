@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS photo_variants (
   content_type text        NOT NULL,
   created_at   timestamptz NOT NULL DEFAULT now(),
   updated_at   timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (photo_id, variant_type)
+  CONSTRAINT photo_variants_photo_type_uq UNIQUE (photo_id, variant_type)
 );
 
 -- processing_jobs: one row per run; append-only-ish audit/billing/idempotency record
