@@ -124,3 +124,38 @@ any abstraction.
 Orientation scripts and wrappers around verification greps. They are one-time and
 content-varying; an on-the-spot one-liner is cheaper than maintaining an abstraction.
 The goal is to cover what recurs **verbatim**, not everything.
+
+## Session 008 — verified in practice
+
+Session 008 (first **polyglot** session: TS monorepo + a real Python
+`media-worker`, and the first to run the **live Docker stack**) is the first to
+exercise this tooling at scale: ~129 orchestrator Bash calls + ~689 subagent
+command-lines across 44 subagents.
+
+**What held (the 007 tooling worked):**
+
+- `scripts/sdd` (base/brief/package/done) ran ~100× across 22 tasks with **zero**
+  cwd breakage — the 006 `review-package` footgun did not recur.
+- `make gate` paid off as the canonical check: it caught an eslint `.venv` scan
+  and `require-await` violations that per-service `vitest` runs had missed.
+- Commit conventions (`bd create --json`, no confirmation tails, `Co-Authored-By`)
+  were followed on both sides; ceremony stayed lean.
+
+**Fixed immediately (hotfix):**
+
+- `scripts/sdd done` truncated ledger labels containing a colon (anchored on the
+  first `:` instead of the last). Fixed to anchor on the last colon.
+
+**Open follow-ups (next backlog sweep — not a session):** the polyglot + live-stack
+shift surfaced new frictions, tracked as standalone backlog issues:
+
+| Friction | Issue |
+| --- | --- |
+| `make gate` is TS-only; nothing verifies the whole polyglot repo | `photo_ops-uil` |
+| `docker compose …` diagnostics prefix retyped (no convenience targets) | `photo_ops-g3u` |
+| `media-worker` targets recreate `.venv` every run | `photo_ops-jam` |
+| Live-stack validation is high-value but high-friction (a clean gate **and** a clean review missed three real bugs only `make smoke-media` caught) | `photo_ops-0ro` |
+
+The headline from 008: a green gate plus a clean review is **necessary but not
+sufficient** — running the real stack found three bugs nothing else did, which is
+the case for making live-stack validation a cheap, first-class command.
