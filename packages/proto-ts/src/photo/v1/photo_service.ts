@@ -53,6 +53,23 @@ export interface ListPhotosResponse {
   nextPageToken: string;
 }
 
+export interface GetPhotoRequest {
+  photoId: string;
+  userId: string;
+}
+
+/**
+ * A generated variant rendition surfaced to the UI, with a short-lived,
+ * owner-scoped presigned GET url.
+ */
+export interface PhotoVariantView {
+  /** "thumbnail" | "preview" */
+  variantType: string;
+  url: string;
+  width: number;
+  height: number;
+}
+
 export interface PhotoAsset {
   id: string;
   filename: string;
@@ -63,6 +80,22 @@ export interface PhotoAsset {
   createdAt: string;
   updatedAt: string;
   userId: string;
+  /** Extracted attributes (populated after processing; defaults/absent before). */
+  width: number;
+  height: number;
+  /** tz-less wall-clock; "" if absent */
+  takenAtLocal: string;
+  /** explicit-UTC ISO instant; "" if unresolved */
+  takenAtUtc: string;
+  /** exif_offset | gps_time | unknown */
+  takenAtTzSource: string;
+  cameraMake: string;
+  cameraModel: string;
+  /** EXIF 1..8; 0 = absent */
+  orientation: number;
+  lat?: number | undefined;
+  lon?: number | undefined;
+  variants: PhotoVariantView[];
 }
 
 export const PHOTOOPS_PHOTO_V1_PACKAGE_NAME = "photoops.photo.v1";
@@ -362,6 +395,124 @@ export const ListPhotosResponse: MessageFns<ListPhotosResponse> = {
   },
 };
 
+function createBaseGetPhotoRequest(): GetPhotoRequest {
+  return { photoId: "", userId: "" };
+}
+
+export const GetPhotoRequest: MessageFns<GetPhotoRequest> = {
+  encode(message: GetPhotoRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.photoId !== "") {
+      writer.uint32(10).string(message.photoId);
+    }
+    if (message.userId !== "") {
+      writer.uint32(18).string(message.userId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetPhotoRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetPhotoRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.photoId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.userId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBasePhotoVariantView(): PhotoVariantView {
+  return { variantType: "", url: "", width: 0, height: 0 };
+}
+
+export const PhotoVariantView: MessageFns<PhotoVariantView> = {
+  encode(message: PhotoVariantView, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.variantType !== "") {
+      writer.uint32(10).string(message.variantType);
+    }
+    if (message.url !== "") {
+      writer.uint32(18).string(message.url);
+    }
+    if (message.width !== 0) {
+      writer.uint32(24).uint32(message.width);
+    }
+    if (message.height !== 0) {
+      writer.uint32(32).uint32(message.height);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PhotoVariantView {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBasePhotoVariantView();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.variantType = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.url = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.width = reader.uint32();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.height = reader.uint32();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
 function createBasePhotoAsset(): PhotoAsset {
   return {
     id: "",
@@ -373,6 +524,15 @@ function createBasePhotoAsset(): PhotoAsset {
     createdAt: "",
     updatedAt: "",
     userId: "",
+    width: 0,
+    height: 0,
+    takenAtLocal: "",
+    takenAtUtc: "",
+    takenAtTzSource: "",
+    cameraMake: "",
+    cameraModel: "",
+    orientation: 0,
+    variants: [],
   };
 }
 
@@ -404,6 +564,39 @@ export const PhotoAsset: MessageFns<PhotoAsset> = {
     }
     if (message.userId !== "") {
       writer.uint32(74).string(message.userId);
+    }
+    if (message.width !== 0) {
+      writer.uint32(80).uint32(message.width);
+    }
+    if (message.height !== 0) {
+      writer.uint32(88).uint32(message.height);
+    }
+    if (message.takenAtLocal !== "") {
+      writer.uint32(98).string(message.takenAtLocal);
+    }
+    if (message.takenAtUtc !== "") {
+      writer.uint32(106).string(message.takenAtUtc);
+    }
+    if (message.takenAtTzSource !== "") {
+      writer.uint32(114).string(message.takenAtTzSource);
+    }
+    if (message.cameraMake !== "") {
+      writer.uint32(122).string(message.cameraMake);
+    }
+    if (message.cameraModel !== "") {
+      writer.uint32(130).string(message.cameraModel);
+    }
+    if (message.orientation !== 0) {
+      writer.uint32(136).uint32(message.orientation);
+    }
+    if (message.lat !== undefined) {
+      writer.uint32(145).double(message.lat);
+    }
+    if (message.lon !== undefined) {
+      writer.uint32(153).double(message.lon);
+    }
+    for (const v of message.variants) {
+      PhotoVariantView.encode(v!, writer.uint32(162).fork()).join();
     }
     return writer;
   },
@@ -487,6 +680,94 @@ export const PhotoAsset: MessageFns<PhotoAsset> = {
           message.userId = reader.string();
           continue;
         }
+        case 10: {
+          if (tag !== 80) {
+            break;
+          }
+
+          message.width = reader.uint32();
+          continue;
+        }
+        case 11: {
+          if (tag !== 88) {
+            break;
+          }
+
+          message.height = reader.uint32();
+          continue;
+        }
+        case 12: {
+          if (tag !== 98) {
+            break;
+          }
+
+          message.takenAtLocal = reader.string();
+          continue;
+        }
+        case 13: {
+          if (tag !== 106) {
+            break;
+          }
+
+          message.takenAtUtc = reader.string();
+          continue;
+        }
+        case 14: {
+          if (tag !== 114) {
+            break;
+          }
+
+          message.takenAtTzSource = reader.string();
+          continue;
+        }
+        case 15: {
+          if (tag !== 122) {
+            break;
+          }
+
+          message.cameraMake = reader.string();
+          continue;
+        }
+        case 16: {
+          if (tag !== 130) {
+            break;
+          }
+
+          message.cameraModel = reader.string();
+          continue;
+        }
+        case 17: {
+          if (tag !== 136) {
+            break;
+          }
+
+          message.orientation = reader.uint32();
+          continue;
+        }
+        case 18: {
+          if (tag !== 145) {
+            break;
+          }
+
+          message.lat = reader.double();
+          continue;
+        }
+        case 19: {
+          if (tag !== 153) {
+            break;
+          }
+
+          message.lon = reader.double();
+          continue;
+        }
+        case 20: {
+          if (tag !== 162) {
+            break;
+          }
+
+          message.variants.push(PhotoVariantView.decode(reader, reader.uint32()));
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -505,6 +786,8 @@ export interface PhotoServiceClient {
   completeUpload(request: CompleteUploadRequest): Observable<PhotoAsset>;
 
   listPhotos(request: ListPhotosRequest): Observable<ListPhotosResponse>;
+
+  getPhoto(request: GetPhotoRequest): Observable<PhotoAsset>;
 }
 
 export interface PhotoServiceController {
@@ -521,11 +804,13 @@ export interface PhotoServiceController {
   listPhotos(
     request: ListPhotosRequest,
   ): Promise<ListPhotosResponse> | Observable<ListPhotosResponse> | ListPhotosResponse;
+
+  getPhoto(request: GetPhotoRequest): Promise<PhotoAsset> | Observable<PhotoAsset> | PhotoAsset;
 }
 
 export function PhotoServiceControllerMethods() {
   return function (constructor: Function) {
-    const grpcMethods: string[] = ["health", "createUploadIntent", "completeUpload", "listPhotos"];
+    const grpcMethods: string[] = ["health", "createUploadIntent", "completeUpload", "listPhotos", "getPhoto"];
     for (const method of grpcMethods) {
       const descriptor: any = Reflect.getOwnPropertyDescriptor(constructor.prototype, method);
       GrpcMethod("PhotoService", method)(constructor.prototype[method], method, descriptor);
@@ -581,6 +866,15 @@ export const PhotoServiceService = {
     responseSerialize: (value: ListPhotosResponse): Buffer => Buffer.from(ListPhotosResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer): ListPhotosResponse => ListPhotosResponse.decode(value),
   },
+  getPhoto: {
+    path: "/photoops.photo.v1.PhotoService/GetPhoto" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: GetPhotoRequest): Buffer => Buffer.from(GetPhotoRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): GetPhotoRequest => GetPhotoRequest.decode(value),
+    responseSerialize: (value: PhotoAsset): Buffer => Buffer.from(PhotoAsset.encode(value).finish()),
+    responseDeserialize: (value: Buffer): PhotoAsset => PhotoAsset.decode(value),
+  },
 } as const;
 
 export interface PhotoServiceServer extends UntypedServiceImplementation {
@@ -588,6 +882,7 @@ export interface PhotoServiceServer extends UntypedServiceImplementation {
   createUploadIntent: handleUnaryCall<CreateUploadIntentRequest, CreateUploadIntentResponse>;
   completeUpload: handleUnaryCall<CompleteUploadRequest, PhotoAsset>;
   listPhotos: handleUnaryCall<ListPhotosRequest, ListPhotosResponse>;
+  getPhoto: handleUnaryCall<GetPhotoRequest, PhotoAsset>;
 }
 
 export interface MessageFns<T> {

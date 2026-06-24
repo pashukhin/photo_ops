@@ -27,6 +27,10 @@ service PhotoService {
   rpc ListPhotos(ListPhotosRequest) returns (ListPhotosResponse) {
     option (google.api.http) = {get: "/v1/photos"};
   }
+
+  rpc GetPhoto(GetPhotoRequest) returns (PhotoAsset) {
+    option (google.api.http) = {get: "/v1/photos/{photo_id}"};
+  }
 }
 
 message CreateUploadIntentRequest {
@@ -59,6 +63,20 @@ message ListPhotosResponse {
   string next_page_token = 2;
 }
 
+message GetPhotoRequest {
+  string photo_id = 1;
+  string user_id = 2;
+}
+
+// A generated variant rendition surfaced to the UI, with a short-lived,
+// owner-scoped presigned GET url.
+message PhotoVariantView {
+  string variant_type = 1; // "thumbnail" | "preview"
+  string url = 2;
+  uint32 width = 3;
+  uint32 height = 4;
+}
+
 message PhotoAsset {
   string id = 1;
   string filename = 2;
@@ -69,6 +87,18 @@ message PhotoAsset {
   string created_at = 7;
   string updated_at = 8;
   string user_id = 9;
+  // Extracted attributes (populated after processing; defaults/absent before).
+  uint32 width = 10;
+  uint32 height = 11;
+  string taken_at_local = 12;     // tz-less wall-clock; "" if absent
+  string taken_at_utc = 13;       // explicit-UTC ISO instant; "" if unresolved
+  string taken_at_tz_source = 14; // exif_offset | gps_time | unknown
+  string camera_make = 15;
+  string camera_model = 16;
+  uint32 orientation = 17;        // EXIF 1..8; 0 = absent
+  optional double lat = 18;
+  optional double lon = 19;
+  repeated PhotoVariantView variants = 20;
 }
 
 enum PhotoStatus {
