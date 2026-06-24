@@ -1,9 +1,13 @@
-.PHONY: install proto proto-check build typecheck test lint gate gate-media test-api test-identity test-photo test-web test-media-worker lint-media-worker dev down reset logs status migrate migrate-identity migrate-photo smoke-upload smoke-auth smoke-contract smoke-media smoke-stack
+.PHONY: install proto proto-check build typecheck test lint gate gate-media test-api test-identity test-photo test-web test-media-worker lint-media-worker dev down reset logs status ps-all logs-svc sh restart-svc up-svc migrate migrate-identity migrate-photo smoke-upload smoke-auth smoke-contract smoke-media smoke-stack
 
 ifneq (,$(wildcard .env))
 include .env
 export
 endif
+
+# Canonical docker compose invocation. Use $(DC) everywhere instead of retyping
+# the -f/--env-file prefix (s008 retyped it 17x for diagnostics — photo_ops-g3u).
+DC := docker compose -f infra/docker/docker-compose.yml --env-file .env
 
 install:
 	pnpm install
@@ -54,30 +58,56 @@ test-web:
 	pnpm --filter @photoops/web test
 
 dev:
-	docker compose -f infra/docker/docker-compose.yml --env-file .env up --build
+	$(DC) up --build
 
 down:
-	docker compose -f infra/docker/docker-compose.yml --env-file .env down
+	$(DC) down
 
 reset:
-	docker compose -f infra/docker/docker-compose.yml --env-file .env down -v
+	$(DC) down -v
 
 logs:
-	docker compose -f infra/docker/docker-compose.yml --env-file .env logs -f
+	$(DC) logs -f
 
 status:
-	docker compose -f infra/docker/docker-compose.yml --env-file .env ps
+	$(DC) ps
+
+# --- targeted compose diagnostics (g3u) --------------------------------------
+# The happy-path targets above are all-services; these cover the per-service
+# gaps s008 kept retyping. Pass svc=<name> (one or more, space-separated):
+#   make logs-svc svc=photo-service        # follow one service's logs
+#   make sh svc=api-gateway                # shell into a running container
+#   make restart-svc svc=media-worker      # restart after a code/env change
+#   make up-svc svc="photo-service media-worker"   # (re)start a subset, detached
+ps-all:
+	$(DC) ps -a
+
+logs-svc:
+	@test -n "$(svc)" || { echo "usage: make logs-svc svc=<service>"; exit 2; }
+	$(DC) logs -f $(svc)
+
+sh:
+	@test -n "$(svc)" || { echo "usage: make sh svc=<service>"; exit 2; }
+	$(DC) exec $(svc) sh
+
+restart-svc:
+	@test -n "$(svc)" || { echo "usage: make restart-svc svc=<service>"; exit 2; }
+	$(DC) restart $(svc)
+
+up-svc:
+	@test -n "$(svc)" || { echo "usage: make up-svc svc=<service ...>"; exit 2; }
+	$(DC) up -d --build $(svc)
 
 migrate: migrate-identity migrate-photo
 
 migrate-identity:
-	docker compose -f infra/docker/docker-compose.yml --env-file .env exec -T postgres psql -U "$${POSTGRES_SUPERUSER}" -d postgres < infra/postgres/init/001-create-databases.sql
-	docker compose -f infra/docker/docker-compose.yml --env-file .env exec -T postgres psql "$${IDENTITY_DATABASE_URL}" < apps/identity-service/migrations/0001_create_identity_tables.sql
+	$(DC) exec -T postgres psql -U "$${POSTGRES_SUPERUSER}" -d postgres < infra/postgres/init/001-create-databases.sql
+	$(DC) exec -T postgres psql "$${IDENTITY_DATABASE_URL}" < apps/identity-service/migrations/0001_create_identity_tables.sql
 
 migrate-photo:
-	docker compose -f infra/docker/docker-compose.yml --env-file .env exec -T postgres psql -U "$${POSTGRES_SUPERUSER}" -d postgres < infra/postgres/init/001-create-databases.sql
-	docker compose -f infra/docker/docker-compose.yml --env-file .env exec -T postgres psql "$${PHOTO_DATABASE_URL}" < apps/photo-service/migrations/0001_create_photo_assets.sql
-	docker compose -f infra/docker/docker-compose.yml --env-file .env exec -T postgres psql "$${PHOTO_DATABASE_URL}" < apps/photo-service/migrations/0002_media_processing.sql
+	$(DC) exec -T postgres psql -U "$${POSTGRES_SUPERUSER}" -d postgres < infra/postgres/init/001-create-databases.sql
+	$(DC) exec -T postgres psql "$${PHOTO_DATABASE_URL}" < apps/photo-service/migrations/0001_create_photo_assets.sql
+	$(DC) exec -T postgres psql "$${PHOTO_DATABASE_URL}" < apps/photo-service/migrations/0002_media_processing.sql
 
 smoke-upload:
 	scripts/smoke-upload.sh

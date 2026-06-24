@@ -154,8 +154,8 @@ shift surfaced new frictions, tracked as standalone backlog issues:
 | Friction | Issue |
 | --- | --- |
 | ~~`make gate` is TS-only; nothing verifies the whole polyglot repo~~ — **done**: `gate` now runs `gate-media` (lint+test media-worker) | `photo_ops-uil` ✅ |
-| `docker compose …` diagnostics prefix retyped (no convenience targets) | `photo_ops-g3u` |
-| `media-worker` targets recreate `.venv` every run | `photo_ops-jam` |
+| ~~`docker compose …` diagnostics prefix retyped (no convenience targets)~~ — **done**: `$(DC)` var + `ps-all` / `logs-svc` / `sh` / `restart-svc` / `up-svc` (svc=…) targets | `photo_ops-g3u` ✅ |
+| ~~`media-worker` targets recreate `.venv` every run~~ — **done**: `test-`/`lint-media-worker` depend on a pyproject-keyed stamp; install runs only when deps change | `photo_ops-jam` ✅ |
 | ~~Live-stack validation is high-value but high-friction (a clean gate **and** a clean review missed three real bugs only `make smoke-media` caught)~~ — **done**: `make smoke-stack` (`scripts/smoke-stack.sh`) builds the media-path services, brings them up clean, migrates, runs the smoke, and tears down — full build output to a log file, df pre-check, honest exit code | `photo_ops-0ro` ✅ |
 
 The headline from 008: a green gate plus a clean review is **necessary but not
