@@ -69,7 +69,11 @@ case "$cmd" in
     tmp=$(mktemp)
     awk -v n="$n" -v s="$status" '
       !marked && $0 ~ ("^- *[Tt]ask[ \t]+" n "([^0-9]|:)") {
-        c = index($0, ":")
+        # The label/status separator is the LAST colon on the line. Labels may
+        # contain colons (e.g. "(domain: publish job)"); anchoring on the first
+        # colon truncated the label. Status text we write carries no colon.
+        c = 0
+        for (i = 1; i <= length($0); i++) if (substr($0, i, 1) == ":") c = i
         if (c > 0) { print substr($0, 1, c) " " s; marked=1; next }
       }
       { print }
