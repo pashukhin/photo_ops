@@ -17,7 +17,7 @@ export interface PhotoAssetRecord {
   // Extracted attributes (populated at processing finalize; null before that).
   width: number | null;
   height: number | null;
-  takenAtLocal: Date | null;
+  takenAtLocal: string | null;
   takenAtUtc: Date | null;
   takenAtTzSource: string | null;
   cameraMake: string | null;

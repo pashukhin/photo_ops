@@ -102,7 +102,7 @@ export class PhotoRepository implements PhotoRepositoryPort {
       });
   }
 
-  async applyAttributes(photoId: string, attrs: { width: number | null; height: number | null; takenAtLocal: Date | null; takenAtUtc: Date | null; takenAtTzSource: string | null; cameraMake: string | null; cameraModel: string | null; orientation: number | null; lat: number | null; lon: number | null; metadataJson: unknown }): Promise<void> {
+  async applyAttributes(photoId: string, attrs: { width: number | null; height: number | null; takenAtLocal: string | null; takenAtUtc: Date | null; takenAtTzSource: string | null; cameraMake: string | null; cameraModel: string | null; orientation: number | null; lat: number | null; lon: number | null; metadataJson: unknown }): Promise<void> {
     await this.db
       .update(photoAssets)
       .set({ ...attrs, updatedAt: new Date() })

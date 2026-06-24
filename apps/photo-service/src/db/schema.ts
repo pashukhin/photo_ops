@@ -27,7 +27,9 @@ export const photoAssets = pgTable(
     // nullable attribute columns added in migration 0002
     width: integer('width'),
     height: integer('height'),
-    takenAtLocal: timestamp('taken_at_local', { withTimezone: false }),
+    // tz-less wall-clock from EXIF; stored verbatim as a string to avoid any
+    // Date/timezone reinterpretation. takenAtUtc is a true instant (Date).
+    takenAtLocal: timestamp('taken_at_local', { withTimezone: false, mode: 'string' }),
     takenAtUtc: timestamp('taken_at_utc', { withTimezone: true }),
     takenAtTzSource: text('taken_at_tz_source'),
     cameraMake: text('camera_make'),

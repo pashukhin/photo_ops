@@ -20,7 +20,7 @@ export interface PhotoRepositoryPort {
   markProcessingForUser(userId: string, photoId: string): Promise<boolean>;
   finalizeJob(jobId: string, outcome: 'succeeded' | 'failed', errorMessage?: string): Promise<boolean>;
   upsertVariant(v: { photoId: string; variantType: 'thumbnail' | 'preview'; objectKey: string; width: number; height: number; sizeBytes: bigint; contentType: string }): Promise<void>;
-  applyAttributes(photoId: string, attrs: { width: number | null; height: number | null; takenAtLocal: Date | null; takenAtUtc: Date | null; takenAtTzSource: string | null; cameraMake: string | null; cameraModel: string | null; orientation: number | null; lat: number | null; lon: number | null; metadataJson: unknown }): Promise<void>;
+  applyAttributes(photoId: string, attrs: { width: number | null; height: number | null; takenAtLocal: string | null; takenAtUtc: Date | null; takenAtTzSource: string | null; cameraMake: string | null; cameraModel: string | null; orientation: number | null; lat: number | null; lon: number | null; metadataJson: unknown }): Promise<void>;
   setStatus(photoId: string, status: 'ready' | 'failed' | 'processing'): Promise<void>;
   findByIdWithVariantsForUser(userId: string, photoId: string): Promise<{ photo: PhotoAssetRecord; variants: PhotoVariantRecord[] } | null>;
   listVariantsForPhotos(photoIds: string[]): Promise<PhotoVariantRecord[]>;
