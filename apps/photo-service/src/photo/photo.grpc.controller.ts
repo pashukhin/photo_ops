@@ -47,11 +47,15 @@ export class PhotoGrpcController {
 
   @GrpcMethod('PhotoService', 'GetPhoto')
   async getPhoto(request: { photoId: string; userId: string }) {
-    const pwv = await this.photoService.getPhoto(request.userId, request.photoId);
-    if (!pwv) {
-      throw new Error('photo not found');
+    try {
+      const pwv = await this.photoService.getPhoto(request.userId, request.photoId);
+      if (!pwv) {
+        throw new Error('photo not found');
+      }
+      return this.toProtoPhoto(pwv);
+    } catch (error) {
+      throw this.mapDomainError(error);
     }
-    return this.toProtoPhoto(pwv);
   }
 
   private toProtoPhoto(pwv: PhotoWithVariants) {

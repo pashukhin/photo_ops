@@ -89,10 +89,16 @@ describe('PhotoGrpcController', () => {
     expect(reply.variants[0].height).toBe(150);
   });
 
-  it('GetPhoto throws when domain service returns null', async () => {
+  it('GetPhoto maps a missing photo to not found', async () => {
     const { controller, photoService } = createController();
     photoService.getPhoto.mockResolvedValue(null);
 
-    await expect(controller.getPhoto({ userId: 'user-1', photoId: 'missing' })).rejects.toThrow('photo not found');
+    try {
+      await controller.getPhoto({ userId: 'user-1', photoId: 'missing' });
+      throw new Error('expected rpc exception');
+    } catch (error) {
+      expect(error).toBeInstanceOf(RpcException);
+      expect((error as RpcException).getError()).toEqual({ code: status.NOT_FOUND, message: 'photo not found' });
+    }
   });
 });
