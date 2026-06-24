@@ -30,3 +30,6 @@ data/
 
 # Editor settings (user-specific)
 .vscode/
+
+# smoke-stack build/up/migrate logs (scripts/smoke-stack.sh)
+.smoke-stack/

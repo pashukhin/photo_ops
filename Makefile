@@ -1,4 +1,4 @@
-.PHONY: install proto proto-check build typecheck test lint gate gate-media test-api test-identity test-photo test-web test-media-worker lint-media-worker dev down reset logs status migrate migrate-identity migrate-photo smoke-upload smoke-auth smoke-contract smoke-media
+.PHONY: install proto proto-check build typecheck test lint gate gate-media test-api test-identity test-photo test-web test-media-worker lint-media-worker dev down reset logs status migrate migrate-identity migrate-photo smoke-upload smoke-auth smoke-contract smoke-media smoke-stack
 
 ifneq (,$(wildcard .env))
 include .env
@@ -92,6 +92,14 @@ smoke-contract:
 # Do NOT add to `gate` or CI targets.
 smoke-media:
 	scripts/smoke-media-processing.sh
+
+# One-shot live-stack validation: build only the media-path services, bring
+# them up clean, wait for readiness, migrate, run smoke-media, then tear down.
+# OWNS the dev compose project (resets volumes) — do not run alongside `make dev`.
+# Local-only; do NOT add to `gate` or CI. See scripts/smoke-stack.sh and
+# docs/agent-ergonomics.md (s008 friction #8).
+smoke-stack:
+	scripts/smoke-stack.sh
 
 test-media-worker:
 	cd apps/media-worker && python3 -m venv .venv && .venv/bin/pip install -q -e ".[dev]" && .venv/bin/python -m pytest -q
