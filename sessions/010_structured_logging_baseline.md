@@ -20,9 +20,11 @@ immediately, independent of future service shape.
 - **Structured JSON logs** with consistent levels across `api-gateway`,
   `identity-service`, and `photo-service` (pick a logger: Nest's built-in vs
   pino/nestjs-pino — decide in the design pass).
-- **Correlation id** generated (or accepted from an inbound header) at the
-  `web` → `api-gateway` edge and **propagated through gRPC** to identity/photo
-  via request metadata, so a single request is traceable across services.
+- **Correlation id = OpenTelemetry trace context** (see the design steer
+  below), generated (or accepted from an inbound `traceparent`) at the
+  `web` → `api-gateway` edge and **propagated across gRPC and the RabbitMQ
+  job/result** to identity/photo/media-worker, so a single request is
+  traceable across the whole mesh. Logs carry `trace_id`/`span_id`.
 - **No secrets in logs** — redact tokens, passwords, cookies, presigned URLs.
 - Wire the Python `media-worker` into the same shape where it makes sense
   (job/correlation id carried on the `ProcessPhotoJob` message), or explicitly
@@ -33,6 +35,29 @@ immediately, independent of future service shape.
 - Foundation of observability that helps existing services today.
 - **Blocks `photo_ops-pb6`** (metrics + tracing / OpenTelemetry) — structured
   logs + a correlation id are the substrate tracing builds on.
+
+## Design steer: correlation id = OpenTelemetry trace context
+
+A recommendation for the brainstorming pass, not a settled decision — but a
+strong default. zg6 (correlation id) and `pb6` (distributed tracing) overlap on
+one thing: **OpenTelemetry's trace context (W3C `traceparent`) _is_ a
+correlation id** propagated across HTTP → gRPC → AMQP. So rather than build a
+bespoke correlation-id header that `pb6` would later rebuild and discard:
+
+- **In zg6 (now):** adopt `@opentelemetry/api` + auto-instrumentation
+  (HTTP/gRPC/pg/amqp) for **context propagation only**, and stamp
+  `trace_id`/`span_id` into the structured logs. No exporter, no backend — OTel
+  just propagates context and correlates logs. This delivers zg6's actual goal
+  while laying `pb6`'s foundation with zero throwaway.
+- **In `pb6` (later):** purely additive — an OTLP exporter + a trace/metrics
+  backend (Jaeger/Tempo + Prometheus, or a collector) in compose, plus RED
+  metrics. The spans already exist, so there is no re-instrumentation.
+
+The lighter alternative (a homemade correlation id now, all OTel deferred to
+`pb6`) is simpler today but largely throwaway. Given this is a real
+HTTP+gRPC+AMQP mesh — where the session-009 readiness-race 500 would have been
+obvious from a single trace — the OTel-context default is preferred. Settle it
+in the design pass.
 
 ## Adjacent (not this session)
 
@@ -46,7 +71,9 @@ immediately, independent of future service shape.
 
 ## Out of scope
 
-- Metrics, tracing, OpenTelemetry (`pb6`).
+- OTel **exporters, a trace/metrics backend, and RED metrics** (`pb6`). Note
+  the seam: OTel *context propagation + log correlation* is in scope here; only
+  the exporter/backend/metrics half is deferred.
 - Log shipping / aggregation backend (future production infrastructure,
   `photo_ops-cmb`).
 
