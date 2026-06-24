@@ -12,7 +12,9 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(501)
         self.send_header("content-type", "application/json")
         self.end_headers()
-        self.wfile.write(b'{"code":"not_implemented","message":"media processing is not implemented in this frame"}')
+        self.wfile.write(
+            b'{"code":"not_implemented","message":"media processing is not implemented in this frame"}'  # noqa: E501
+        )
 
 
 if __name__ == "__main__":

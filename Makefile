@@ -1,4 +1,4 @@
-.PHONY: install proto proto-check build typecheck test lint gate test-api test-identity test-photo test-web dev down reset logs status migrate migrate-identity migrate-photo smoke-upload smoke-auth smoke-contract
+.PHONY: install proto proto-check build typecheck test lint gate test-api test-identity test-photo test-web test-media-worker lint-media-worker dev down reset logs status migrate migrate-identity migrate-photo smoke-upload smoke-auth smoke-contract
 
 ifneq (,$(wildcard .env))
 include .env
@@ -78,3 +78,9 @@ smoke-auth:
 
 smoke-contract:
 	sh scripts/test-smoke-upload-contract.sh
+
+test-media-worker:
+	cd apps/media-worker && python3 -m venv .venv && .venv/bin/pip install -q -e ".[dev]" && .venv/bin/python -m pytest -q
+
+lint-media-worker:
+	cd apps/media-worker && python3 -m venv .venv && .venv/bin/pip install -q -e ".[dev]" && .venv/bin/ruff check src tests && .venv/bin/mypy src
