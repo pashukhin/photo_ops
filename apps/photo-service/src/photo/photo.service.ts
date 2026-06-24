@@ -38,6 +38,7 @@ export interface PhotoRepositoryPort {
 export interface ObjectStoragePort {
   createPresignedPutUrl(objectKey: string, contentType: string): Promise<{ uploadUrl: string; expiresAt: Date }>;
   objectExists(objectKey: string): Promise<boolean>;
+  createPresignedGetUrl(objectKey: string, expiresIn?: number): Promise<string>;
 }
 
 @Injectable()

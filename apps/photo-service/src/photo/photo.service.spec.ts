@@ -18,7 +18,8 @@ function createService() {
   };
   const storage = {
     createPresignedPutUrl: vi.fn(),
-    objectExists: vi.fn()
+    objectExists: vi.fn(),
+    createPresignedGetUrl: vi.fn()
   };
   const publisher = { publish: vi.fn() };
   // Sensible defaults so completeUpload's processing kickoff runs in tests that
