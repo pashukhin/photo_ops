@@ -1,6 +1,12 @@
 # media-worker
 
-Health-only Python scaffold with a full Python toolchain (Task 0.3). No real worker logic yet; see roadmap stage 3 (media processing).
+Full media-processing worker with RabbitMQ consumer loop (Task 2.5). Handles
+`ProcessPhotoJob` messages, renders image variants, and publishes
+`PhotoProcessingResult` messages.
+
+Health HTTP scaffold dropped — worker liveness is signalled by the consumer
+connection remaining open (no dedicated health endpoint; liveness probe in
+production should check the AMQP connection or use a container health check).
 
 ## Local context
 
@@ -13,4 +19,6 @@ Health-only Python scaffold with a full Python toolchain (Task 0.3). No real wor
 ## Local invariants
 
 - Do not regenerate proto stubs from this service; `make proto` / `make proto-check` handles drift detection at the repo root.
-- Preserve service boundaries until an approved session wires media processing logic.
+- `RabbitMqBus` is not instantiated in unit tests — it requires a live broker. It is covered by the Task 4.2 integration test.
+- Broker topology (exchange/queue/DLX/DLQ) is canonical and mirrored exactly by the TypeScript adapter in the photo-service (Task 4.2). Do not change topology constants without updating both sides.
+- Entry point: `python src/main.py` — calls `app.run(load())`, which blocks on `bus.start()`.
