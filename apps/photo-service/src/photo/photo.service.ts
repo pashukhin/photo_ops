@@ -1,8 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { uuidv7 } from 'uuidv7';
 import { MessagePublisher } from '../messaging/messaging.port';
-import { CreateUploadIntentInput, PhotoAssetRecord, PhotoVariantRecord, ProcessingJobRecord } from './photo.types';
+import { CreateUploadIntentInput, PhotoAssetRecord, PhotoVariantRecord, ProcessingJobRecord, ProcessingResultInput } from './photo.types';
 import { encodeJob } from './processing.codec';
+
+function parseMetadata(raw: string): unknown {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
 
 // Logical destination name for the processing job flow (broker topology lives
 // in the adapter, not here).
@@ -102,5 +111,52 @@ export class PhotoDomainService {
 
   async listPhotos(userId: string, limit = 100) {
     return this.repository.list(userId, limit);
+  }
+
+  async finalizeResult(result: ProcessingResultInput): Promise<void> {
+    const applied = await this.repository.finalizeJob(result.jobId, result.outcome, result.errorMessage);
+    if (!applied) return;
+
+    if (result.outcome === 'succeeded') {
+      for (const v of result.variants) {
+        await this.repository.upsertVariant({
+          photoId: result.photoId,
+          variantType: v.variantType,
+          objectKey: v.objectKey,
+          width: v.width,
+          height: v.height,
+          sizeBytes: v.sizeBytes,
+          contentType: v.contentType
+        });
+      }
+
+      const a = result.attributes;
+      await this.repository.applyAttributes(result.photoId, {
+        width: a?.width ?? null,
+        height: a?.height ?? null,
+        takenAtLocal: a?.takenAtLocal ?? null,
+        takenAtUtc: a?.takenAtUtc ? new Date(a.takenAtUtc) : null,
+        takenAtTzSource: a?.takenAtTzSource ?? null,
+        cameraMake: a?.cameraMake ?? null,
+        cameraModel: a?.cameraModel ?? null,
+        orientation: a?.orientation ? a.orientation : null,
+        lat: a?.lat ?? null,
+        lon: a?.lon ?? null,
+        metadataJson: parseMetadata(result.metadataJson)
+      });
+
+      await this.repository.setStatus(result.photoId, 'ready');
+    } else {
+      await this.repository.setStatus(result.photoId, 'failed');
+    }
+
+    console.log(JSON.stringify({
+      level: 'info',
+      msg: 'processing.finalized',
+      correlationId: result.correlationId ?? null,
+      jobId: result.jobId,
+      photoId: result.photoId,
+      outcome: result.outcome
+    }));
   }
 }

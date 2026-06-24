@@ -191,4 +191,29 @@ describe('PhotoDomainService', () => {
     expect(repository.createProcessingJob).not.toHaveBeenCalled();
     expect(publisher.publish).not.toHaveBeenCalled();
   });
+
+  it('finalize SUCCEEDED: upserts variants, applies attributes, marks ready', async () => {
+    const { service, repository } = createService();
+    repository.finalizeJob.mockResolvedValue(true);
+    await service.finalizeResult({ jobId: 'j1', photoId: 'p1', outcome: 'succeeded',
+      attributes: { width: 100, height: 50 }, variants: [{ variantType: 'thumbnail', objectKey: 'variants/p1/thumbnail.jpg', width: 100, height: 50, sizeBytes: 10n, contentType: 'image/jpeg' }], metadataJson: '{}' });
+    expect(repository.upsertVariant).toHaveBeenCalledTimes(1);
+    expect(repository.applyAttributes).toHaveBeenCalledWith('p1', expect.objectContaining({ width: 100 }));
+    expect(repository.setStatus).toHaveBeenCalledWith('p1', 'ready');
+  });
+
+  it('finalize is idempotent: duplicate result (finalizeJob=false) writes nothing', async () => {
+    const { service, repository } = createService();
+    repository.finalizeJob.mockResolvedValue(false);
+    await service.finalizeResult({ jobId: 'j1', photoId: 'p1', outcome: 'succeeded', attributes: {}, variants: [], metadataJson: '{}' });
+    expect(repository.upsertVariant).not.toHaveBeenCalled();
+    expect(repository.setStatus).not.toHaveBeenCalled();
+  });
+
+  it('finalize FAILED: marks failed', async () => {
+    const { service, repository } = createService();
+    repository.finalizeJob.mockResolvedValue(true);
+    await service.finalizeResult({ jobId: 'j1', photoId: 'p1', outcome: 'failed', errorMessage: 'bad', variants: [], metadataJson: '' });
+    expect(repository.setStatus).toHaveBeenCalledWith('p1', 'failed');
+  });
 });
