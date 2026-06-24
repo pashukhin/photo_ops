@@ -1,6 +1,48 @@
 import { describe, expect, it, vi } from 'vitest';
 import { PhotoDomainService } from './photo.service';
 
+function makePhotoRecord(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    id: 'photo-1',
+    userId: 'user-1',
+    filename: 'photo.jpg',
+    contentType: 'image/jpeg',
+    sizeBytes: 123n,
+    objectKey: 'originals/photo-1/photo.jpg',
+    status: 'ready',
+    width: 1920,
+    height: 1080,
+    takenAtLocal: '2024-01-15T10:30:00',
+    takenAtUtc: new Date('2024-01-15T09:30:00.000Z'),
+    takenAtTzSource: 'exif',
+    cameraMake: 'Canon',
+    cameraModel: 'EOS R5',
+    orientation: 1,
+    lat: 51.5074,
+    lon: -0.1278,
+    metadataJson: null,
+    createdAt: new Date('2026-06-21T00:00:00.000Z'),
+    updatedAt: new Date('2026-06-21T00:00:00.000Z'),
+    ...overrides
+  };
+}
+
+function makeVariantRecord(overrides: Partial<Record<string, unknown>> = {}) {
+  return {
+    id: 'variant-1',
+    photoId: 'photo-1',
+    variantType: 'thumbnail' as const,
+    objectKey: 'variants/photo-1/thumbnail.jpg',
+    width: 200,
+    height: 150,
+    sizeBytes: 5000n,
+    contentType: 'image/jpeg',
+    createdAt: new Date('2026-06-21T00:00:00.000Z'),
+    updatedAt: new Date('2026-06-21T00:00:00.000Z'),
+    ...overrides
+  };
+}
+
 function createService() {
   const repository = {
     createUploading: vi.fn(),
@@ -26,6 +68,9 @@ function createService() {
   // don't exercise it directly (won the uploaded->processing transition).
   repository.markProcessingForUser.mockResolvedValue(true);
   repository.createProcessingJob.mockResolvedValue({ id: 'job-default' });
+  // Default: no variants (so listPhotos tests don't crash).
+  repository.listVariantsForPhotos.mockResolvedValue([]);
+  storage.createPresignedGetUrl.mockResolvedValue('signed://x');
   return { service: new PhotoDomainService(repository, storage, publisher), repository, storage, publisher };
 }
 
@@ -96,6 +141,52 @@ describe('PhotoDomainService', () => {
     await service.listPhotos('user-1');
 
     expect(repository.list).toHaveBeenCalledWith('user-1', 100);
+  });
+
+  it('getPhoto returns null when repository returns null (photo not found or not owned)', async () => {
+    const { service, repository } = createService();
+    repository.findByIdWithVariantsForUser.mockResolvedValue(null);
+
+    const result = await service.getPhoto('user-1', 'photo-missing');
+
+    expect(result).toBeNull();
+    expect(repository.findByIdWithVariantsForUser).toHaveBeenCalledWith('user-1', 'photo-missing');
+  });
+
+  it('getPhoto presigns each variant and returns PhotoWithVariants', async () => {
+    const { service, repository, storage } = createService();
+    const photo = makePhotoRecord();
+    const variant = makeVariantRecord();
+    repository.findByIdWithVariantsForUser.mockResolvedValue({ photo, variants: [variant] });
+    storage.createPresignedGetUrl.mockResolvedValue('signed://x');
+
+    const result = await service.getPhoto('user-1', 'photo-1');
+
+    expect(result).not.toBeNull();
+    expect(result!.photo).toBe(photo);
+    expect(result!.variants).toHaveLength(1);
+    expect(result!.variants[0].url).toBe('signed://x');
+    expect(result!.variants[0].variantType).toBe('thumbnail');
+    expect(result!.variants[0].width).toBe(200);
+    expect(result!.variants[0].height).toBe(150);
+    expect(storage.createPresignedGetUrl).toHaveBeenCalledWith('variants/photo-1/thumbnail.jpg');
+  });
+
+  it('listPhotos fetches variants for all photos and presigns urls', async () => {
+    const { service, repository, storage } = createService();
+    const photo = makePhotoRecord();
+    repository.list.mockResolvedValue([photo]);
+    const variant = makeVariantRecord();
+    repository.listVariantsForPhotos.mockResolvedValue([variant]);
+    storage.createPresignedGetUrl.mockResolvedValue('signed://x');
+
+    const result = await service.listPhotos('user-1');
+
+    expect(result).toHaveLength(1);
+    expect(result[0].photo).toBe(photo);
+    expect(result[0].variants).toHaveLength(1);
+    expect(result[0].variants[0].url).toBe('signed://x');
+    expect(repository.listVariantsForPhotos).toHaveBeenCalledWith(['photo-1']);
   });
 
   it('completes upload only for the owning user', async () => {

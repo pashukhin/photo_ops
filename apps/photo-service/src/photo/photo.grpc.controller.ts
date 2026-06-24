@@ -2,6 +2,7 @@ import { Controller } from '@nestjs/common';
 import { status } from '@grpc/grpc-js';
 import { GrpcMethod, RpcException } from '@nestjs/microservices';
 import { PhotoDomainService } from './photo.service';
+import { PhotoWithVariants } from './photo.types';
 
 @Controller()
 export class PhotoGrpcController {
@@ -31,7 +32,8 @@ export class PhotoGrpcController {
   @GrpcMethod('PhotoService', 'CompleteUpload')
   async completeUpload(request: { photoId: string; userId: string }) {
     try {
-      return this.mapPhoto(await this.photoService.completeUpload(request.userId, request.photoId));
+      const record = await this.photoService.completeUpload(request.userId, request.photoId);
+      return this.toProtoPhoto({ photo: record, variants: [] });
     } catch (error) {
       throw this.mapDomainError(error);
     }
@@ -39,11 +41,20 @@ export class PhotoGrpcController {
 
   @GrpcMethod('PhotoService', 'ListPhotos')
   async listPhotos(request: { pageSize?: number; userId: string }) {
-    const photos = await this.photoService.listPhotos(request.userId, request.pageSize || 100);
-    return { photos: photos.map((photo) => this.mapPhoto(photo)), nextPageToken: '' };
+    const pwvs = await this.photoService.listPhotos(request.userId, request.pageSize || 100);
+    return { photos: pwvs.map((pwv) => this.toProtoPhoto(pwv)), nextPageToken: '' };
   }
 
-  private mapPhoto(photo: Awaited<ReturnType<PhotoDomainService['listPhotos']>>[number]) {
+  @GrpcMethod('PhotoService', 'GetPhoto')
+  async getPhoto(request: { photoId: string; userId: string }) {
+    const pwv = await this.photoService.getPhoto(request.userId, request.photoId);
+    if (!pwv) {
+      throw new Error('photo not found');
+    }
+    return this.toProtoPhoto(pwv);
+  }
+
+  private toProtoPhoto(pwv: PhotoWithVariants) {
     const statusMap = {
       uploading: 1,
       uploaded: 2,
@@ -51,16 +62,33 @@ export class PhotoGrpcController {
       ready: 4,
       failed: 5
     } as const;
+    const p = pwv.photo;
     return {
-      id: photo.id,
-      userId: photo.userId,
-      filename: photo.filename,
-      contentType: photo.contentType,
-      sizeBytes: photo.sizeBytes.toString(),
-      objectKey: photo.objectKey,
-      status: statusMap[photo.status],
-      createdAt: photo.createdAt.toISOString(),
-      updatedAt: photo.updatedAt.toISOString()
+      id: p.id,
+      userId: p.userId,
+      filename: p.filename,
+      contentType: p.contentType,
+      sizeBytes: p.sizeBytes.toString(),
+      objectKey: p.objectKey,
+      status: statusMap[p.status],
+      createdAt: p.createdAt.toISOString(),
+      updatedAt: p.updatedAt.toISOString(),
+      width: p.width ?? 0,
+      height: p.height ?? 0,
+      takenAtLocal: p.takenAtLocal ?? '',
+      takenAtUtc: p.takenAtUtc ? p.takenAtUtc.toISOString() : '',
+      takenAtTzSource: p.takenAtTzSource ?? '',
+      cameraMake: p.cameraMake ?? '',
+      cameraModel: p.cameraModel ?? '',
+      orientation: p.orientation ?? 0,
+      ...(p.lat !== null && { lat: p.lat }),
+      ...(p.lon !== null && { lon: p.lon }),
+      variants: pwv.variants.map((v) => ({
+        variantType: v.variantType,
+        url: v.url,
+        width: v.width,
+        height: v.height
+      }))
     };
   }
 

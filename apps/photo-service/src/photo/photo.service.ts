@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { uuidv7 } from 'uuidv7';
 import { MessagePublisher } from '../messaging/messaging.port';
-import { CreateUploadIntentInput, PhotoAssetRecord, PhotoVariantRecord, ProcessingJobRecord, ProcessingResultInput } from './photo.types';
+import { CreateUploadIntentInput, PhotoAssetRecord, PhotoVariantRecord, PhotoVariantView, PhotoWithVariants, ProcessingJobRecord, ProcessingResultInput } from './photo.types';
 import { encodeJob } from './processing.codec';
 
 function parseMetadata(raw: string): unknown {
@@ -110,8 +110,36 @@ export class PhotoDomainService {
     return { ...uploaded, status: 'processing' as const };
   }
 
-  async listPhotos(userId: string, limit = 100) {
-    return this.repository.list(userId, limit);
+  async getPhoto(userId: string, photoId: string): Promise<PhotoWithVariants | null> {
+    const result = await this.repository.findByIdWithVariantsForUser(userId, photoId);
+    if (!result) return null;
+    const variants = await Promise.all(result.variants.map((v) => this.toVariantView(v)));
+    return { photo: result.photo, variants };
+  }
+
+  async listPhotos(userId: string, limit = 100): Promise<PhotoWithVariants[]> {
+    const photos = await this.repository.list(userId, limit);
+    if (photos.length === 0) return [];
+    const photoIds = photos.map((p) => p.id);
+    const variantRecords = await this.repository.listVariantsForPhotos(photoIds);
+    const variantsByPhotoId = new Map<string, PhotoVariantRecord[]>();
+    for (const v of variantRecords) {
+      const list = variantsByPhotoId.get(v.photoId) ?? [];
+      list.push(v);
+      variantsByPhotoId.set(v.photoId, list);
+    }
+    return Promise.all(
+      photos.map(async (photo) => {
+        const records = variantsByPhotoId.get(photo.id) ?? [];
+        const variants = await Promise.all(records.map((v) => this.toVariantView(v)));
+        return { photo, variants };
+      })
+    );
+  }
+
+  private async toVariantView(v: PhotoVariantRecord): Promise<PhotoVariantView> {
+    const url = await this.storage.createPresignedGetUrl(v.objectKey);
+    return { variantType: v.variantType, url, width: v.width, height: v.height };
   }
 
   async finalizeResult(result: ProcessingResultInput): Promise<void> {

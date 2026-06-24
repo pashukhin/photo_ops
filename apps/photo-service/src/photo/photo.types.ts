@@ -50,6 +50,18 @@ export interface PhotoVariantRecord {
   updatedAt: Date;
 }
 
+export interface PhotoVariantView {
+  variantType: VariantType;
+  url: string;
+  width: number;
+  height: number;
+}
+
+export interface PhotoWithVariants {
+  photo: PhotoAssetRecord;
+  variants: PhotoVariantView[];
+}
+
 export interface ProcessingJobRecord {
   id: string;
   photoId: string;
