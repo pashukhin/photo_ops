@@ -65,6 +65,9 @@ export class PhotoController {
       variants?: unknown[];
     };
     const status = statusMap[String(asset.status)] ?? asset.status;
-    return { ...asset, status };
+    // proto-loader represents proto3 `optional` presence with synthetic oneof
+    // fields (e.g. `_lat`/`_lon`); strip them from the public response.
+    const cleaned = Object.fromEntries(Object.entries(asset).filter(([key]) => !key.startsWith('_')));
+    return { ...cleaned, status };
   }
 }

@@ -149,12 +149,12 @@ def fail(msg):
 if photo.get("status") != "ready":
     fail(f"expected status=ready, got {photo.get('status')!r}")
 
-# variants
+# variants (API field is "variantType", not "type")
 variants = photo.get("variants", [])
 if len(variants) != 2:
-    fail(f"expected 2 variants, got {len(variants)}: {[v.get('type') for v in variants]}")
+    fail(f"expected 2 variants, got {len(variants)}: {[v.get('variantType') for v in variants]}")
 
-variant_types = {v.get("type") for v in variants}
+variant_types = {v.get("variantType") for v in variants}
 if "thumbnail" not in variant_types:
     fail(f"missing 'thumbnail' variant; found: {variant_types}")
 if "preview" not in variant_types:
@@ -162,11 +162,11 @@ if "preview" not in variant_types:
 
 for v in variants:
     if not v.get("url"):
-        fail(f"variant {v.get('type')!r} has empty url")
+        fail(f"variant {v.get('variantType')!r} has empty url")
     if not (isinstance(v.get("width"), (int, float)) and v["width"] > 0):
-        fail(f"variant {v.get('type')!r} has non-positive width: {v.get('width')!r}")
+        fail(f"variant {v.get('variantType')!r} has non-positive width: {v.get('width')!r}")
     if not (isinstance(v.get("height"), (int, float)) and v["height"] > 0):
-        fail(f"variant {v.get('type')!r} has non-positive height: {v.get('height')!r}")
+        fail(f"variant {v.get('variantType')!r} has non-positive height: {v.get('height')!r}")
 
 # image dimensions
 if not (isinstance(photo.get("width"), (int, float)) and photo["width"] > 0):
