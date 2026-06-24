@@ -101,8 +101,20 @@ smoke-media:
 smoke-stack:
 	scripts/smoke-stack.sh
 
-test-media-worker:
-	cd apps/media-worker && python3 -m venv .venv && .venv/bin/pip install -q -e ".[dev]" && .venv/bin/python -m pytest -q
+# media-worker venv: created/refreshed only when pyproject.toml changes. The
+# stamp is a REAL file target (not .PHONY), so make skips the venv+install on
+# every lint/test loop and only re-runs it when deps actually change. This is
+# why test-/lint-media-worker depend on the stamp instead of building the venv
+# inline (s008 friction #7 / photo_ops-jam).
+MW_DIR := apps/media-worker
+MW_STAMP := $(MW_DIR)/.venv/.install-stamp
 
-lint-media-worker:
-	cd apps/media-worker && python3 -m venv .venv && .venv/bin/pip install -q -e ".[dev]" && .venv/bin/ruff check src tests && .venv/bin/mypy src
+$(MW_STAMP): $(MW_DIR)/pyproject.toml
+	cd $(MW_DIR) && python3 -m venv .venv && .venv/bin/pip install -q -e ".[dev]"
+	touch $@
+
+test-media-worker: $(MW_STAMP)
+	cd $(MW_DIR) && .venv/bin/python -m pytest -q
+
+lint-media-worker: $(MW_STAMP)
+	cd $(MW_DIR) && .venv/bin/ruff check src tests && .venv/bin/mypy src
