@@ -6,7 +6,15 @@ function createService() {
     createUploading: vi.fn(),
     markUploadedForUser: vi.fn(),
     findByIdForUser: vi.fn(),
-    list: vi.fn()
+    list: vi.fn(),
+    createProcessingJob: vi.fn(),
+    markProcessingForUser: vi.fn(),
+    finalizeJob: vi.fn(),
+    upsertVariant: vi.fn(),
+    applyAttributes: vi.fn(),
+    setStatus: vi.fn(),
+    findByIdWithVariantsForUser: vi.fn(),
+    listVariantsForPhotos: vi.fn()
   };
   const storage = {
     createPresignedPutUrl: vi.fn(),

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { CreateUploadIntentInput, PhotoAssetRecord } from './photo.types';
+import { CreateUploadIntentInput, PhotoAssetRecord, PhotoVariantRecord, ProcessingJobRecord } from './photo.types';
 
 const MAX_UPLOAD_BYTES = 25n * 1024n * 1024n;
 const JPEG_CONTENT_TYPES = new Set(['image/jpeg', 'image/jpg']);
@@ -9,6 +9,14 @@ export interface PhotoRepositoryPort {
   markUploadedForUser(userId: string, photoId: string): Promise<PhotoAssetRecord>;
   findByIdForUser(userId: string, photoId: string): Promise<PhotoAssetRecord | null>;
   list(userId: string, limit: number): Promise<PhotoAssetRecord[]>;
+  createProcessingJob(input: { photoId: string; userId: string; type: 'initial' | 'reprocess'; correlationId: string }): Promise<ProcessingJobRecord>;
+  markProcessingForUser(userId: string, photoId: string): Promise<void>;
+  finalizeJob(jobId: string, outcome: 'succeeded' | 'failed', errorMessage?: string): Promise<boolean>;
+  upsertVariant(v: { photoId: string; variantType: 'thumbnail' | 'preview'; objectKey: string; width: number; height: number; sizeBytes: bigint; contentType: string }): Promise<void>;
+  applyAttributes(photoId: string, attrs: { width: number | null; height: number | null; takenAtLocal: Date | null; takenAtUtc: Date | null; takenAtTzSource: string | null; cameraMake: string | null; cameraModel: string | null; orientation: number | null; lat: number | null; lon: number | null; metadataJson: unknown }): Promise<void>;
+  setStatus(photoId: string, status: 'ready' | 'failed' | 'processing'): Promise<void>;
+  findByIdWithVariantsForUser(userId: string, photoId: string): Promise<{ photo: PhotoAssetRecord; variants: PhotoVariantRecord[] } | null>;
+  listVariantsForPhotos(photoIds: string[]): Promise<PhotoVariantRecord[]>;
 }
 
 export interface ObjectStoragePort {
