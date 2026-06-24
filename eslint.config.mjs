@@ -12,6 +12,8 @@ export default tseslint.config(
       "**/.next/**",
       "packages/proto-ts/**", // GENERATED — never lint or edit
       "**/node_modules/**",
+      "**/.venv/**", // Python virtualenv (media-worker) — installed packages
+      "**/*.egg-info/**", // Python editable-install metadata
       "**/*.tsbuildinfo",
       // next-env.d.ts is Next.js generated; it uses /// <reference path> which
       // @typescript-eslint/triple-slash-reference flags — ignore it.

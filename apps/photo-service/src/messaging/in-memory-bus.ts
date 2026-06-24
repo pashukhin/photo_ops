@@ -6,12 +6,15 @@ export class InMemoryBus implements MessagePublisher, MessageConsumer {
   private readonly handlers = new Map<string, (msg: BusMessage) => Promise<void>>();
   private readonly queue: Array<{ destination: string; msg: BusMessage }> = [];
 
-  async consume(source: string, handler: (msg: BusMessage) => Promise<void>): Promise<void> {
+  // consume() overwrites any existing handler for a name (single-consumer fake).
+  consume(source: string, handler: (msg: BusMessage) => Promise<void>): Promise<void> {
     this.handlers.set(source, handler);
+    return Promise.resolve();
   }
 
-  async publish(destination: string, msg: BusMessage): Promise<void> {
+  publish(destination: string, msg: BusMessage): Promise<void> {
     this.queue.push({ destination, msg });
+    return Promise.resolve();
   }
 
   async drain(): Promise<void> {
@@ -27,9 +30,7 @@ export class InMemoryBus implements MessagePublisher, MessageConsumer {
           await handler(entry.msg);
           break;
         } catch {
-          if (attempt >= MAX_ATTEMPTS) {
-            // drop after max attempts
-          }
+          // failed attempt; retry until MAX_ATTEMPTS total, then drop
         }
       }
     }
