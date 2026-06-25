@@ -3,10 +3,23 @@ import { loadSync } from '@grpc/proto-loader';
 import { Injectable } from '@nestjs/common';
 import { join } from 'node:path';
 
+// Numeric enums (PhotoSortField / SortDirection / PhotoStatus) because this
+// client is configured with enums:Number; 0 means "unset" (photo-service applies
+// the default). statusFilter is empty for "all". (session 011)
+export interface ListPhotosInput {
+  userId: string;
+  page: number;
+  pageSize: number;
+  sortBy: number;
+  sortDir: number;
+  statusFilter: number[];
+  filenameQuery: string;
+}
+
 export interface PhotoGatewayClient {
   createUploadIntent(input: { userId: string; filename: string; contentType: string; sizeBytes: string }): Promise<unknown>;
   completeUpload(input: { userId: string; photoId: string }): Promise<unknown>;
-  listPhotos(input: { userId: string; pageSize: number }): Promise<unknown>;
+  listPhotos(input: ListPhotosInput): Promise<unknown>;
   getPhoto(input: { userId: string; photoId: string }): Promise<unknown>;
 }
 
@@ -15,7 +28,7 @@ type Callback<T> = (error: Error | null, value: T) => void;
 interface GrpcPhotoServiceClient {
   CreateUploadIntent(input: { userId: string; filename: string; contentType: string; sizeBytes: string }, callback: Callback<unknown>): void;
   CompleteUpload(input: { userId: string; photoId: string }, callback: Callback<unknown>): void;
-  ListPhotos(input: { userId: string; pageSize: number }, callback: Callback<unknown>): void;
+  ListPhotos(input: ListPhotosInput, callback: Callback<unknown>): void;
   GetPhoto(input: { userId: string; photoId: string }, callback: Callback<unknown>): void;
 }
 
@@ -48,7 +61,7 @@ export class PhotoClient implements PhotoGatewayClient {
     return this.call((callback) => this.client.CompleteUpload(input, callback));
   }
 
-  async listPhotos(input: { userId: string; pageSize: number }) {
+  async listPhotos(input: ListPhotosInput) {
     return this.call((callback) => this.client.ListPhotos(input, callback));
   }
 

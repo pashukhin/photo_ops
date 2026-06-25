@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
 import { createDb } from '../db/client';
 import { photoAssets, photoVariants, processingJobs } from '../db/schema';
-import { CreateUploadIntentInput, PhotoAssetRecord, PhotoVariantRecord, ProcessingJobRecord } from './photo.types';
+import { CreateUploadIntentInput, ListPhotosParams, PhotoAssetRecord, PhotoVariantRecord, ProcessingJobRecord } from './photo.types';
 import { PhotoRepositoryPort } from './photo.service';
 
 @Injectable()
@@ -46,9 +46,15 @@ export class PhotoRepository implements PhotoRepositoryPort {
     return row ? this.toRecord(row) : null;
   }
 
-  async list(userId: string, limit: number): Promise<PhotoAssetRecord[]> {
-    const rows = await this.db.select().from(photoAssets).where(eq(photoAssets.userId, userId)).orderBy(desc(photoAssets.createdAt)).limit(limit);
-    return rows.map((row) => this.toRecord(row));
+  async list(_params: ListPhotosParams): Promise<{ rows: PhotoAssetRecord[]; totalCount: number }> {
+    // GREEN obligation (session 011): build one filtered query scoped to
+    // _params.userId — status IN (_params.statusFilter) when non-empty, filename
+    // ILIKE %_params.filenameQuery% when non-empty — ORDER BY the column mapped
+    // from _params.sortBy in _params.sortDir, then LIMIT _params.pageSize OFFSET
+    // (_params.page - 1) * _params.pageSize; plus a COUNT(*) over the same filter
+    // (ignoring pagination) for totalCount. SQL correctness is verified by the
+    // live UI smoke + manual e2e (no in-process DB in this session; see 4vg).
+    throw new Error('NotImplemented: PhotoRepository.list'); // GREEN is the implementer's job
   }
 
   async createProcessingJob(input: { photoId: string; userId: string; type: 'initial' | 'reprocess'; correlationId: string }): Promise<ProcessingJobRecord> {

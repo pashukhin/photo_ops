@@ -53,14 +53,22 @@ message CompleteUploadRequest {
 }
 
 message ListPhotosRequest {
-  int32 page_size = 1;
-  string page_token = 2;
+  int32 page_size = 1; // clamp 1..100; 0 -> default 24
+  reserved 2; // removed: page_token (cursor; never implemented)
+  reserved "page_token";
   string user_id = 3;
+  int32 page = 4; // 1-based page; 0 -> default 1
+  PhotoSortField sort_by = 5; // UNSPECIFIED -> created_at
+  SortDirection sort_dir = 6; // UNSPECIFIED -> desc
+  repeated PhotoStatus status_filter = 7; // empty -> all statuses
+  string filename_query = 8; // empty -> no filter; case-insensitive substring on filename
 }
 
 message ListPhotosResponse {
   repeated PhotoAsset photos = 1;
-  string next_page_token = 2;
+  reserved 2; // removed: next_page_token (cursor; never implemented)
+  reserved "next_page_token";
+  int32 total_count = 3; // total rows matching the filter (for page N of M)
 }
 
 message GetPhotoRequest {
@@ -108,4 +116,20 @@ enum PhotoStatus {
   PHOTO_STATUS_PROCESSING = 3;
   PHOTO_STATUS_READY = 4;
   PHOTO_STATUS_FAILED = 5;
+}
+
+// Sort key for ListPhotos. UNSPECIFIED is treated as CREATED_AT.
+enum PhotoSortField {
+  PHOTO_SORT_FIELD_UNSPECIFIED = 0;
+  PHOTO_SORT_FIELD_CREATED_AT = 1;
+  PHOTO_SORT_FIELD_TAKEN_AT = 2;
+  PHOTO_SORT_FIELD_FILENAME = 3;
+  PHOTO_SORT_FIELD_SIZE_BYTES = 4;
+}
+
+// Sort direction for ListPhotos. UNSPECIFIED is treated as DESC.
+enum SortDirection {
+  SORT_DIRECTION_UNSPECIFIED = 0;
+  SORT_DIRECTION_ASC = 1;
+  SORT_DIRECTION_DESC = 2;
 }

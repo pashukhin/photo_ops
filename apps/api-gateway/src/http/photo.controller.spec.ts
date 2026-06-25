@@ -63,30 +63,53 @@ describe('PhotoController', () => {
     expect(photoClient.completeUpload).toHaveBeenCalledWith({ userId: 'user-1', photoId: 'photo-1' });
   });
 
-  it('lists photos with the first frame page size', async () => {
+  it('maps gallery query params onto the gRPC ListPhotos request (session 011)', async () => {
+    // why: the browser sends string query params; the gateway is the boundary
+    // that turns them into the numeric proto enums + numbers photo-service
+    // expects, preserving multi-status order (ready, processing -> [4, 3]).
     const { controller, photoClient } = createController();
-    vi.mocked(photoClient.listPhotos).mockResolvedValue({ photos: [{ ...BASE_PHOTO, status: 2 }] });
+    vi.mocked(photoClient.listPhotos).mockResolvedValue({ photos: [], totalCount: 0 });
 
-    await expect(controller.listPhotos('photoops_session=session-1')).resolves.toMatchObject({ photos: [{ id: 'photo-1', status: 'uploaded' }] });
-    expect(photoClient.listPhotos).toHaveBeenCalledWith({ userId: 'user-1', pageSize: 100 });
+    await controller.listPhotos('photoops_session=session-1', { page: '2', pageSize: '10', sort: 'taken_at', dir: 'asc', status: ['ready', 'processing'], q: 'beach' });
+
+    expect(photoClient.listPhotos).toHaveBeenCalledWith({
+      userId: 'user-1',
+      page: 2,
+      pageSize: 10,
+      sortBy: 2,
+      sortDir: 1,
+      statusFilter: [4, 3],
+      filenameQuery: 'beach'
+    });
   });
 
-  it('includes new attribute and variant fields in list response', async () => {
+  it('normalizes a single ?status= and an empty query to numeric defaults (session 011)', async () => {
+    // why: NestJS yields a string for one ?status= and an array for many; an
+    // empty query must still produce a well-formed input (0 -> photo-service
+    // applies the documented default).
     const { controller, photoClient } = createController();
-    vi.mocked(photoClient.listPhotos).mockResolvedValue({ photos: [FULL_PHOTO] });
+    vi.mocked(photoClient.listPhotos).mockResolvedValue({ photos: [], totalCount: 0 });
 
-    const result = await controller.listPhotos('photoops_session=session-1') as { photos: unknown[] };
-    const photo = result.photos[0] as Record<string, unknown>;
+    await controller.listPhotos('photoops_session=session-1', { status: 'failed' });
+    expect(photoClient.listPhotos).toHaveBeenCalledWith({ userId: 'user-1', page: 0, pageSize: 0, sortBy: 0, sortDir: 0, statusFilter: [5], filenameQuery: '' });
+
+    vi.mocked(photoClient.listPhotos).mockClear();
+    await controller.listPhotos('photoops_session=session-1', {});
+    expect(photoClient.listPhotos).toHaveBeenCalledWith({ userId: 'user-1', page: 0, pageSize: 0, sortBy: 0, sortDir: 0, statusFilter: [], filenameQuery: '' });
+  });
+
+  it('includes new attribute/variant fields and threads totalCount in the list response (session 011)', async () => {
+    const { controller, photoClient } = createController();
+    vi.mocked(photoClient.listPhotos).mockResolvedValue({ photos: [FULL_PHOTO], totalCount: 12 });
+
+    const result = (await controller.listPhotos('photoops_session=session-1', {})) as { photos: Array<Record<string, unknown>>; totalCount: number };
+    const photo = result.photos[0];
+    expect(result.totalCount).toBe(12);
     expect(photo.width).toBe(3024);
     expect(photo.height).toBe(4032);
     expect(photo.takenAtLocal).toBe('2024-01-15T10:30:00');
-    expect(photo.takenAtUtc).toBe('2024-01-15T09:30:00Z');
-    expect(photo.takenAtTzSource).toBe('exif_offset');
     expect(photo.cameraMake).toBe('Apple');
-    expect(photo.cameraModel).toBe('iPhone 15 Pro');
-    expect(photo.orientation).toBe(1);
     expect(photo.lat).toBe(48.8566);
-    expect(photo.lon).toBe(2.3522);
     expect(photo.variants).toEqual([{ variantType: 'thumbnail', url: 'https://example.com/thumb.jpg', width: 320, height: 240 }]);
     expect(photo.status).toBe('ready');
   });

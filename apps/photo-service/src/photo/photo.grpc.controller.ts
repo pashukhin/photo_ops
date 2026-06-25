@@ -40,9 +40,25 @@ export class PhotoGrpcController {
   }
 
   @GrpcMethod('PhotoService', 'ListPhotos')
-  async listPhotos(request: { pageSize?: number; userId: string }) {
-    const pwvs = await this.photoService.listPhotos(request.userId, request.pageSize || 100);
-    return { photos: pwvs.map((pwv) => this.toProtoPhoto(pwv)), nextPageToken: '' };
+  async listPhotos(_request: {
+    userId: string;
+    pageSize?: number;
+    page?: number;
+    sortBy?: number; // proto PhotoSortField (numeric); 0 -> created_at
+    sortDir?: number; // proto SortDirection (numeric); 0 -> desc
+    statusFilter?: number[]; // proto PhotoStatus numbers; [] -> all
+    filenameQuery?: string;
+  }): Promise<{ photos: unknown[]; totalCount: number }> {
+    // GREEN obligation (session 011): map this proto request onto a
+    // ListPhotosParams and return the mapped page. Defaults/clamps (pinned by
+    // photo.grpc.controller.spec.ts): page 0/absent -> 1; pageSize 0/absent ->
+    // 24 then clamp to 1..100; sortBy 0 -> 'created_at' (1 created_at, 2 taken_at,
+    // 3 filename, 4 size_bytes); sortDir 0 -> 'desc' (1 asc, 2 desc); statusFilter
+    // numbers -> status strings (1 uploading..5 failed) dropping unknown/0;
+    // filenameQuery -> ''. Then call photoService.listPhotos(params) and return
+    // { photos: result.photos.map((pwv) => this.toProtoPhoto(pwv)), totalCount:
+    // result.totalCount }.
+    throw new Error('NotImplemented: PhotoGrpcController.listPhotos'); // GREEN is the implementer's job
   }
 
   @GrpcMethod('PhotoService', 'GetPhoto')

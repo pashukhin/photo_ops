@@ -3,7 +3,7 @@ import { PinoLogger } from 'nestjs-pino';
 import { uuidv7 } from 'uuidv7';
 import { currentTraceparent } from '@photoops/observability';
 import { MessagePublisher } from '../messaging/messaging.port';
-import { CreateUploadIntentInput, PhotoAssetRecord, PhotoVariantRecord, PhotoVariantView, PhotoWithVariants, ProcessingJobRecord, ProcessingResultInput } from './photo.types';
+import { CreateUploadIntentInput, ListPhotosParams, ListPhotosResult, PhotoAssetRecord, PhotoVariantRecord, PhotoVariantView, PhotoWithVariants, ProcessingJobRecord, ProcessingResultInput } from './photo.types';
 import { encodeJob } from './processing.codec';
 
 function parseMetadata(raw: string): unknown {
@@ -26,7 +26,9 @@ export interface PhotoRepositoryPort {
   createUploading(input: CreateUploadIntentInput): Promise<PhotoAssetRecord>;
   markUploadedForUser(userId: string, photoId: string): Promise<PhotoAssetRecord>;
   findByIdForUser(userId: string, photoId: string): Promise<PhotoAssetRecord | null>;
-  list(userId: string, limit: number): Promise<PhotoAssetRecord[]>;
+  // Returns the page of rows matching the filter/sort plus the total matching
+  // count (ignoring pagination) for "page N of M". (session 011)
+  list(params: ListPhotosParams): Promise<{ rows: PhotoAssetRecord[]; totalCount: number }>;
   createProcessingJob(input: { photoId: string; userId: string; type: 'initial' | 'reprocess'; correlationId: string }): Promise<ProcessingJobRecord>;
   markProcessingForUser(userId: string, photoId: string): Promise<boolean>;
   finalizeJob(jobId: string, outcome: 'succeeded' | 'failed', errorMessage?: string): Promise<boolean>;
@@ -120,24 +122,13 @@ export class PhotoDomainService {
     return { photo: result.photo, variants };
   }
 
-  async listPhotos(userId: string, limit = 100): Promise<PhotoWithVariants[]> {
-    const photos = await this.repository.list(userId, limit);
-    if (photos.length === 0) return [];
-    const photoIds = photos.map((p) => p.id);
-    const variantRecords = await this.repository.listVariantsForPhotos(photoIds);
-    const variantsByPhotoId = new Map<string, PhotoVariantRecord[]>();
-    for (const v of variantRecords) {
-      const list = variantsByPhotoId.get(v.photoId) ?? [];
-      list.push(v);
-      variantsByPhotoId.set(v.photoId, list);
-    }
-    return Promise.all(
-      photos.map(async (photo) => {
-        const records = variantsByPhotoId.get(photo.id) ?? [];
-        const variants = await Promise.all(records.map((v) => this.toVariantView(v)));
-        return { photo, variants };
-      })
-    );
+  // GREEN obligation (session 011): call repository.list(params), compose each
+  // returned row with its presigned variant views (preserve the existing
+  // grouping behavior — guarded by the RED test in photo.service.spec.ts), and
+  // thread repository totalCount through unchanged. An empty page must still
+  // return the real totalCount.
+  async listPhotos(_params: ListPhotosParams): Promise<ListPhotosResult> {
+    throw new Error('NotImplemented: PhotoDomainService.listPhotos'); // GREEN is the implementer's job
   }
 
   private async toVariantView(v: PhotoVariantRecord): Promise<PhotoVariantView> {

@@ -1,7 +1,21 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { context, trace } from '@opentelemetry/api';
 import { PhotoDomainService } from './photo.service';
+import { ListPhotosParams } from './photo.types';
 import { registerTestOtel } from './test-otel';
+
+function makeListParams(overrides: Partial<ListPhotosParams> = {}): ListPhotosParams {
+  return {
+    userId: 'user-1',
+    page: 1,
+    pageSize: 24,
+    sortBy: 'created_at',
+    sortDir: 'desc',
+    statusFilter: [],
+    filenameQuery: '',
+    ...overrides
+  };
+}
 
 beforeAll(() => {
   registerTestOtel();
@@ -142,13 +156,28 @@ describe('PhotoDomainService', () => {
     await expect(service.completeUpload('user-1', '018f0000-0000-7000-8000-000000000001')).rejects.toThrow('uploaded object not found');
   });
 
-  it('lists only photos for the provided user id', async () => {
+  it('listPhotos passes the full query params straight through to the repository (session 011)', async () => {
+    // why: filtering/sorting/pagination is owned by the repository SQL; the
+    // service must forward the already-defaulted params verbatim, not re-derive.
     const { service, repository } = createService();
-    repository.list.mockResolvedValue([]);
+    repository.list.mockResolvedValue({ rows: [], totalCount: 0 });
+    const params = makeListParams({ page: 2, pageSize: 10, sortBy: 'taken_at', sortDir: 'asc', statusFilter: ['processing', 'ready'], filenameQuery: 'beach' });
 
-    await service.listPhotos('user-1');
+    await service.listPhotos(params);
 
-    expect(repository.list).toHaveBeenCalledWith('user-1', 100);
+    expect(repository.list).toHaveBeenCalledWith(params);
+  });
+
+  it('listPhotos returns the real totalCount even when the page is empty (session 011)', async () => {
+    // why: a page past the end has zero rows but the UI still needs the total to
+    // render "page N of M"; an empty page must not collapse totalCount to 0.
+    const { service, repository } = createService();
+    repository.list.mockResolvedValue({ rows: [], totalCount: 42 });
+
+    const result = await service.listPhotos(makeListParams({ page: 99 }));
+
+    expect(result.photos).toEqual([]);
+    expect(result.totalCount).toBe(42);
   });
 
   it('getPhoto returns null when repository returns null (photo not found or not owned)', async () => {
@@ -180,20 +209,23 @@ describe('PhotoDomainService', () => {
     expect(storage.createPresignedGetUrl).toHaveBeenCalledWith('variants/photo-1/thumbnail.jpg');
   });
 
-  it('listPhotos fetches variants for all photos and presigns urls', async () => {
+  it('listPhotos composes each photo with its presigned variants and threads totalCount (session 011)', async () => {
+    // why: the gallery renders variant urls per row plus the total count; the
+    // service groups variants by photo id and passes repository.totalCount on.
     const { service, repository, storage } = createService();
     const photo = makePhotoRecord();
-    repository.list.mockResolvedValue([photo]);
+    repository.list.mockResolvedValue({ rows: [photo], totalCount: 7 });
     const variant = makeVariantRecord();
     repository.listVariantsForPhotos.mockResolvedValue([variant]);
     storage.createPresignedGetUrl.mockResolvedValue('signed://x');
 
-    const result = await service.listPhotos('user-1');
+    const result = await service.listPhotos(makeListParams());
 
-    expect(result).toHaveLength(1);
-    expect(result[0].photo).toBe(photo);
-    expect(result[0].variants).toHaveLength(1);
-    expect(result[0].variants[0].url).toBe('signed://x');
+    expect(result.totalCount).toBe(7);
+    expect(result.photos).toHaveLength(1);
+    expect(result.photos[0].photo).toBe(photo);
+    expect(result.photos[0].variants).toHaveLength(1);
+    expect(result.photos[0].variants[0].url).toBe('signed://x');
     expect(repository.listVariantsForPhotos).toHaveBeenCalledWith(['photo-1']);
   });
 

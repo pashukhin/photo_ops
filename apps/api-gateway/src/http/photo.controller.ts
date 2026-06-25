@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Post, Query } from '@nestjs/common';
 import { AuthService } from '../auth/auth.service';
 import { PhotoClient } from '../grpc/photo.client';
 
@@ -22,10 +22,21 @@ export class PhotoController {
   }
 
   @Get()
-  async listPhotos(@Headers('cookie') cookieHeader: string | undefined) {
-    const auth = await this.authService.requireSession(cookieHeader);
-    const response = (await this.photoClient.listPhotos({ userId: auth.userId, pageSize: 100 })) as { photos?: unknown[] };
-    return { ...response, photos: (response.photos ?? []).map((photo) => this.mapPhoto(photo)) };
+  async listPhotos(
+    @Headers('cookie') cookieHeader: string | undefined,
+    @Query() _query: { page?: string; pageSize?: string; sort?: string; dir?: string; status?: string | string[]; q?: string }
+  ): Promise<{ photos: unknown[]; totalCount: number }> {
+    await this.authService.requireSession(cookieHeader);
+    // GREEN obligation (session 011): map _query onto a ListPhotosInput
+    // (pinned by photo.controller.spec.ts): page/pageSize -> Number (0 when
+    // absent); sort -> proto PhotoSortField number (created_at 1, taken_at 2,
+    // filename 3, size_bytes 4; 0 when absent); dir -> SortDirection (asc 1,
+    // desc 2; 0 when absent); status (string | string[]) -> numeric PhotoStatus
+    // array preserving order (uploading 1..failed 5); q -> filenameQuery (''
+    // when absent). Call photoClient.listPhotos with userId from the session,
+    // then return { photos: (response.photos ?? []).map((p) => mapPhoto(p)),
+    // totalCount: response.totalCount ?? 0 }.
+    throw new Error('NotImplemented: PhotoController.listPhotos'); // GREEN is the implementer's job
   }
 
   @Get(':photoId')

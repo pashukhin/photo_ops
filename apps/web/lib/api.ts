@@ -1,5 +1,12 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001';
 
+export interface PhotoVariant {
+  variantType: string; // 'thumbnail' | 'preview'
+  url: string; // short-lived owner-scoped presigned GET url
+  width: number;
+  height: number;
+}
+
 export interface PhotoAsset {
   id: string;
   filename: string;
@@ -9,6 +16,36 @@ export interface PhotoAsset {
   status: string;
   createdAt: string;
   updatedAt: string;
+  // Extracted attributes (present once processing finishes; absent/0 before).
+  width?: number;
+  height?: number;
+  takenAtLocal?: string;
+  takenAtUtc?: string;
+  takenAtTzSource?: string;
+  cameraMake?: string;
+  cameraModel?: string;
+  orientation?: number;
+  lat?: number;
+  lon?: number;
+  variants?: PhotoVariant[];
+}
+
+export type PhotoSortField = 'created_at' | 'taken_at' | 'filename' | 'size_bytes';
+
+export type SortDirection = 'asc' | 'desc';
+
+export interface ListPhotosParams {
+  page?: number;
+  pageSize?: number;
+  sort?: PhotoSortField;
+  dir?: SortDirection;
+  status?: string[]; // status names to filter by; empty/undefined = all
+  q?: string; // filename substring search
+}
+
+export interface ListPhotosResult {
+  photos: PhotoAsset[];
+  totalCount: number;
 }
 
 export interface CurrentUser {
@@ -82,13 +119,19 @@ export async function completeUpload(photoId: string) {
   return response.json() as Promise<PhotoAsset>;
 }
 
-export async function listPhotos() {
-  const response = await fetch(`${API_BASE_URL}/photos`, { credentials: 'include', cache: 'no-store' });
-  if (!response.ok) {
-    throw new Error(await readErrorMessage(response, `ListPhotos failed: ${response.status}`));
-  }
-  const body = await response.json();
-  return (body.photos ?? []) as PhotoAsset[];
+// GREEN obligation (session 011): build a query string from params — page,
+// pageSize, sort, dir, repeated `status` for each filter value, q — appending
+// `?<query>` only when at least one param is present (pinned by api.spec.ts).
+// GET it with credentials, then return { photos: body.photos ?? [], totalCount:
+// body.totalCount ?? 0 }.
+export async function listPhotos(_params: ListPhotosParams = {}): Promise<ListPhotosResult> {
+  throw new Error('NotImplemented: listPhotos'); // GREEN is the implementer's job
+}
+
+// GREEN obligation (session 011): GET `${API_BASE_URL}/photos/${photoId}` with
+// credentials and return the parsed PhotoAsset (throw readErrorMessage on !ok).
+export async function getPhoto(_photoId: string): Promise<PhotoAsset> {
+  throw new Error('NotImplemented: getPhoto'); // GREEN is the implementer's job
 }
 
 export async function uploadFileToPresignedUrl(uploadUrl: string, file: File) {

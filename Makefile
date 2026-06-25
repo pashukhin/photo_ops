@@ -1,4 +1,4 @@
-.PHONY: install proto proto-check build typecheck test lint gate gate-media test-api test-identity test-photo test-web test-media-worker lint-media-worker dev down reset logs status ps-all logs-svc sh restart-svc up-svc migrate migrate-identity migrate-photo smoke-upload smoke-auth smoke-contract smoke-media smoke-stack
+.PHONY: install proto proto-check build typecheck test lint gate gate-media test-api test-identity test-photo test-web test-media-worker lint-media-worker dev down reset logs status ps-all logs-svc sh restart-svc up-svc migrate migrate-identity migrate-photo smoke-upload smoke-auth smoke-contract smoke-media smoke-stack smoke-ui
 
 ifneq (,$(wildcard .env))
 include .env
@@ -130,6 +130,9 @@ smoke-media:
 # docs/agent-ergonomics.md (s008 friction #8).
 smoke-stack:
 	scripts/smoke-stack.sh
+
+smoke-ui:
+	scripts/smoke-ui.sh
 
 # media-worker venv: created/refreshed only when pyproject.toml changes. The
 # stamp is a REAL file target (not .PHONY), so make skips the venv+install on

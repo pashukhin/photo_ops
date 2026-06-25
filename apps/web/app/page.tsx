@@ -2,24 +2,20 @@
 
 import React from 'react';
 import { FormEvent, useEffect, useState } from 'react';
-import { completeUpload, createUploadIntent, CurrentUser, getCurrentUser, listPhotos, login, logout, PhotoAsset, signUp, uploadFileToPresignedUrl } from '../lib/api';
+import { completeUpload, createUploadIntent, CurrentUser, getCurrentUser, login, logout, signUp, uploadFileToPresignedUrl } from '../lib/api';
+import { PhotoGallery } from '../components/gallery/PhotoGallery';
 
 export default function HomePage() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
-  const [photos, setPhotos] = useState<PhotoAsset[]>([]);
+  // Bumped after a successful upload so <PhotoGallery> refetches and shows the
+  // new (processing) photo; the gallery otherwise owns its own data + polling.
+  const [reloadToken, setReloadToken] = useState(0);
   const [message, setMessage] = useState('Ready');
-
-  async function refreshPhotos() {
-    setPhotos(await listPhotos());
-  }
 
   useEffect(() => {
     void getCurrentUser()
       .then((user) => {
         setCurrentUser(user);
-        if (user) {
-          void refreshPhotos();
-        }
       })
       .catch((error) => setMessage(error instanceof Error ? error.message : 'Failed to load session'));
   }, []);
@@ -33,7 +29,6 @@ export default function HomePage() {
       const displayName = (form.elements.namedItem('displayName') as HTMLInputElement).value;
       const user = await signUp({ email, password, displayName });
       setCurrentUser(user);
-      await refreshPhotos();
       form.reset();
       setMessage('Signed up');
     } catch (error) {
@@ -49,7 +44,6 @@ export default function HomePage() {
       const password = (form.elements.namedItem('password') as HTMLInputElement).value;
       const user = await login({ email, password });
       setCurrentUser(user);
-      await refreshPhotos();
       form.reset();
       setMessage('Logged in');
     } catch (error) {
@@ -60,7 +54,6 @@ export default function HomePage() {
   async function onLogout() {
     await logout();
     setCurrentUser(null);
-    setPhotos([]);
     setMessage('Logged out');
   }
 
@@ -80,7 +73,7 @@ export default function HomePage() {
       await uploadFileToPresignedUrl(intent.uploadUrl, file);
       setMessage('Completing upload');
       await completeUpload(intent.photoId);
-      await refreshPhotos();
+      setReloadToken((token) => token + 1);
       form.reset();
       setMessage('Upload complete');
     } catch (error) {
@@ -112,15 +105,8 @@ export default function HomePage() {
             <p>{message}</p>
           </section>
           <section>
-            <h2>Uploaded Photos</h2>
-            {photos.length === 0 ? <p>No photos uploaded yet.</p> : null}
-            <ul>
-              {photos.map((photo) => (
-                <li key={photo.id}>
-                  {photo.filename} - {photo.status}
-                </li>
-              ))}
-            </ul>
+            <h2>Your photos</h2>
+            <PhotoGallery reloadToken={reloadToken} />
           </section>
         </>
       ) : (

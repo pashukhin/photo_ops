@@ -101,4 +101,70 @@ describe('PhotoGrpcController', () => {
       expect((error as RpcException).getError()).toEqual({ code: status.NOT_FOUND, message: 'photo not found' });
     }
   });
+
+  describe('ListPhotos (session 011 query mapping)', () => {
+    it('maps a full proto request (numeric enums) onto domain params and threads totalCount', async () => {
+      // why: the controller is the proto<->domain boundary; proto-loader decodes
+      // enums as numbers here, so the boundary must translate them to the clean
+      // internal status/sort strings the service+repo consume, and pass the total
+      // matching count straight through for "page N of M".
+      const { controller, photoService } = createController();
+      photoService.listPhotos.mockResolvedValue({ photos: [makePhotoWithVariants()], totalCount: 7 });
+
+      const reply = (await controller.listPhotos({
+        userId: 'user-1',
+        page: 2,
+        pageSize: 10,
+        sortBy: 2, // PHOTO_SORT_FIELD_TAKEN_AT
+        sortDir: 1, // SORT_DIRECTION_ASC
+        statusFilter: [3, 4], // PROCESSING, READY
+        filenameQuery: 'beach'
+      })) as { photos: Array<{ status: number }>; totalCount: number };
+
+      expect(photoService.listPhotos).toHaveBeenCalledWith({
+        userId: 'user-1',
+        page: 2,
+        pageSize: 10,
+        sortBy: 'taken_at',
+        sortDir: 'asc',
+        statusFilter: ['processing', 'ready'],
+        filenameQuery: 'beach'
+      });
+      expect(reply.totalCount).toBe(7);
+      expect(reply.photos).toHaveLength(1);
+      expect(reply.photos[0].status).toBe(4); // ready -> proto enum 4
+    });
+
+    it('applies defaults for an empty request: page 1, size 24, created_at desc, no filters', async () => {
+      // why: an unset proto field arrives as 0/absent; the boundary owns the
+      // documented defaults so the service/repo never reason about "missing".
+      const { controller, photoService } = createController();
+      photoService.listPhotos.mockResolvedValue({ photos: [], totalCount: 0 });
+
+      const reply = (await controller.listPhotos({ userId: 'user-1' })) as { photos: unknown[]; totalCount: number };
+
+      expect(photoService.listPhotos).toHaveBeenCalledWith({
+        userId: 'user-1',
+        page: 1,
+        pageSize: 24,
+        sortBy: 'created_at',
+        sortDir: 'desc',
+        statusFilter: [],
+        filenameQuery: ''
+      });
+      expect(reply.totalCount).toBe(0);
+      expect(reply.photos).toEqual([]);
+    });
+
+    it('clamps an oversized pageSize to 100', async () => {
+      // why: page size is attacker/caller controlled; the boundary caps the DB
+      // LIMIT so a huge value cannot fetch the whole table.
+      const { controller, photoService } = createController();
+      photoService.listPhotos.mockResolvedValue({ photos: [], totalCount: 0 });
+
+      await controller.listPhotos({ userId: 'user-1', pageSize: 5000 });
+
+      expect(photoService.listPhotos).toHaveBeenCalledWith(expect.objectContaining({ pageSize: 100 }));
+    });
+  });
 });

@@ -23,6 +23,24 @@ export enum PhotoStatus {
   UNRECOGNIZED = -1,
 }
 
+/** Sort key for ListPhotos. UNSPECIFIED is treated as CREATED_AT. */
+export enum PhotoSortField {
+  PHOTO_SORT_FIELD_UNSPECIFIED = 0,
+  PHOTO_SORT_FIELD_CREATED_AT = 1,
+  PHOTO_SORT_FIELD_TAKEN_AT = 2,
+  PHOTO_SORT_FIELD_FILENAME = 3,
+  PHOTO_SORT_FIELD_SIZE_BYTES = 4,
+  UNRECOGNIZED = -1,
+}
+
+/** Sort direction for ListPhotos. UNSPECIFIED is treated as DESC. */
+export enum SortDirection {
+  SORT_DIRECTION_UNSPECIFIED = 0,
+  SORT_DIRECTION_ASC = 1,
+  SORT_DIRECTION_DESC = 2,
+  UNRECOGNIZED = -1,
+}
+
 export interface CreateUploadIntentRequest {
   filename: string;
   contentType: string;
@@ -43,14 +61,25 @@ export interface CompleteUploadRequest {
 }
 
 export interface ListPhotosRequest {
+  /** clamp 1..100; 0 -> default 24 */
   pageSize: number;
-  pageToken: string;
   userId: string;
+  /** 1-based page; 0 -> default 1 */
+  page: number;
+  /** UNSPECIFIED -> created_at */
+  sortBy: PhotoSortField;
+  /** UNSPECIFIED -> desc */
+  sortDir: SortDirection;
+  /** empty -> all statuses */
+  statusFilter: PhotoStatus[];
+  /** empty -> no filter; case-insensitive substring on filename */
+  filenameQuery: string;
 }
 
 export interface ListPhotosResponse {
   photos: PhotoAsset[];
-  nextPageToken: string;
+  /** total rows matching the filter (for page N of M) */
+  totalCount: number;
 }
 
 export interface GetPhotoRequest {
@@ -289,7 +318,7 @@ export const CompleteUploadRequest: MessageFns<CompleteUploadRequest> = {
 };
 
 function createBaseListPhotosRequest(): ListPhotosRequest {
-  return { pageSize: 0, pageToken: "", userId: "" };
+  return { pageSize: 0, userId: "", page: 0, sortBy: 0, sortDir: 0, statusFilter: [], filenameQuery: "" };
 }
 
 export const ListPhotosRequest: MessageFns<ListPhotosRequest> = {
@@ -297,11 +326,25 @@ export const ListPhotosRequest: MessageFns<ListPhotosRequest> = {
     if (message.pageSize !== 0) {
       writer.uint32(8).int32(message.pageSize);
     }
-    if (message.pageToken !== "") {
-      writer.uint32(18).string(message.pageToken);
-    }
     if (message.userId !== "") {
       writer.uint32(26).string(message.userId);
+    }
+    if (message.page !== 0) {
+      writer.uint32(32).int32(message.page);
+    }
+    if (message.sortBy !== 0) {
+      writer.uint32(40).int32(message.sortBy);
+    }
+    if (message.sortDir !== 0) {
+      writer.uint32(48).int32(message.sortDir);
+    }
+    writer.uint32(58).fork();
+    for (const v of message.statusFilter) {
+      writer.int32(v);
+    }
+    writer.join();
+    if (message.filenameQuery !== "") {
+      writer.uint32(66).string(message.filenameQuery);
     }
     return writer;
   },
@@ -321,20 +364,62 @@ export const ListPhotosRequest: MessageFns<ListPhotosRequest> = {
           message.pageSize = reader.int32();
           continue;
         }
-        case 2: {
-          if (tag !== 18) {
-            break;
-          }
-
-          message.pageToken = reader.string();
-          continue;
-        }
         case 3: {
           if (tag !== 26) {
             break;
           }
 
           message.userId = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.page = reader.int32();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.sortBy = reader.int32() as any;
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.sortDir = reader.int32() as any;
+          continue;
+        }
+        case 7: {
+          if (tag === 56) {
+            message.statusFilter.push(reader.int32() as any);
+
+            continue;
+          }
+
+          if (tag === 58) {
+            const end2 = reader.uint32() + reader.pos;
+            while (reader.pos < end2) {
+              message.statusFilter.push(reader.int32() as any);
+            }
+
+            continue;
+          }
+
+          break;
+        }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.filenameQuery = reader.string();
           continue;
         }
       }
@@ -348,7 +433,7 @@ export const ListPhotosRequest: MessageFns<ListPhotosRequest> = {
 };
 
 function createBaseListPhotosResponse(): ListPhotosResponse {
-  return { photos: [], nextPageToken: "" };
+  return { photos: [], totalCount: 0 };
 }
 
 export const ListPhotosResponse: MessageFns<ListPhotosResponse> = {
@@ -356,8 +441,8 @@ export const ListPhotosResponse: MessageFns<ListPhotosResponse> = {
     for (const v of message.photos) {
       PhotoAsset.encode(v!, writer.uint32(10).fork()).join();
     }
-    if (message.nextPageToken !== "") {
-      writer.uint32(18).string(message.nextPageToken);
+    if (message.totalCount !== 0) {
+      writer.uint32(24).int32(message.totalCount);
     }
     return writer;
   },
@@ -377,12 +462,12 @@ export const ListPhotosResponse: MessageFns<ListPhotosResponse> = {
           message.photos.push(PhotoAsset.decode(reader, reader.uint32()));
           continue;
         }
-        case 2: {
-          if (tag !== 18) {
+        case 3: {
+          if (tag !== 24) {
             break;
           }
 
-          message.nextPageToken = reader.string();
+          message.totalCount = reader.int32();
           continue;
         }
       }

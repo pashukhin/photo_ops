@@ -62,6 +62,29 @@ export interface PhotoWithVariants {
   variants: PhotoVariantView[];
 }
 
+// --- ListPhotos query (session 011) -----------------------------------------
+// Internal (domain-side) representation of the ListPhotos query. The gRPC
+// controller is the boundary that maps proto enums/defaults onto these clean
+// internal values, so the service and repository never see proto shapes.
+export type PhotoSortField = 'created_at' | 'taken_at' | 'filename' | 'size_bytes';
+
+export type SortDirection = 'asc' | 'desc';
+
+export interface ListPhotosParams {
+  userId: string;
+  page: number; // 1-based; already defaulted to >= 1 by the boundary
+  pageSize: number; // already clamped to 1..100 by the boundary
+  sortBy: PhotoSortField;
+  sortDir: SortDirection;
+  statusFilter: PhotoStatus[]; // empty = all statuses
+  filenameQuery: string; // '' = no filter; case-insensitive substring on filename
+}
+
+export interface ListPhotosResult {
+  photos: PhotoWithVariants[];
+  totalCount: number; // total rows matching the filter, ignoring pagination
+}
+
 export interface ProcessingJobRecord {
   id: string;
   photoId: string;
