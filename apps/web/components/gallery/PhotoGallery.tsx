@@ -1,3 +1,15 @@
+'use client';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { listPhotos } from '../../lib/api';
+import type { PhotoAsset } from '../../lib/api';
+import { GalleryToolbar } from './GalleryToolbar';
+import { PhotoTable } from './PhotoTable';
+import { GalleryPagination } from './GalleryPagination';
+import { PhotoDetailModal } from './PhotoDetailModal';
+import type { GalleryQuery } from './types';
+import { GALLERY_POLL_MS } from './types';
+
 // GREEN obligation (session 011): the gallery container that ties the toolbar,
 // table, pagination, and detail modal to the server-side query.
 //
@@ -23,6 +35,135 @@ export interface PhotoGalleryProps {
   reloadToken?: number;
 }
 
-export function PhotoGallery(_props: PhotoGalleryProps = {}) {
-  return null; // GREEN is the implementer's job
+const PAGE_SIZE = 24;
+
+const SETTLED_STATUSES = new Set(['ready', 'failed']);
+
+function isSettled(status: string): boolean {
+  return SETTLED_STATUSES.has(status);
+}
+
+function allSettled(photos: PhotoAsset[]): boolean {
+  return photos.every((p) => isSettled(p.status));
+}
+
+export function PhotoGallery({ reloadToken }: PhotoGalleryProps = {}) {
+  const [query, setQuery] = useState<GalleryQuery>({
+    status: [],
+    q: '',
+    sort: 'created_at',
+    dir: 'desc'
+  });
+  const [page, setPage] = useState(1);
+
+  const [photos, setPhotos] = useState<PhotoAsset[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // Track the previous reloadToken to detect changes
+  const prevReloadToken = useRef<number | undefined>(reloadToken);
+
+  const fetchPhotos = useCallback(() => {
+    setError(null);
+    return listPhotos({
+      page,
+      pageSize: PAGE_SIZE,
+      sort: query.sort,
+      dir: query.dir,
+      status: query.status.length > 0 ? query.status : undefined,
+      q: query.q || undefined
+    })
+      .then(({ photos: p, totalCount: tc }) => {
+        setPhotos(p);
+        setTotalCount(tc);
+        setLoading(false);
+        return p;
+      })
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        setError(msg);
+        setLoading(false);
+        return [] as PhotoAsset[];
+      });
+  }, [page, query]);
+
+  // Initial fetch and re-fetch on query/page change
+  useEffect(() => {
+    setLoading(true);
+    fetchPhotos();
+  }, [fetchPhotos]);
+
+  // Re-fetch when reloadToken changes (after an upload)
+  useEffect(() => {
+    if (reloadToken === prevReloadToken.current) return;
+    prevReloadToken.current = reloadToken;
+    setLoading(true);
+    fetchPhotos();
+  }, [reloadToken, fetchPhotos]);
+
+  // Polling while any photo is processing/uploading
+  useEffect(() => {
+    if (loading || error) return;
+    if (allSettled(photos)) return;
+
+    const interval = setInterval(() => {
+      listPhotos({
+        page,
+        pageSize: PAGE_SIZE,
+        sort: query.sort,
+        dir: query.dir,
+        status: query.status.length > 0 ? query.status : undefined,
+        q: query.q || undefined
+      })
+        .then(({ photos: p, totalCount: tc }) => {
+          setPhotos(p);
+          setTotalCount(tc);
+          if (allSettled(p)) {
+            clearInterval(interval);
+          }
+        })
+        .catch(() => {
+          clearInterval(interval);
+        });
+    }, GALLERY_POLL_MS);
+
+    return () => clearInterval(interval);
+  }, [photos, loading, error, page, query]);
+
+  if (loading) {
+    return <p>Loading photos…</p>;
+  }
+
+  if (error) {
+    return (
+      <div role="alert" className="p-4 text-destructive border border-destructive rounded-md">
+        {error}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <GalleryToolbar value={query} onChange={setQuery} />
+
+      {totalCount === 0 ? (
+        <p className="text-center text-muted-foreground py-8">No photos found.</p>
+      ) : (
+        <>
+          <PhotoTable photos={photos} onRowClick={(photo) => setSelectedId(photo.id)} />
+          <GalleryPagination
+            page={page}
+            pageSize={PAGE_SIZE}
+            totalCount={totalCount}
+            onPageChange={setPage}
+          />
+        </>
+      )}
+
+      <PhotoDetailModal photoId={selectedId} onClose={() => setSelectedId(null)} />
+    </div>
+  );
 }

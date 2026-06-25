@@ -1,3 +1,4 @@
+import path from 'path';
 import { configDefaults, defineConfig } from 'vitest/config';
 
 // Web tests run in jsdom so React component behavior (rendering, clicks, modal
@@ -5,6 +6,11 @@ import { configDefaults, defineConfig } from 'vitest/config';
 // SSR-string tests still work in this environment. The live Playwright UI smoke
 // (smoke/**) is driven by `make smoke-ui`, not vitest.
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, '.')
+    }
+  },
   esbuild: { jsx: 'automatic' },
   test: {
     environment: 'jsdom',

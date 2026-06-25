@@ -1,3 +1,7 @@
+'use client';
+
+import { Badge } from '@/components/ui/badge';
+
 export interface StatusBadgeProps {
   status: string;
 }
@@ -6,6 +10,13 @@ export interface StatusBadgeProps {
 // text contains the status name (PhotoGallery.spec.tsx queries it by text).
 // Distinct visual treatment per status (e.g. ready/processing/failed) is a
 // styling concern for the implementer (shadcn Badge).
-export function StatusBadge(_props: StatusBadgeProps) {
-  return null; // GREEN is the implementer's job
+export function StatusBadge({ status }: StatusBadgeProps) {
+  const variant =
+    status === 'ready'
+      ? 'default'
+      : status === 'failed'
+        ? 'destructive'
+        : 'secondary';
+
+  return <Badge variant={variant}>{status}</Badge>;
 }
