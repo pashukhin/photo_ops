@@ -85,6 +85,9 @@ Subagent (general-purpose):
       "nice to haves"
     - **Misunderstood:** right feature built the wrong way, wrong problem
       solved
+    - **Gutted spec:** a skeleton RED test weakened, deleted, renamed-away, or
+      with its expected behavior changed to force green — the skeleton tests are
+      the guarded spec, not the implementer's to edit. Flag as Important.
 
     If a requirement cannot be verified from this diff alone (it lives in
     unchanged code or spans tasks), report it as a ⚠️ item instead of

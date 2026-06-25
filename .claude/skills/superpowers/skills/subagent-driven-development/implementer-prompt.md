@@ -13,7 +13,9 @@ Subagent (general-purpose):
     ## Task Description
 
     Read your task brief first: [BRIEF_FILE]
-    It contains the full task text from the plan.
+    It names the RED test files and the stub files for this task and contains
+    the full task text from the plan. The RED tests are your spec — your job is
+    to make them green within the provided stubs.
 
     ## Context
 
@@ -31,11 +33,15 @@ Subagent (general-purpose):
 
     ## Your Job
 
-    Once you're clear on requirements:
-    1. Implement exactly what the task specifies
-    2. Write tests (following TDD if task says to)
-    3. Verify implementation works
-    4. Commit your work
+    You are given RED tests and stubs. Make the RED tests green within the
+    stubs. Once you're clear on requirements:
+    1. Read the RED tests — they are your spec
+    2. Implement inside the provided stubs until the RED tests pass; do not
+       change a stub signature unless the brief tells you to
+    3. You MAY add narrower tests for cases you discover; you may NOT weaken,
+       delete, rename, or change the expected behavior of a skeleton RED test
+       (see "The Skeleton Tests Are Guarded" below)
+    4. Run the tests + typecheck; commit your work
     5. Self-review (see below)
     6. Report back
 
@@ -46,6 +52,21 @@ Subagent (general-purpose):
 
     While iterating, run the focused test for what you're changing; run the
     full suite once before committing, not after every edit.
+
+    ## The Skeleton Tests Are Guarded
+
+    The RED tests in your task were authored and reviewed deliberately — they
+    are the spec, not a draft.
+
+    - You MAY add tests for cases you discover.
+    - You may NOT delete, weaken, rename-away, or change the expected behavior
+      of a skeleton test to make it pass.
+    - "This test is wrong" is not yours to decide silently. If implementing
+      convinces you a skeleton test is wrong, STOP and report back with status
+      NEEDS_CONTEXT (or BLOCKED), naming the test, why it seems wrong, and which
+      artifact you think must change. The controller runs the spec-change
+      protocol (note → approval → update skeleton → re-run RED). Silently
+      editing a skeleton test to go green defeats the whole model.
 
     ## Code Organization
 
@@ -115,9 +136,12 @@ Subagent (general-purpose):
     Write your full report to [REPORT_FILE]:
     - What you implemented (or what you attempted, if blocked)
     - What you tested and test results
-    - **TDD Evidence** (if TDD was required for this task):
-      - RED: command run, relevant failing output before implementation, and why the failure was expected
-      - GREEN: command run and relevant passing output after implementation
+    - **TDD Evidence:**
+      - RED: the skeleton test command + the failing output *before* your
+        implementation (the skeleton ships RED — show that state), and which
+        obligation it pins
+      - GREEN: the same command + passing output after your implementation,
+        plus the typecheck result
     - Files changed
     - Self-review findings (if any)
     - Any issues or concerns

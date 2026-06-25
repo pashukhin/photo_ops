@@ -5,11 +5,11 @@ description: Use when executing implementation plans with independent tasks in t
 
 # Subagent-Driven Development
 
-Execute plan by dispatching a fresh implementer subagent per task, a task review (spec compliance + code quality) after each, and a broad whole-branch review at the end.
+Fill a skeleton commit's GREEN phase: dispatch a fresh implementer subagent per task to make its RED tests green within the stubs. The per-task review is conditional — green tests + typecheck is the task-local verdict for mechanical tasks; a full dual-verdict task review runs only for architecture-sensitive tasks. One broad whole-branch review runs at the end and carries the global verdict.
 
 **Why subagents:** You delegate tasks to specialized agents with isolated context. By precisely crafting their instructions and context, you ensure they stay focused and succeed at their task. They should never inherit your session's context or history — you construct exactly what they need. This also preserves your own context for coordination work.
 
-**Core principle:** Fresh subagent per task + task review (spec + quality) + broad final review = high quality, fast iteration
+**Core principle:** Fresh subagent per task makes the RED tests green within the stubs; the task-local verdict is green + typecheck (full dual-verdict review only for architecture-sensitive tasks); the global verdict is one broad whole-branch review at the end.
 
 **Narration:** between tool calls, narrate at most one short line — the
 ledger and the tool results carry the record.
@@ -39,7 +39,7 @@ digraph when_to_use {
 **vs. Executing Plans (parallel session):**
 - Same session (no context switch)
 - Fresh subagent per task (no context pollution)
-- Review after each task (spec compliance + code quality), broad review at the end
+- Task-local verdict (green + typecheck) per task; full review only for architecture-sensitive tasks; broad whole-branch review at the end
 - Faster iteration (no human-in-loop between tasks)
 
 ## The Process
@@ -53,7 +53,9 @@ digraph process {
         "Dispatch implementer subagent (./implementer-prompt.md)" [shape=box];
         "Implementer subagent asks questions?" [shape=diamond];
         "Answer questions, provide context" [shape=box];
-        "Implementer subagent implements, tests, commits, self-reviews" [shape=box];
+        "Implementer makes RED tests green within stubs, commits, self-reviews" [shape=box];
+        "Architecture-sensitive task?" [shape=diamond];
+        "Confirm green + typecheck from report (task-local verdict)" [shape=box];
         "Write diff file, dispatch task reviewer subagent (./task-reviewer-prompt.md)" [shape=box];
         "Task reviewer reports spec ✅ and quality approved?" [shape=diamond];
         "Dispatch fix subagent for Critical/Important findings" [shape=box];
@@ -69,8 +71,11 @@ digraph process {
     "Dispatch implementer subagent (./implementer-prompt.md)" -> "Implementer subagent asks questions?";
     "Implementer subagent asks questions?" -> "Answer questions, provide context" [label="yes"];
     "Answer questions, provide context" -> "Dispatch implementer subagent (./implementer-prompt.md)";
-    "Implementer subagent asks questions?" -> "Implementer subagent implements, tests, commits, self-reviews" [label="no"];
-    "Implementer subagent implements, tests, commits, self-reviews" -> "Write diff file, dispatch task reviewer subagent (./task-reviewer-prompt.md)";
+    "Implementer subagent asks questions?" -> "Implementer makes RED tests green within stubs, commits, self-reviews" [label="no"];
+    "Implementer makes RED tests green within stubs, commits, self-reviews" -> "Architecture-sensitive task?";
+    "Architecture-sensitive task?" -> "Confirm green + typecheck from report (task-local verdict)" [label="no - mechanical"];
+    "Architecture-sensitive task?" -> "Write diff file, dispatch task reviewer subagent (./task-reviewer-prompt.md)" [label="yes"];
+    "Confirm green + typecheck from report (task-local verdict)" -> "Mark task complete in todo list and progress ledger";
     "Write diff file, dispatch task reviewer subagent (./task-reviewer-prompt.md)" -> "Task reviewer reports spec ✅ and quality approved?";
     "Task reviewer reports spec ✅ and quality approved?" -> "Dispatch fix subagent for Critical/Important findings" [label="no"];
     "Dispatch fix subagent for Critical/Important findings" -> "Write diff file, dispatch task reviewer subagent (./task-reviewer-prompt.md)" [label="re-review"];
@@ -81,6 +86,27 @@ digraph process {
     "Dispatch final code reviewer subagent (../requesting-code-review/code-reviewer.md)" -> "Use superpowers:finishing-a-development-branch";
 }
 ```
+
+## Task-Local Verdict vs Full Task Review
+
+The skeleton already carries the spec as RED tests, so most tasks do not need a
+fresh dual-verdict reviewer. Gate on one observable question:
+
+**Is the task architecture-sensitive?** Yes if it: crosses a module boundary or
+changes a shared contract, introduces a new pattern other code will copy, has
+more than one valid design, or touches concurrency, security, or money. No if it
+fills a stub to green within a fixed signature, single-file, with a clear spec.
+
+- **Mechanical (no):** the task-local verdict is **green RED tests + typecheck**,
+  confirmed from the implementer's report. Record Minor observations in the
+  ledger for the final review; do not dispatch a per-task reviewer.
+- **Architecture-sensitive (yes):** run the full dual-verdict task reviewer
+  (spec compliance + code quality) via `./task-reviewer-prompt.md`, with the
+  review loop below.
+
+Either way, the **global verdict stays at branch level**: the final whole-branch
+review runs once, after all tasks, and is never skipped. When unsure which lane a
+task is in, treat it as architecture-sensitive.
 
 ## Pre-Flight Plan Review
 
@@ -133,7 +159,7 @@ that implementer. Single-file mechanical fixes also take the cheapest tier.
 
 Implementer subagents report one of four statuses. Handle each appropriately:
 
-**DONE:** Generate the review package (`scripts/review-package BASE HEAD`, from this skill's directory — it prints the unique file path it wrote; BASE is the commit you recorded before dispatching the implementer — never `HEAD~1`, which silently drops all but the last commit of a multi-commit task), then dispatch the task reviewer with the printed path.
+**DONE:** Apply the task-local-verdict gate. For a **mechanical** task, confirm green tests + typecheck from the report and mark it complete — no reviewer. For an **architecture-sensitive** task, generate the review package (`scripts/review-package BASE HEAD`, from this skill's directory — it prints the unique file path it wrote; BASE is the commit you recorded before dispatching the implementer — never `HEAD~1`, which silently drops all but the last commit of a multi-commit task), then dispatch the task reviewer with the printed path.
 
 **DONE_WITH_CONCERNS:** The implementer completed the work but flagged doubts. Read the concerns before proceeding. If the concerns are about correctness or scope, address them before review. If they're observations (e.g., "this file is getting large"), note them and proceed to review.
 
@@ -147,6 +173,22 @@ Implementer subagents report one of four statuses. Handle each appropriately:
 
 **Never** ignore an escalation or force the same model to retry without changes. If the implementer said it's stuck, something needs to change.
 
+## Guarded Skeleton Tests & the Spec-Change Protocol
+
+The skeleton's RED tests are the spec. The implementer may add narrower tests
+but may not weaken, delete, rename-away, or change the expected behavior of a
+skeleton test (its prompt enforces this). Two things follow for you:
+
+- If an implementer reports a skeleton test looks wrong (it escalates instead
+  of editing it), run the **spec-change protocol**: get the spec-change note
+  (which executable artifact must change and why) → your human partner /
+  strong-model approves → update the skeleton (and any dependent stubs/tests) →
+  re-run to confirm RED → re-dispatch the implementer. Never wave it through by
+  letting the implementer "just fix the test."
+- Any task review (or the final review) that finds a skeleton test was
+  weakened, deleted, or renamed treats it as a failed spec review — send it
+  back. A green suite built by gutting the spec is not done.
+
 ## Handling Reviewer ⚠️ Items
 
 The task reviewer may report "⚠️ Cannot verify from diff" items — requirements
@@ -158,8 +200,9 @@ review — send it back to the implementer and re-review.
 
 ## Constructing Reviewer Prompts
 
-Per-task reviews are task-scoped gates. The broad review happens once, at the
-final whole-branch review. When you fill a reviewer template:
+Per-task reviews are task-scoped gates that run only for architecture-sensitive
+tasks (see Task-Local Verdict vs Full Task Review). The broad review happens
+once, at the final whole-branch review. When you fill a reviewer template:
 
 - Do not add open-ended directives like "check all uses" or "run race tests
   if useful" without a concrete, task-specific reason
@@ -277,7 +320,7 @@ You: I'm using Subagent-Driven Development to execute this plan.
 [Read plan file once: docs/superpowers/plans/feature-plan.md]
 [Create todos for all tasks]
 
-Task 1: Hook installation script
+Task 1: Hook installation script (mechanical — task-local verdict)
 
 [Run task-brief for Task 1; dispatch implementer with brief + report paths + context]
 
@@ -287,29 +330,26 @@ You: "User level (~/.config/superpowers/hooks/)"
 
 Implementer: "Got it. Implementing now..."
 [Later] Implementer:
-  - Implemented install-hook command
-  - Added tests, 5/5 passing
-  - Self-review: Found I missed --force flag, added it
+  - Made the RED tests green within the stub
+  - 5/5 passing, typecheck clean
+  - Self-review: Found I missed --force flag, added it (+ a test)
   - Committed
 
-[Run review-package, dispatch task reviewer with the printed path]
-Task reviewer: Spec ✅ - all requirements met, nothing extra.
-  Strengths: Good test coverage, clean. Issues: None. Task quality: Approved.
-
+[Mechanical task: green + typecheck from the report IS the verdict — no reviewer]
 [Mark Task 1 complete]
 
-Task 2: Recovery modes
+Task 2: Recovery modes (architecture-sensitive — full review)
 
 [Run task-brief for Task 2; dispatch implementer with brief + report paths + context]
 
 Implementer: [No questions, proceeds]
 Implementer:
-  - Added verify/repair modes
-  - 8/8 tests passing
+  - Made the RED tests green within the stubs (verify/repair modes)
+  - 8/8 passing, typecheck clean
   - Self-review: All good
   - Committed
 
-[Run review-package, dispatch task reviewer with the printed path]
+[Architecture-sensitive: run review-package, dispatch task reviewer with the printed path]
 Task reviewer: Spec ❌:
   - Missing: Progress reporting (spec says "report every 100 items")
   - Extra: Added --json flag (not requested)
@@ -353,10 +393,11 @@ Done!
 
 **Quality gates:**
 - Self-review catches issues before handoff
-- Task review carries two verdicts: spec compliance and code quality
+- Task-local verdict (green RED tests + typecheck) gates every task
+- Full task review (spec compliance + code quality) gates architecture-sensitive tasks
+- The whole-branch review carries the global verdict
 - Review loops ensure fixes actually work
-- Spec compliance prevents over/under-building
-- Code quality ensures implementation is well-built
+- Guarded skeleton tests prevent the spec being gutted to force green
 
 **Cost:**
 - More subagent invocations (implementer + reviewer per task)
@@ -368,7 +409,9 @@ Done!
 
 **Never:**
 - Start implementation on main/master branch without explicit user consent
-- Skip task review, or accept a report missing either verdict (spec compliance AND task quality are both required)
+- Skip the task-local verdict — green tests + typecheck is mandatory for every task; for an architecture-sensitive task the full dual-verdict review (spec compliance AND task quality) is also mandatory
+- Skip the final whole-branch review — it carries the global verdict and always runs
+- Let an implementer weaken, delete, or rename a skeleton test instead of escalating — the tests are guarded (run the spec-change protocol)
 - Proceed with unfixed issues
 - Dispatch multiple implementation subagents in parallel (conflicts)
 - Make a subagent read the whole plan file (hand it its task brief —
@@ -377,7 +420,7 @@ Done!
 - Ignore subagent questions (answer before letting them proceed)
 - Accept "close enough" on spec compliance (reviewer found spec issues = not done)
 - Skip review loops (reviewer found issues = implementer fixes = review again)
-- Let implementer self-review replace actual review (both are needed)
+- For an architecture-sensitive task, let implementer self-review replace the task review (both are needed)
 - Tell a reviewer what not to flag, or pre-rate a finding's severity in the
   dispatch prompt ("treat it as Minor at most") — the plan's example code is
   a starting point, not evidence that its weaknesses were chosen

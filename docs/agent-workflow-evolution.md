@@ -228,12 +228,13 @@ on structural metrics. Out of scope for this repo.
    **project level** (pins methodology, makes it diffable/reviewable; verify the
    SessionStart `using-superpowers` hook still fires; ensure no double-load with
    global). A fresh session is required for the project install to load.
-2. **Napильник session (own short session, `photo_ops-657`):** in a fresh session
+2. **Napильник session (own short session, `photo_ops-657`) — a separate setup
+   step immediately BEFORE 011, NOT 011's first commit:** in a fresh session
    (project skills now loaded), edit `writing-plans` + `subagent-driven-development`
    per Decision 1, commit, end. It runs on the *old* rules — it only edits files,
-   does no SDD. **A fresh session is then required** for the edited skills to take
-   effect (skills load at session start; editing them mid-session does not reload
-   them). This is why the nap. is NOT 011's first commit.
+   does no SDD. The split is forced by plugin/skill reload: **a fresh session is
+   then required** for the edited skills to take effect (skills load at session
+   start; editing them mid-session does not reload them).
 3. **Session 011 (fresh session):** loads the edited skills. Constitution already
    applied (AGENTS.md `## Principles`). Pre-register the metrics + kill-criterion in
    the brief, then run the UI gallery under executable-spec (product primary,
