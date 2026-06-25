@@ -10,7 +10,9 @@ Preconditions: `make dev` and `make migrate` are running.
    photo-service lines, and that the photo→worker chain shares it
    (media-worker `trace_id` parsed from the job's `correlation_id`).
 5. Confirm NO secrets: the following must return nothing:
-   `grep -Ei '"(cookie|authorization|password|passwordHash|uploadUrl)":"(?!\[REDACTED\])' /tmp/photoops.logs`
+   `grep -Ei '"(cookie|authorization|password|passwordHash|uploadUrl)":"[^\[]' /tmp/photoops.logs`
+   (matches any value NOT starting with `[`, i.e. anything other than `[REDACTED]`;
+   GNU `grep -E` has no PCRE lookahead, so this `[^\[]` form is used — same as `smoke-stack.sh`)
    and no raw `X-Amz-Signature` / presigned PUT URL appears.
 
 Pass: one trace_id threads gateway → identity/photo → worker; no secret values
