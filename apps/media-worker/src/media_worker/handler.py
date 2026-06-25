@@ -1,7 +1,6 @@
 """Job handler: claim → process → publish result."""
 from __future__ import annotations
 
-import json
 import logging
 
 from src.photoops_proto.photo.v1.processing_pb2 import (
@@ -13,6 +12,7 @@ from src.photoops_proto.photo.v1.processing_pb2 import (
 from .codec import VariantResult, decode_job, encode_result
 from .exif import extract_attributes
 from .imaging import RENDITIONS, render_variant
+from .logging_setup import bind_job_context, clear_job_context
 from .messaging.port import BusMessage, MessagePublisher
 from .storage import ObjectStore
 
@@ -33,6 +33,13 @@ class JobHandler:
         self._result_dest = result_dest
 
     def handle(self, message: BusMessage) -> None:
+        bind_job_context(message.correlation_id)
+        try:
+            self._handle(message)
+        finally:
+            clear_job_context()
+
+    def _handle(self, message: BusMessage) -> None:
         """Handle one BusMessage carrying a serialized ProcessPhotoJob.
 
         On any exception the failure is caught, a FAILED result is published,
@@ -42,18 +49,7 @@ class JobHandler:
         try:
             job = decode_job(message.body)
         except Exception as exc:
-            log.error(
-                json.dumps(
-                    {
-                        "level": "error",
-                        "correlation_id": message.correlation_id,
-                        "job_id": "",
-                        "photo_id": "",
-                        "outcome": "failed",
-                        "error": str(exc),
-                    }
-                )
-            )
+            log.error("job.failed", extra={"job_id": "", "photo_id": "", "error": str(exc)})
             body = encode_result(
                 job_id="",
                 photo_id="",
@@ -73,18 +69,9 @@ class JobHandler:
         try:
             self._process(job)
         except Exception as exc:
-            # Structured failure log
             log.error(
-                json.dumps(
-                    {
-                        "level": "error",
-                        "correlation_id": job.correlation_id,
-                        "job_id": job.job_id,
-                        "photo_id": job.photo_id,
-                        "outcome": "failed",
-                        "error": str(exc),
-                    }
-                )
+                "job.failed",
+                extra={"job_id": job.job_id, "photo_id": job.photo_id, "error": str(exc)},
             )
             body = encode_result(
                 job_id=job.job_id,
@@ -102,7 +89,7 @@ class JobHandler:
             )
 
     def _process(self, job: ProcessPhotoJob) -> None:
-        """Core processing — raises on any error (caught by handle())."""
+        """Core processing — raises on any error (caught by _handle())."""
         # Deterministic object keys for variants
         keys: dict[str, str] = {
             vt: f"variants/{job.photo_id}/{vt}.jpg"
@@ -167,18 +154,13 @@ class JobHandler:
             original = self._store.download(job.object_key)
             attrs = extract_attributes(original)
 
-        # Structured success log
         log.info(
-            json.dumps(
-                {
-                    "level": "info",
-                    "correlation_id": job.correlation_id,
-                    "job_id": job.job_id,
-                    "photo_id": job.photo_id,
-                    "outcome": "succeeded",
-                    "variants": [v.variant_type for v in variants],
-                }
-            )
+            "job.succeeded",
+            extra={
+                "job_id": job.job_id,
+                "photo_id": job.photo_id,
+                "variants": [v.variant_type for v in variants],
+            },
         )
 
         body = encode_result(
