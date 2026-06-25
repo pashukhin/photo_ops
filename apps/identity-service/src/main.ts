@@ -1,10 +1,15 @@
+import './tracing';
 import { NestFactory } from '@nestjs/core';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
+import { Logger } from 'nestjs-pino';
+import { GrpcLoggingInterceptor } from '@photoops/observability';
 import { join } from 'node:path';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  app.useLogger(app.get(Logger));
+  app.useGlobalInterceptors(new GrpcLoggingInterceptor('identity-service'));
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.GRPC,
     options: {

@@ -1,4 +1,7 @@
 import { Module } from '@nestjs/common';
+import { LoggerModule } from 'nestjs-pino';
+import { makeLoggerOptions } from '@photoops/observability';
+import type { Options } from 'pino-http';
 import { HealthController } from './health/health.controller';
 import { IdentityGrpcController } from './identity/identity.grpc.controller';
 import { IdentityRepository } from './identity/identity.repository';
@@ -6,6 +9,7 @@ import { IdentityDomainService } from './identity/identity.service';
 import { PasswordService } from './identity/password.service';
 
 @Module({
+  imports: [LoggerModule.forRoot({ pinoHttp: makeLoggerOptions('identity-service') as Options })],
   controllers: [HealthController, IdentityGrpcController],
   providers: [
     IdentityRepository,
