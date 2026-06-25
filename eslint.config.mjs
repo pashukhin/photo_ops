@@ -35,7 +35,12 @@ export default tseslint.config(
     files: ["**/*.ts", "**/*.tsx"],
     languageOptions: {
       parserOptions: {
-        projectService: true,
+        projectService: {
+          // vitest.config.ts files live outside src/ and are not included in
+          // any tsconfig; type-check them against a default project so the
+          // type-aware rules still run on them.
+          allowDefaultProject: ["packages/*/vitest.config.ts"],
+        },
         tsconfigRootDir: import.meta.dirname,
       },
     },

@@ -27,3 +27,4 @@ This section reflects the present state of the frame and changes as sessions lan
 - Implemented services: `api-gateway`, `identity-service`, `photo-service`, `web`.
 - Other services are health-only scaffolds until their approved sessions wire real behavior.
 - CI (`.github/workflows/ci.yml`) gates `push`/`pull_request` on proto-drift, typecheck, lint, build, and tests across the TS slice.
+- Observability: structured JSON logs across all services with an OpenTelemetry trace-context correlation id propagated over HTTP/gRPC/AMQP (propagation only; no exporter/backend — that is `pb6`). Secrets are redacted centrally in `@photoops/observability`.

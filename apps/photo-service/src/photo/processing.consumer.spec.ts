@@ -81,8 +81,9 @@ describe('ProcessingResultConsumer', () => {
   it('finalizes within the trace context carried by correlation_id', async () => {
     let seenTraceId: string | undefined;
     const service = {
-      finalizeResult: vi.fn(async () => {
+      finalizeResult: vi.fn(() => {
         seenTraceId = trace.getActiveSpan()?.spanContext().traceId;
+        return Promise.resolve();
       })
     };
     const bus = new InMemoryBus();

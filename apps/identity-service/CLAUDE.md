@@ -6,6 +6,7 @@
 - Signup/login handled by `IdentityDomainService` (`src/identity/identity.service.ts`) and `IdentityRepository` (`src/identity/identity.repository.ts`); passwords are hashed with argon2id via `PasswordService` (`src/identity/password.service.ts`); user and credential rows are written in a single transaction.
 - Sessions are stored in the `sessions` table in `identity-db` (Drizzle schema in `src/db/schema.ts`); `IdentityRepository.createSession` writes a new row with a 14-day TTL; lookup joins `sessions` and `users` to return an `AuthSessionRecord`; revocation sets `revoked_at`.
 - Schema: `migrations/` applied via `make migrate-identity`.
+- Logging / correlation: structured JSON via `nestjs-pino` (`makeLoggerOptions` from `@photoops/observability`); per-RPC lines via `GrpcLoggingInterceptor`.
 - Tests: `vitest run` (`make test-identity`).
 - Typecheck: `tsc --noEmit` (`make typecheck` runs it across all services).
 

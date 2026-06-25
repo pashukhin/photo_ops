@@ -137,3 +137,14 @@ say "mesh ready (gateway -> identity + photo round-trips succeed)"
 say "running live media smoke…"
 make smoke-media   # streams to console — this is the actual assertion
 say "PASSED ✅ (live stack validated end-to-end)"
+
+# --- 9. log-correlation assertion (best-effort; see docs/e2e-structured-logging.md)
+DC="$COMPOSE"
+LOGS="$($DC logs --no-color 2>/dev/null)"
+TRACE="$(printf '%s' "$LOGS" | grep -oE '"trace_id":"[a-f0-9]{32}"' | sort | uniq -c | sort -rn | head -1)"
+say "smoke-stack: dominant trace line -> ${TRACE:-none}"
+if printf '%s' "$LOGS" | grep -Eiq '"(password|passwordHash|cookie|authorization|uploadUrl)":"[^\[]'; then
+  printf '%s' "$LOGS" | grep -Ei '"(password|passwordHash|cookie|authorization|uploadUrl)":"[^\[]' >&2
+  say "smoke-stack: SECRET LEAK in logs"; exit 1
+fi
+say "smoke-stack: no unredacted secrets in logs"

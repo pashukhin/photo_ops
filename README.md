@@ -108,3 +108,4 @@ Session 005: Agent Working Conditions
 See `docs/architecture-frame-verification.md` and `docs/e2e-auth-upload-ownership.md` for the commands and manual checks used to verify the authenticated upload/list frame.
 
 - Quality gate: `make proto-check`, `make typecheck`, `make lint`, `make build`, and `make test` run locally and in CI (`.github/workflows/ci.yml`) on every push/PR.
+- Structured logging: all services emit JSON with `trace_id` at `LOG_LEVEL` (default `info`). To verify trace correlation end-to-end, see `docs/e2e-structured-logging.md`.
