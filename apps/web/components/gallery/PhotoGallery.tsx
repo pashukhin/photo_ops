@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { listPhotos } from '../../lib/api';
-import type { PhotoAsset } from '../../lib/api';
+import type { ListPhotosParams, PhotoAsset } from '../../lib/api';
 import { GalleryToolbar } from './GalleryToolbar';
 import { PhotoTable } from './PhotoTable';
 import { GalleryPagination } from './GalleryPagination';
@@ -13,19 +13,10 @@ import { GALLERY_POLL_MS } from './types';
 // GREEN obligation (session 011): the gallery container that ties the toolbar,
 // table, pagination, and detail modal to the server-side query.
 //
-// On mount and whenever the query state changes (page, pageSize, sort, dir,
-// status, q), call listPhotos(params) and render the toolbar, table, pagination
-// and (when a row is selected) the detail modal.
-//
-// UX states: a loading indicator (text matching /loading/i) while the first
-// request is in flight; an empty state (text matching /no photos/i) when
-// totalCount is 0; an error alert (role="alert") when the request rejects.
-//
-// Freshness: while any loaded photo is uploading/processing, re-poll listPhotos
-// every GALLERY_POLL_MS; stop once every photo is settled.
-//
-// Defaults: page 1, pageSize 24, sort 'created_at', dir 'desc', status [], q ''.
-// When the optional reloadToken prop changes, refetch the current page.
+// One fetch effect keyed on [page, query, reloadToken] loads the page; changing
+// any filter/sort/search resets to page 1; an upload (reloadToken bump) refetches.
+// While any loaded photo is uploading/processing it re-polls every
+// GALLERY_POLL_MS and stops once all settle. Loading / empty / error states.
 // Full behavior is pinned by PhotoGallery.spec.tsx.
 export interface PhotoGalleryProps {
   reloadToken?: number;
@@ -39,13 +30,19 @@ function allSettled(photos: PhotoAsset[]): boolean {
   return photos.every((p) => SETTLED_STATUSES.has(p.status));
 }
 
+function buildParams(page: number, query: GalleryQuery): ListPhotosParams {
+  return {
+    page,
+    pageSize: PAGE_SIZE,
+    sort: query.sort,
+    dir: query.dir,
+    status: query.status.length > 0 ? query.status : undefined,
+    q: query.q || undefined
+  };
+}
+
 export function PhotoGallery({ reloadToken }: PhotoGalleryProps = {}) {
-  const [query, setQuery] = useState<GalleryQuery>({
-    status: [],
-    q: '',
-    sort: 'created_at',
-    dir: 'desc'
-  });
+  const [query, setQuery] = useState<GalleryQuery>({ status: [], q: '', sort: 'created_at', dir: 'desc' });
   const [page, setPage] = useState(1);
 
   const [photos, setPhotos] = useState<PhotoAsset[]>([]);
@@ -55,85 +52,50 @@ export function PhotoGallery({ reloadToken }: PhotoGalleryProps = {}) {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const fetchPhotos = useCallback(() => {
+  // Single fetch trigger: mount + any of page/query/reloadToken changing. The
+  // cancelled guard drops a stale response if a newer fetch (or unmount) raced
+  // ahead, so out-of-order resolutions can't clobber the current view.
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
     setError(null);
-    return listPhotos({
-      page,
-      pageSize: PAGE_SIZE,
-      sort: query.sort,
-      dir: query.dir,
-      status: query.status.length > 0 ? query.status : undefined,
-      q: query.q || undefined
-    })
+    listPhotos(buildParams(page, query))
       .then(({ photos: p, totalCount: tc }) => {
+        if (cancelled) return;
         setPhotos(p);
         setTotalCount(tc);
         setLoading(false);
-        return p;
       })
       .catch((err: unknown) => {
+        if (cancelled) return;
         setError(err instanceof Error ? err.message : String(err));
         setLoading(false);
-        return [] as PhotoAsset[];
       });
-  }, [page, query]);
+    return () => {
+      cancelled = true;
+    };
+  }, [page, query, reloadToken]);
 
-  // Main fetch: on mount and whenever page/query change.
-  useEffect(() => {
-    setLoading(true);
-    void fetchPhotos();
-  }, [fetchPhotos]);
-
-  // Finding 1 fix: reload on reloadToken change via a ref, so this effect does
-  // not share `fetchPhotos` as a dep with the main effect (which would let both
-  // fire for the same request when page/query AND reloadToken change together).
-  const fetchPhotosRef = useRef(fetchPhotos);
-  fetchPhotosRef.current = fetchPhotos;
-  const prevReloadToken = useRef<number | undefined>(reloadToken);
-
-  useEffect(() => {
-    if (reloadToken === prevReloadToken.current) return;
-    prevReloadToken.current = reloadToken;
-    setLoading(true);
-    void fetchPhotosRef.current();
-  }, [reloadToken]);
-
-  // Finding 2 fix: a stable polling interval that does not restart on every
-  // photos update. The interval reads the latest page/query from refs, so it
-  // need not list them as deps; it starts when there is unsettled work and is
-  // cleared once all photos settle and on unmount.
+  // Poll the current page while work is in flight, without restarting on every
+  // photos update: the interval reads the latest page/query from refs and the
+  // effect only re-runs when polling should start/stop.
   const pageRef = useRef(page);
   const queryRef = useRef(query);
   pageRef.current = page;
   queryRef.current = query;
-
   const shouldPoll = !loading && !error && photos.length > 0 && !allSettled(photos);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (!shouldPoll) return;
-
     const interval = setInterval(() => {
-      const q = queryRef.current;
-      void listPhotos({
-        page: pageRef.current,
-        pageSize: PAGE_SIZE,
-        sort: q.sort,
-        dir: q.dir,
-        status: q.status.length > 0 ? q.status : undefined,
-        q: q.q || undefined
-      })
+      void listPhotos(buildParams(pageRef.current, queryRef.current))
         .then(({ photos: newPhotos, totalCount: tc }) => {
           setPhotos(newPhotos);
           setTotalCount(tc);
-          if (allSettled(newPhotos)) {
-            clearInterval(interval);
-          }
+          if (allSettled(newPhotos)) clearInterval(interval);
         })
-        .catch(() => {
-          clearInterval(interval);
-        });
+        .catch(() => clearInterval(interval));
     }, GALLERY_POLL_MS);
-
     return () => clearInterval(interval);
   }, [shouldPoll]);
 
@@ -151,7 +113,15 @@ export function PhotoGallery({ reloadToken }: PhotoGalleryProps = {}) {
 
   return (
     <div className="space-y-4">
-      <GalleryToolbar value={query} onChange={setQuery} />
+      <GalleryToolbar
+        value={query}
+        onChange={(next) => {
+          // Any filter/sort/search change starts from page 1 — otherwise a
+          // narrower result set can land the viewer on an out-of-range page.
+          setQuery(next);
+          setPage(1);
+        }}
+      />
 
       {totalCount === 0 ? (
         <p className="text-center text-muted-foreground py-8">No photos found.</p>
@@ -162,8 +132,6 @@ export function PhotoGallery({ reloadToken }: PhotoGalleryProps = {}) {
         </>
       )}
 
-      {/* Finding 3 fix: lazy-mount the modal so Radix's Presence tree is absent
-          while closed (no state updates under fake timers). */}
       {selectedId !== null && <PhotoDetailModal photoId={selectedId} onClose={() => setSelectedId(null)} />}
     </div>
   );

@@ -93,6 +93,21 @@ describe('PhotoGallery (session 011)', () => {
     await waitFor(() => expect(api.listPhotos).toHaveBeenCalledWith(expect.objectContaining({ page: 2 })));
   });
 
+  it('resets to page 1 when the query changes (so a narrower result set is not viewed past its end)', async () => {
+    // why: review finding — changing the filter while on a later page would
+    // otherwise fetch an out-of-range page and render a blank table.
+    vi.mocked(api.listPhotos).mockResolvedValue({ photos: [READY_PHOTO], totalCount: 60 });
+
+    render(<PhotoGallery />);
+    await screen.findByText('beach.jpg');
+
+    fireEvent.click(screen.getByRole('button', { name: /next/i })); // -> page 2
+    await waitFor(() => expect(api.listPhotos).toHaveBeenCalledWith(expect.objectContaining({ page: 2 })));
+
+    fireEvent.change(screen.getByLabelText(/search/i), { target: { value: 'x' } }); // query change
+    await waitFor(() => expect(api.listPhotos).toHaveBeenCalledWith(expect.objectContaining({ q: 'x', page: 1 })));
+  });
+
   it('shows a loading state, then the empty state when there are no photos', async () => {
     // why: per the UX-states requirement; an authenticated user with no photos
     // sees an empty message, not a blank table.

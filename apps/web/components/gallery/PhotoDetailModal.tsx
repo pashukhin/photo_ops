@@ -105,9 +105,6 @@ export function PhotoDetailModal({ photoId, onClose }: PhotoDetailModalProps) {
               <dt className="font-medium text-muted-foreground">Photo ID</dt>
               <dd className="font-mono text-xs">{photo.id}</dd>
 
-              <dt className="font-medium text-muted-foreground">Object key</dt>
-              <dd className="font-mono text-xs break-all">{photo.objectKey}</dd>
-
               <dt className="font-medium text-muted-foreground">Created at</dt>
               <dd>{fmt(photo.createdAt)}</dd>
 

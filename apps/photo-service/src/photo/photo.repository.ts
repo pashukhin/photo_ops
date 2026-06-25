@@ -61,7 +61,10 @@ export class PhotoRepository implements PhotoRepositoryPort {
     }
 
     if (params.filenameQuery !== '') {
-      conditions.push(ilike(photoAssets.filename, `%${params.filenameQuery}%`));
+      // Escape ILIKE wildcards so a literal substring search does not treat a
+      // user-typed % or _ as a pattern (\ is Postgres's default LIKE escape).
+      const escaped = params.filenameQuery.replace(/[\\%_]/g, (c) => `\\${c}`);
+      conditions.push(ilike(photoAssets.filename, `%${escaped}%`));
     }
 
     const where = and(...conditions);
