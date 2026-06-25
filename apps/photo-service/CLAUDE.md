@@ -6,7 +6,7 @@
 - Upload flow: `PhotoGrpcController` (`src/photo/photo.grpc.controller.ts`) calls `PhotoDomainService.createUploadIntent` → `PhotoRepository` creates a `photo_assets` row with status `uploading` and a server-generated `objectKey` (`originals/<uuid>/<sanitized-filename>`), then `MinioStorageService` (`src/storage/minio.service.ts`) returns a presigned S3 PUT URL; `CompleteUpload` verifies the object exists in MinIO before marking status `uploaded`.
 - List photos scoped by `userId`: `PhotoGrpcController.listPhotos` → `PhotoDomainService.listPhotos` → `PhotoRepository.list` queries `photo_assets` filtered and ordered by `created_at` desc; `userId` is always caller-supplied from the validated session in api-gateway.
 - Schema: `migrations/` applied via `make migrate-photo`.
-- Logging / correlation: structured JSON via `nestjs-pino` (`makeLoggerOptions` from `@photoops/observability`); per-RPC lines via `GrpcLoggingInterceptor`. Bridge invariant: the async hop carries the W3C traceparent in the proto `correlation_id` field (`currentTraceparent()` on publish, `withExtractedContext()` on result consume); `job_id` stays the idempotency key.
+- Logging / correlation: structured JSON via `nestjs-pino`, configured by `makePinoHttpOptions` from `@photoops/observability` (wraps `makeLoggerOptions` — redaction + trace_id/span_id mixin); per-RPC lines via `GrpcLoggingInterceptor`. Bridge invariant: the async hop carries the W3C traceparent in the proto `correlation_id` field (`currentTraceparent()` on publish, `withExtractedContext()` on result consume); `job_id` stays the idempotency key.
 - Tests: `vitest run` (`make test-photo`).
 - Typecheck: `tsc --noEmit` (`make typecheck` runs it across all services).
 
