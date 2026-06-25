@@ -15,6 +15,7 @@ operational rules in this file.
 5. **Simplicity over sophistication.** Document retained imperfections as trade-offs.
 6. **Evidence before claims.** Verify with commands/tests; "feels done" is not done.
 7. **No duplicate truth.** Each fact lives in the cheapest artifact that fails when it drifts (types, tests, proto, config); don't state one thought in two places.
+8. **Fix cheap things now.** If a problem is cheaply and confidently fixable in ~5 minutes, do it in the next 5 minutes — don't defer it (the bar is cheap *and* confident, not "while I'm here").
 
 ## Required Reading
 

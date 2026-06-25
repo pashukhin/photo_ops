@@ -142,7 +142,8 @@ be the exact prose-duplication we are removing). Keep ≤ ~8 one-liners.
 4. **One canonical way** — one gate, one workflow, one source of truth; no duplicate mechanisms. *(AGENTS.md)*
 5. **Simplicity over sophistication** — document retained imperfections as trade-offs. *(AGENTS.md verbatim)*
 6. **Evidence before claims** — verify with commands/tests; "feels done" ≠ done. *(verification skill; METR "felt faster" finding)*
-7. **Single source of truth** — the spec lives where it can fail on drift (types, tests, proto, config); don't duplicate one thought in two places. *(ties to Decision 1)*
+7. **No duplicate truth** — each fact lives in the cheapest artifact that fails on drift (types, tests, proto, config); don't state one thought in two places. *(ties to Decision 1)*
+8. **Fix cheap things now** — if a problem is cheaply and confidently fixable in ~5 minutes, do it in the next 5 minutes. *(extends Scope Guardrails: cheap fixes from allowed → do-it-now)*
 
 ---
 
