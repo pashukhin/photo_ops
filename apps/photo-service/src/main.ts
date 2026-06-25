@@ -1,11 +1,16 @@
+import './tracing';
 import { NestFactory } from '@nestjs/core';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
+import { Logger } from 'nestjs-pino';
+import { GrpcLoggingInterceptor } from '@photoops/observability';
 import { join } from 'node:path';
 import { AppModule } from './app.module';
 import { ProcessingResultConsumer } from './photo/processing.consumer';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  app.useLogger(app.get(Logger));
+  app.useGlobalInterceptors(new GrpcLoggingInterceptor('photo-service'));
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.GRPC,
     options: {
@@ -20,9 +25,6 @@ async function bootstrap() {
   await app.startAllMicroservices();
   await app.listen(3002);
 
-  // Start the RabbitMQ result consumer after the gRPC server is up.
-  // The RabbitMqBus connection is already established by the async factory in
-  // AppModule; consume() just registers a callback on the open channel.
   const resultConsumer = app.get(ProcessingResultConsumer);
   await resultConsumer.start();
 }

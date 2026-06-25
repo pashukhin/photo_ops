@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.723.0",
+    "@photoops/observability": "workspace:*",
     "@aws-sdk/s3-request-presigner": "^3.723.0",
     "@grpc/grpc-js": "^1.12.6",
     "@nestjs/common": "^10.4.15",
@@ -19,6 +20,9 @@
     "amqplib": "^2.0.1",
     "drizzle-orm": "^0.38.4",
     "pg": "^8.13.1",
+    "nestjs-pino": "^4.4.0",
+    "pino": "^9.6.0",
+    "pino-http": "^10.4.0",
     "protobufjs": "^7.4.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
