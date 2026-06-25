@@ -14,7 +14,7 @@ operational rules in this file.
 4. **One canonical way.** One gate, one workflow, one source of truth; no duplicate mechanisms.
 5. **Simplicity over sophistication.** Document retained imperfections as trade-offs.
 6. **Evidence before claims.** Verify with commands/tests; "feels done" is not done.
-7. **Single source of truth.** Put a fact where it can fail on drift (types, tests, proto, config); don't duplicate one thought in two places.
+7. **No duplicate truth.** Each fact lives in the cheapest artifact that fails when it drifts (types, tests, proto, config); don't state one thought in two places.
 
 ## Required Reading
 

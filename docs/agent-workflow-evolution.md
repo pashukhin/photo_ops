@@ -34,11 +34,14 @@ log.
 
 ## Decision 1 — Executable-spec / skeleton-first SDD
 
-**Principle:** single source of truth. A spec lives where **something fails when
-code and spec disagree** (types → compiler, tests → run, proto →
-`make proto-check`, config/schema → boot validation). Prose is written **only**
-for what cannot be expressed that way. We already practice this for gRPC
-contracts (`proto/` + `make proto-check`); we generalize it.
+Framing: not "executable spec instead of prose" but **skeleton-first SDD where
+the design artifact is the first RED diff**.
+
+**Principle: no duplicate truth** (routing, not one source). Each claim lives in
+the cheapest artifact that **fails when it drifts** (types → compiler, tests →
+run, proto → `make proto-check`, config/schema → boot validation). Prose is
+written **only** for what cannot be expressed that way. We already practice this
+for gRPC contracts (`proto/` + `make proto-check`); we generalize it.
 
 **Layer routing (route each layer to its cheapest fail-on-drift home):**
 
@@ -61,7 +64,9 @@ cheaper than refactoring a typed skeleton + tests). Use the **cheapest**
 executable carrier (a test or one line of type), never type-gymnastics. The
 short prose note keeps only intent + links to the executable spec as **entry
 points** ("contract → logger.ts, interfaces → these stubs, behavior → these
-tests").
+tests"). Crossover: brainstorm in prose **until you know what should fail**, then
+skeleton — the executable skeleton is mandatory only once changing signatures is
+cheaper than continuing prose, so hypotheses are not concreted prematurely.
 
 **Branch rule:** because the spec now touches code, this model runs **only on a
 regular feature branch** (already mandated in AGENTS.md; no worktrees — beads).
@@ -73,8 +78,36 @@ regular feature branch** (already mandated in AGENTS.md; no worktrees — beads)
 - `subagent-driven-development` → per-task brief = "make these RED tests green
   within these stubs," not "transcribe this code." This tightens the leash on
   the implementer subagent AND collapses most per-task spec-compliance review
-  (green test + typecheck = the verdict).
+  (green test + typecheck = the **task-local** verdict; the global verdict stays
+  at branch level — final whole-branch review + integration tests `4vg`).
 - `brainstorming` → unchanged.
+
+**Skeleton guardrails (from external review — cheap rules now, tooling deferred):**
+
+- **RED tests constrain obligations, not the route.** Pin observable behavior,
+  contracts, invariants, known edge cases; do not freeze incidental
+  implementation choices unless that choice *is* the design decision. Each test:
+  explicit fixture + explicit expected output + one reason it matters; no
+  "invisible prose" as the oracle.
+- **Tests are guarded.** The implementer may *add* narrower tests; it may not
+  delete, weaken, rename-away, or change the expected behavior of skeleton tests.
+- **Spec-change protocol.** If implementation shows the skeleton is wrong: stop →
+  spec-change note (which executable artifact changes and why) → human/strong-model
+  approval → update skeleton → re-run RED → continue. Silent skeleton mutation
+  defeats the model.
+- **Skeleton stays reviewable.** Small enough to review *intended behavior*
+  without reading implementation: ~1-3 RED acceptance tests + a few focused
+  unit/property tests + minimal stubs + the contract/schema diff + a short WHY.
+  An 800-line "skeleton" is unfinished implementation.
+- **Negative space.** State non-goals / rejected behaviors explicitly (some
+  enforced by tests/lint, the rest in `docs/adr` / `## Local invariants`).
+- **Roles are hats, not a fan-out.** skeleton-author / implementer / reviewer are
+  distinct roles but, for cost (Decision 2), hats one agent wears + the single
+  final-review subagent — not three subagents per task.
+- **Deferred (`photo_ops-mp0`, revisit after 011):** a mechanical diff-guard
+  (test files only gain tests; proto/schema/migration diffs flagged) and
+  anti-gaming techniques (visible/hidden test split, mutation testing) — real but
+  session-sized; not day-one.
 
 Reference for the duplication this kills: the 010 spec (264 lines) + plan
 (1747 lines) were ~90% a prose twin of the shipped code; only ~50-70 lines were
