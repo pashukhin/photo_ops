@@ -24,7 +24,7 @@ describe('GrpcLoggingInterceptor', () => {
       interceptor.intercept(rpcContext('ListPhotos'), next).subscribe({ complete: resolve })
     );
     expect(logger.info).toHaveBeenCalledWith(
-      expect.objectContaining({ rpc: 'ListPhotos', outcome: 'ok' }),
+      expect.objectContaining({ rpc: 'ListPhotos', outcome: 'ok', duration_ms: expect.any(Number) }),
       'grpc.request'
     );
   });
@@ -37,7 +37,7 @@ describe('GrpcLoggingInterceptor', () => {
       interceptor.intercept(rpcContext('GetPhoto'), next).subscribe({ error: () => resolve() })
     );
     expect(logger.warn).toHaveBeenCalledWith(
-      expect.objectContaining({ rpc: 'GetPhoto', outcome: 'error', err_code: 5 }),
+      expect.objectContaining({ rpc: 'GetPhoto', outcome: 'error', duration_ms: expect.any(Number), err_code: 5 }),
       'grpc.request'
     );
   });
@@ -51,5 +51,6 @@ describe('GrpcLoggingInterceptor', () => {
       interceptor.intercept(httpCtx, next).subscribe({ complete: resolve })
     );
     expect(logger.info).not.toHaveBeenCalled();
+    expect(logger.warn).not.toHaveBeenCalled();
   });
 });

@@ -19,6 +19,13 @@ describe('currentTraceparent', () => {
       expect(currentTraceparent()).toBe(`00-${'a'.repeat(32)}-${'b'.repeat(16)}-01`);
     });
   });
+
+  it('is undefined when an invalid (all-zeros) span context is active', () => {
+    const invalid = trace.wrapSpanContext({ traceId: '0'.repeat(32), spanId: '0'.repeat(16), traceFlags: 0 });
+    context.with(trace.setSpan(context.active(), invalid), () => {
+      expect(currentTraceparent()).toBeUndefined();
+    });
+  });
 });
 
 describe('withExtractedContext', () => {

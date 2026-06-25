@@ -331,6 +331,9 @@ importers:
       '@nestjs/common':
         specifier: ^10.4.15
         version: 10.4.22(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      pino-http:
+        specifier: ^10.3.0
+        version: 10.5.0
       rxjs:
         specifier: ^7.8.1
         version: 7.8.2

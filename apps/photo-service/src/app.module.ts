@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { LoggerModule, PinoLogger } from 'nestjs-pino';
-import { makeLoggerOptions } from '@photoops/observability';
-import type { Options } from 'pino-http';
+import { makePinoHttpOptions } from '@photoops/observability';
 import { HealthController } from './health/health.controller';
 import { RabbitMqBus } from './messaging/rabbitmq-bus';
 import { MESSAGE_PUBLISHER, MessagePublisher } from './messaging/messaging.port';
@@ -16,7 +15,7 @@ import { MinioStorageService } from './storage/minio.service';
 const RABBITMQ_BUS = 'RABBITMQ_BUS';
 
 @Module({
-  imports: [LoggerModule.forRoot({ pinoHttp: makeLoggerOptions('photo-service') as Options })],
+  imports: [LoggerModule.forRoot({ pinoHttp: makePinoHttpOptions('photo-service') })],
   controllers: [HealthController, PhotoGrpcController],
   providers: [
     PhotoRepository,

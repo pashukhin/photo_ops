@@ -26,7 +26,7 @@ export class GrpcLoggingInterceptor implements NestInterceptor {
           this.logger.info({ rpc, outcome: 'ok', duration_ms: Date.now() - start }, 'grpc.request'),
         error: (err: { code?: number }) =>
           this.logger.warn(
-            { rpc, outcome: 'error', duration_ms: Date.now() - start, err_code: err?.code },
+            { rpc, outcome: 'error', duration_ms: Date.now() - start, err_code: err?.code ?? null },
             'grpc.request'
           )
       })

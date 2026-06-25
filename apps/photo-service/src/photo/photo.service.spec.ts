@@ -1,12 +1,10 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { context, propagation, trace } from '@opentelemetry/api';
-import { AsyncLocalStorageContextManager } from '@opentelemetry/context-async-hooks';
-import { W3CTraceContextPropagator } from '@opentelemetry/core';
+import { context, trace } from '@opentelemetry/api';
 import { PhotoDomainService } from './photo.service';
+import { registerTestOtel } from './test-otel';
 
 beforeAll(() => {
-  context.setGlobalContextManager(new AsyncLocalStorageContextManager().enable());
-  propagation.setGlobalPropagator(new W3CTraceContextPropagator());
+  registerTestOtel();
 });
 
 function makePhotoRecord(overrides: Partial<Record<string, unknown>> = {}) {
@@ -295,13 +293,17 @@ describe('PhotoDomainService', () => {
   });
 
   it('finalize SUCCEEDED: upserts variants, applies attributes, marks ready', async () => {
-    const { service, repository } = createService();
+    const { service, repository, logger } = createService();
     repository.finalizeJob.mockResolvedValue(true);
     await service.finalizeResult({ jobId: 'j1', photoId: 'p1', outcome: 'succeeded',
       attributes: { width: 100, height: 50 }, variants: [{ variantType: 'thumbnail', objectKey: 'variants/p1/thumbnail.jpg', width: 100, height: 50, sizeBytes: 10n, contentType: 'image/jpeg' }], metadataJson: '{}' });
     expect(repository.upsertVariant).toHaveBeenCalledTimes(1);
     expect(repository.applyAttributes).toHaveBeenCalledWith('p1', expect.objectContaining({ width: 100 }));
     expect(repository.setStatus).toHaveBeenCalledWith('p1', 'ready');
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.objectContaining({ msg: 'processing.finalized' }),
+      'processing.finalized'
+    );
   });
 
   it('finalize is idempotent: duplicate result (finalizeJob=false) writes nothing', async () => {

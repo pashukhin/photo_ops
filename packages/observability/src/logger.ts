@@ -1,5 +1,6 @@
 import { isSpanContextValid, trace } from '@opentelemetry/api';
 import type { LoggerOptions } from 'pino';
+import type { Options } from 'pino-http';
 
 /**
  * Single source of truth for secret redaction. pino redacts these paths on
@@ -37,4 +38,9 @@ export function makeLoggerOptions(serviceName: string): LoggerOptions {
     mixin: traceMixin,
     redact: { paths: REDACT_PATHS, censor: '[REDACTED]' }
   };
+}
+
+/** pino options typed for nestjs-pino's `pinoHttp` (centralizes the LoggerOptions->Options widening). */
+export function makePinoHttpOptions(serviceName: string): Options {
+  return makeLoggerOptions(serviceName) as Options;
 }

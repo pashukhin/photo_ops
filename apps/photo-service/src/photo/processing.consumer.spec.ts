@@ -1,15 +1,13 @@
 import { join } from 'path';
 import * as protobuf from 'protobufjs';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { context, propagation, trace } from '@opentelemetry/api';
-import { AsyncLocalStorageContextManager } from '@opentelemetry/context-async-hooks';
-import { W3CTraceContextPropagator } from '@opentelemetry/core';
+import { trace } from '@opentelemetry/api';
 import { InMemoryBus } from '../messaging/in-memory-bus';
 import { ProcessingResultConsumer, PROCESS_RESULT_SOURCE } from './processing.consumer';
+import { registerTestOtel } from './test-otel';
 
 beforeAll(() => {
-  context.setGlobalContextManager(new AsyncLocalStorageContextManager().enable());
-  propagation.setGlobalPropagator(new W3CTraceContextPropagator());
+  registerTestOtel();
 });
 
 const root = protobuf.loadSync(join(process.cwd(), '../../proto/photo/v1/processing.proto'));

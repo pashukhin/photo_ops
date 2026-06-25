@@ -28,6 +28,7 @@
   },
   "devDependencies": {
     "@nestjs/common": "^10.4.15",
+    "pino-http": "^10.3.0",
     "rxjs": "^7.8.1",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
