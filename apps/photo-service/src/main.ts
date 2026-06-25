@@ -25,6 +25,9 @@ async function bootstrap() {
   await app.startAllMicroservices();
   await app.listen(3002);
 
+  // Start the RabbitMQ result consumer after the gRPC server is up.
+  // The RabbitMqBus connection is already established by the async factory in
+  // AppModule; consume() just registers a callback on the open channel.
   const resultConsumer = app.get(ProcessingResultConsumer);
   await resultConsumer.start();
 }

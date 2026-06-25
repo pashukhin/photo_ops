@@ -50,6 +50,7 @@ class JsonLogFormatter(logging.Formatter):
             "trace_id": _trace_id.get(),
             "correlation_id": _correlation_id.get(),
         }
+        # NOTE: extra fields are NOT redacted — callers must pass identifiers only, no secrets.
         for key, value in record.__dict__.items():
             if key not in _RESERVED and not key.startswith("_"):
                 payload[key] = value
@@ -58,7 +59,7 @@ class JsonLogFormatter(logging.Formatter):
         return json.dumps(payload)
 
 
-def setup_logging(service: str = _SERVICE) -> None:
+def setup_logging() -> None:
     """Configure the root logger to emit JSON at LOG_LEVEL (default INFO)."""
     level = os.getenv("LOG_LEVEL", "info").upper()
     handler = logging.StreamHandler()
