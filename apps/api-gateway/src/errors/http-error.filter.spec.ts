@@ -88,13 +88,19 @@ describe('HttpErrorFilter logging', () => {
       new HttpException('nope', HttpStatus.UNAUTHORIZED),
       createHost().host
     );
-    expect(logger.warn).toHaveBeenCalled();
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 401, code: 'unauthorized' }),
+      'http.error'
+    );
     expect(logger.error).not.toHaveBeenCalled();
   });
 
   it('logs unexpected errors as error', () => {
     const logger = fakeLogger();
     new HttpErrorFilter(logger).catch(new Error('boom'), createHost().host);
-    expect(logger.error).toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 500, code: 'internal_error' }),
+      'http.error'
+    );
   });
 });

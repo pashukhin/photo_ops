@@ -34,7 +34,7 @@ export class HttpErrorFilter implements ExceptionFilter {
   }
 
   private log(status: number, code: string, message: string) {
-    const fields = { status, code, msg: 'http.error', err_message: message };
+    const fields = { status, code, err_message: message };
     if (status >= 500) this.logger.error(fields, 'http.error');
     else this.logger.warn(fields, 'http.error');
   }
