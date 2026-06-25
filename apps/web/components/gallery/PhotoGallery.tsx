@@ -81,7 +81,7 @@ export function PhotoGallery({ reloadToken }: PhotoGalleryProps = {}) {
   // Main fetch: on mount and whenever page/query change.
   useEffect(() => {
     setLoading(true);
-    fetchPhotos();
+    void fetchPhotos();
   }, [fetchPhotos]);
 
   // Finding 1 fix: reload on reloadToken change via a ref, so this effect does
@@ -95,8 +95,7 @@ export function PhotoGallery({ reloadToken }: PhotoGalleryProps = {}) {
     if (reloadToken === prevReloadToken.current) return;
     prevReloadToken.current = reloadToken;
     setLoading(true);
-    fetchPhotosRef.current();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    void fetchPhotosRef.current();
   }, [reloadToken]);
 
   // Finding 2 fix: a stable polling interval that does not restart on every

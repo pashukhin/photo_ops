@@ -11,6 +11,7 @@ export default tseslint.config(
       "**/dist/**",
       "**/.next/**",
       "packages/proto-ts/**", // GENERATED — never lint or edit
+      ".claude/**", // VENDORED plugin (superpowers) — third-party, not ours to lint
       "**/node_modules/**",
       "**/.venv/**", // Python virtualenv (media-worker) — installed packages
       "**/*.egg-info/**", // Python editable-install metadata
