@@ -5,7 +5,8 @@ recorded as a standalone workflow note — **not a numbered product session**.
 Status: **accepted direction.** Records what was decided; it is the input brief
 for the next working session, which is **session 011** (the existing UI-gallery
 brief, `sessions/011_rich_photo_gallery_ui.md`, executed under the direction
-below — the skill edits fold in as 011's setup commit).
+below; the skill edits land in a short setup session just before 011, since
+plugins reload only at session start).
 
 > Method note: backed by an internal audit of this repo plus a deep-research
 > pass (23 sources; key citations inline below). The research synthesis step was
@@ -192,13 +193,17 @@ on structural metrics. Out of scope for this repo.
 1. **Between sessions (user):** uninstall global superpowers; reinstall at
    **project level** (pins methodology, makes it diffable/reviewable; verify the
    SessionStart `using-superpowers` hook still fires; ensure no double-load with
-   global).
-2. **Session 011, first commit (reviewable):** apply the executable-spec
-   skill-edit pass (`photo_ops-657`) to project-level `writing-plans` +
-   `subagent-driven-development` (Decision 1). Constitution already applied — see
-   AGENTS.md `## Principles`. Pre-register the metrics above in the session brief.
-3. **Same session (011):** run the UI gallery under executable-spec (product
-   primary, method the lens). Measure. Apply the kill-criterion.
+   global). A fresh session is required for the project install to load.
+2. **Napильник session (own short session, `photo_ops-657`):** in a fresh session
+   (project skills now loaded), edit `writing-plans` + `subagent-driven-development`
+   per Decision 1, commit, end. It runs on the *old* rules — it only edits files,
+   does no SDD. **A fresh session is then required** for the edited skills to take
+   effect (skills load at session start; editing them mid-session does not reload
+   them). This is why the nap. is NOT 011's first commit.
+3. **Session 011 (fresh session):** loads the edited skills. Constitution already
+   applied (AGENTS.md `## Principles`). Pre-register the metrics + kill-criterion in
+   the brief, then run the UI gallery under executable-spec (product primary,
+   method the lens). Measure. Apply the kill-criterion.
 4. **Cheap retro** (not a full session): short comparison vs the 010 artifact set,
    appended to the 011 brief, scored on the pre-registered metrics.
 5. **Backlog (own sessions / quick wins), now filed:** mise/ADR-0002
