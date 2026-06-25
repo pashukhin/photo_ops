@@ -33,3 +33,8 @@ data/
 
 # smoke-stack build/up/migrate logs (scripts/smoke-stack.sh)
 .smoke-stack/
+.smoke-stack-up.log
+
+# Playwright UI-smoke artifacts (make smoke-ui)
+test-results/
+playwright-report/

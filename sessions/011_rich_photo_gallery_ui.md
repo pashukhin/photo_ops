@@ -1,10 +1,11 @@
 # Session 011: Rich Photo Gallery UI (executable-spec experiment)
 
-Status: **Implementation complete, `make gate` green** on
-`session-011-rich-photo-gallery-ui` (bead `photo_ops-8k9`); pending live UI
-smoke, final `/code-review`, and `--no-ff` merge + tag `exp/exec-spec-011`.
-This session is also the validation run for **executable-spec / skeleton-first
-SDD** — see `docs/agent-workflow-evolution.md` (Decision 1, the experiment, the
+Status: **Done** on `session-011-rich-photo-gallery-ui` (bead `photo_ops-8k9`):
+`make gate` green, final `/code-review` (high effort) findings triaged + fixed,
+live UI smoke (`make smoke-ui`) passed against the Docker stack; merged `--no-ff`
+into `main` + tag `exp/exec-spec-011`. This session is also the validation run
+for **executable-spec / skeleton-first SDD** — see
+`docs/agent-workflow-evolution.md` (Decision 1, the experiment, the
 kill-criterion). Product is primary; the method is the lens. **Verdict: KEEP
 executable-spec** (see Retro).
 
