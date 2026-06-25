@@ -61,6 +61,7 @@ services:
       context: ../..
       dockerfile: apps/identity-service/Dockerfile
     environment:
+      LOG_LEVEL: ${LOG_LEVEL:-info}
       IDENTITY_DATABASE_URL: ${IDENTITY_DATABASE_URL}
       IDENTITY_SERVICE_HTTP_PORT: ${IDENTITY_SERVICE_HTTP_PORT}
       IDENTITY_SERVICE_GRPC_PORT: ${IDENTITY_SERVICE_GRPC_PORT}
@@ -76,6 +77,7 @@ services:
       context: ../..
       dockerfile: apps/photo-service/Dockerfile
     environment:
+      LOG_LEVEL: ${LOG_LEVEL:-info}
       PHOTO_DATABASE_URL: ${PHOTO_DATABASE_URL}
       PHOTO_SERVICE_GRPC_PORT: ${PHOTO_SERVICE_GRPC_PORT}
       MINIO_ENDPOINT: ${MINIO_ENDPOINT}
@@ -100,6 +102,7 @@ services:
       context: ../..
       dockerfile: apps/api-gateway/Dockerfile
     environment:
+      LOG_LEVEL: ${LOG_LEVEL:-info}
       API_GATEWAY_PORT: ${API_GATEWAY_PORT}
       IDENTITY_SERVICE_GRPC_URL: identity-service:${IDENTITY_SERVICE_GRPC_PORT}
       IDENTITY_SESSION_COOKIE_NAME: ${IDENTITY_SESSION_COOKIE_NAME}
@@ -128,6 +131,7 @@ services:
       context: ../..
       dockerfile: apps/media-worker/Dockerfile
     environment:
+      LOG_LEVEL: ${LOG_LEVEL:-info}
       MINIO_ENDPOINT: ${MINIO_ENDPOINT}
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
