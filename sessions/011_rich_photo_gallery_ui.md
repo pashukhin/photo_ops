@@ -1,9 +1,12 @@
 # Session 011: Rich Photo Gallery UI (executable-spec experiment)
 
-Status: **In progress** on `session-011-rich-photo-gallery-ui` (bead
-`photo_ops-8k9`). This session is also the validation run for **executable-spec
-/ skeleton-first SDD** — see `docs/agent-workflow-evolution.md` (Decision 1, the
-experiment, the kill-criterion). Product is primary; the method is the lens.
+Status: **Implementation complete, `make gate` green** on
+`session-011-rich-photo-gallery-ui` (bead `photo_ops-8k9`); pending live UI
+smoke, final `/code-review`, and `--no-ff` merge + tag `exp/exec-spec-011`.
+This session is also the validation run for **executable-spec / skeleton-first
+SDD** — see `docs/agent-workflow-evolution.md` (Decision 1, the experiment, the
+kill-criterion). Product is primary; the method is the lens. **Verdict: KEEP
+executable-spec** (see Retro).
 
 Renumbered 009→011: session 009 became the polyglot-gate/ergonomics sweep and
 010 is the structured-logging baseline (`zg6`). **Backend dependency (session
@@ -95,22 +98,22 @@ structural metrics are weighted; order-sensitive ones interpreted cautiously.**
 
 1. **Primary — doc-to-code ratio (order-immune):** prose spec/plan lines ÷
    shipped src+test LoC for 011. Target: prose collapses to *why + acceptance*;
-   code authored once. _(011 result: TBD)_
+   code authored once. _(011: see Retro)_
 2. **Spec-layer-home checklist (order-immune):** for each layer
    (contract/structure, behavior/acceptance, why/invariants, exploratory form),
    did it live in its cheapest fail-on-drift home, or get duplicated in prose?
-   _(011 result: TBD)_
+   _(011: see Retro)_
 3. **Review yield (order-sensitive):** per-task findings that were real bugs vs
-   nits. _(TBD)_
+   nits. _(011: see Retro)_
 4. **Rework count** and **tokens / wall-clock (order-sensitive — cautious):**
-   _(TBD)_
+   _(011: see Retro)_
 
 **Kill-criterion (pre-committed).** Revert to prose-spec **for exploratory
 work** if, on 011: (a) the agent fills stubs *semantically* wrong materially
 more often than 010's transcription errors; OR (b) doc-to-code ratio doesn't
 drop meaningfully while rework rises; OR (c) net tokens/time up with no quality
 gain (no fewer real bugs). Keep executable-spec for mechanical/well-understood
-work regardless. _(011 verdict: TBD in retro.)_
+work regardless. _(011 verdict: **KEEP** — none of (a)/(b)/(c) fired; see Retro.)_
 
 ## Constraints (session)
 
@@ -121,10 +124,56 @@ work regardless. _(011 verdict: TBD in retro.)_
 - Final review = native `/code-review` (`photo_ops-41q`).
 - Beads: keep-until-trigger (`photo_ops-d62`).
 
-## Retro (filled at end — short, not a separate session)
+## Retro (executable-spec experiment — measured vs the real 010 artifact set)
 
-_TBD: metric results above, kill-criterion verdict, spec-layer-home checklist,
-and the 2–3 things the executable-spec method changed vs the 010 prose-spec run._
+| Metric (order-immune first) | 010 (prose-spec) | 011 (executable-spec) |
+| --- | --- | --- |
+| **doc-to-code ratio** | ~6.2 — 2010 prose ÷ 323 obs LoC; spec/plan ~90% a prose twin | **~0.15–0.21** — ≈250 prose (plan 176 + ADR 74) ÷ ~1190 authored (1673 total) src+test LoC → **~30–40× lower** |
+| **spec-layer-home** | n/a | all layers routed home (below) ✓ |
+
+**doc-to-code (primary, order-immune):** prose collapsed from ~2000 lines to
+~250 — a thin 176-line plan that points at the skeleton plus a 74-line ADR for
+the why — while ~1673 LoC of code+tests were authored once. The 010 "prose
+twin" is gone, and 011 is a *bigger* feature (5 layers, full-stack UI) than 010
+(one package), making the collapse starker.
+
+**spec-layer-home checklist (order-immune):** contract/structure → proto +
+TS types/stubs (fail on `make proto-check` / `tsc`); behavior/acceptance →
+vitest unit + component tests + live smoke; why/invariants/rejected-alts → ADR
+0003 + nested `CLAUDE.md`; exploratory form (gallery layout, status/sort
+widgets) → ephemeral brainstorm + smoke, not frozen in typed tests. No prose
+twin. ✓ every layer.
+
+**Review yield (order-sensitive):** task reviews caught *real* bugs, not nits —
+I5 (the exploratory UI) surfaced 3 Important findings (a double-fetch race, a
+polling interval that restarted every tick, a Radix-Presence test leak); I1 was
+clean (2 Minor). Mechanical tasks (I2–I4) needed no full review.
+
+**Rework / cost (order-sensitive, cautious):** concentrated in the hard lane.
+I5's fix wave over-engineered — a `withAct`/`React.act` shim leaked a test
+concern into the production component (53 min / 115k tokens); the controller
+caught and reverted it, moving `act()` into the test where it belongs. The
+contract/backend/api tasks were first-pass clean.
+
+**Kill-criterion verdict — KEEP executable-spec.** None of (a)/(b)/(c) fired:
+(a) no material rise in semantically-wrong stub fills vs 010's transcription
+errors — errors were concentrated in the genuinely-hard UI task and caught by
+review; (b) doc-to-code dropped ~30–40×, the opposite of "didn't drop"; (c)
+review caught real bugs, so no "tokens up for no quality gain." Carry forward:
+the exploratory UI lane needs a review+fix cycle (it is the "hard/fun" lane by
+design), and **fix subagents need the same strong-model checkpoint as
+implementers** — the one over-engineering slipped from a fix agent.
+
+**What changed vs the 010 prose-spec run:** (1) the design artifact was the
+first RED diff, reviewed as a unit, not a 264+1746-line spec/plan; (2) the human
+checkpoint moved to "approve the skeleton," and reviewing *intended behavior*
+(not implementation) was fast; (3) the surviving "why" is a 74-line ADR, not
+prose duplicating the code.
+
+**Process note (outside 011 scope):** `make gate` was already RED on `main` —
+45e3ea1 vendored `.claude/skills/superpowers/**` as tracked files without an
+ESLint ignore, and ESLint 10 flat config lints dot-dirs; fixed here by ignoring
+`.claude/**`. Surfaced only because this session ran the full gate.
 
 ## References
 
