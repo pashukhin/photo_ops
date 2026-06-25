@@ -219,6 +219,15 @@ importers:
       '@nestjs/cli':
         specifier: ^10.4.8
         version: 10.4.9
+      '@opentelemetry/api':
+        specifier: ^1.9.0
+        version: 1.9.1
+      '@opentelemetry/context-async-hooks':
+        specifier: ^1.30.0
+        version: 1.30.1(@opentelemetry/api@1.9.1)
+      '@opentelemetry/core':
+        specifier: ^1.30.0
+        version: 1.30.1(@opentelemetry/api@1.9.1)
       '@types/amqplib':
         specifier: ^0.10.8
         version: 0.10.8

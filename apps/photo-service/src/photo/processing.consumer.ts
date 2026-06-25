@@ -1,3 +1,4 @@
+import { withExtractedContext } from '@photoops/observability';
 import { MessageConsumer } from '../messaging/messaging.port';
 import { decodeResult } from './processing.codec';
 import { ProcessingResultInput } from './photo.types';
@@ -19,7 +20,7 @@ export class ProcessingResultConsumer {
   async start(): Promise<void> {
     await this.consumer.consume(PROCESS_RESULT_SOURCE, async (msg) => {
       const result = decodeResult(msg.body);
-      await this.service.finalizeResult(result);
+      await withExtractedContext(result.correlationId, () => this.service.finalizeResult(result));
     });
   }
 }

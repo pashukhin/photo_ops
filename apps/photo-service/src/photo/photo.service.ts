@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
+import { PinoLogger } from 'nestjs-pino';
 import { uuidv7 } from 'uuidv7';
+import { currentTraceparent } from '@photoops/observability';
 import { MessagePublisher } from '../messaging/messaging.port';
 import { CreateUploadIntentInput, PhotoAssetRecord, PhotoVariantRecord, PhotoVariantView, PhotoWithVariants, ProcessingJobRecord, ProcessingResultInput } from './photo.types';
 import { encodeJob } from './processing.codec';
@@ -46,7 +48,8 @@ export class PhotoDomainService {
   constructor(
     private readonly repository: PhotoRepositoryPort,
     private readonly storage: ObjectStoragePort,
-    private readonly publisher: MessagePublisher
+    private readonly publisher: MessagePublisher,
+    private readonly logger: PinoLogger
   ) {}
 
   async createUploadIntent(input: CreateUploadIntentInput) {
@@ -87,7 +90,7 @@ export class PhotoDomainService {
     // is threaded to the worker and back via the result for end-to-end tracing.
     const transitioned = await this.repository.markProcessingForUser(userId, photoId);
     if (transitioned) {
-      const correlationId = uuidv7();
+      const correlationId = currentTraceparent() ?? uuidv7();
       const job = await this.repository.createProcessingJob({
         photoId,
         userId,
@@ -179,13 +182,15 @@ export class PhotoDomainService {
       await this.repository.setStatus(result.photoId, 'failed');
     }
 
-    console.log(JSON.stringify({
-      level: 'info',
-      msg: 'processing.finalized',
-      correlationId: result.correlationId ?? null,
-      jobId: result.jobId,
-      photoId: result.photoId,
-      outcome: result.outcome
-    }));
+    this.logger.info(
+      {
+        msg: 'processing.finalized',
+        correlation_id: result.correlationId ?? null,
+        job_id: result.jobId,
+        photo_id: result.photoId,
+        outcome: result.outcome
+      },
+      'processing.finalized'
+    );
   }
 }

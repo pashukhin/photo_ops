@@ -1,5 +1,13 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { context, propagation, trace } from '@opentelemetry/api';
+import { AsyncLocalStorageContextManager } from '@opentelemetry/context-async-hooks';
+import { W3CTraceContextPropagator } from '@opentelemetry/core';
 import { PhotoDomainService } from './photo.service';
+
+beforeAll(() => {
+  context.setGlobalContextManager(new AsyncLocalStorageContextManager().enable());
+  propagation.setGlobalPropagator(new W3CTraceContextPropagator());
+});
 
 function makePhotoRecord(overrides: Partial<Record<string, unknown>> = {}) {
   return {
@@ -64,6 +72,7 @@ function createService() {
     createPresignedGetUrl: vi.fn()
   };
   const publisher = { publish: vi.fn() };
+  const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), setContext: vi.fn() };
   // Sensible defaults so completeUpload's processing kickoff runs in tests that
   // don't exercise it directly (won the uploaded->processing transition).
   repository.markProcessingForUser.mockResolvedValue(true);
@@ -71,7 +80,8 @@ function createService() {
   // Default: no variants (so listPhotos tests don't crash).
   repository.listVariantsForPhotos.mockResolvedValue([]);
   storage.createPresignedGetUrl.mockResolvedValue('signed://x');
-  return { service: new PhotoDomainService(repository, storage, publisher), repository, storage, publisher };
+  const service = new PhotoDomainService(repository, storage, publisher, logger as never);
+  return { service, repository, storage, publisher, logger };
 }
 
 describe('PhotoDomainService', () => {
@@ -307,5 +317,23 @@ describe('PhotoDomainService', () => {
     repository.finalizeJob.mockResolvedValue(true);
     await service.finalizeResult({ jobId: 'j1', photoId: 'p1', outcome: 'failed', errorMessage: 'bad', variants: [], metadataJson: '' });
     expect(repository.setStatus).toHaveBeenCalledWith('p1', 'failed');
+  });
+
+  it('publishes the active traceparent as the job correlation id', async () => {
+    const { service, repository, storage, publisher } = createService();
+    repository.findByIdForUser.mockResolvedValue(makePhotoRecord({ status: 'uploaded' }));
+    storage.objectExists.mockResolvedValue(true);
+    repository.markUploadedForUser.mockResolvedValue(makePhotoRecord({ status: 'uploaded' }));
+    repository.markProcessingForUser.mockResolvedValue(true);
+    repository.createProcessingJob.mockResolvedValue({ id: 'job-1' });
+
+    const sc = { traceId: 'a'.repeat(32), spanId: 'b'.repeat(16), traceFlags: 1 };
+    const span = trace.wrapSpanContext(sc);
+    await context.with(trace.setSpan(context.active(), span), () =>
+      service.completeUpload('user-1', 'photo-1')
+    );
+
+    const published = publisher.publish.mock.calls[0][1];
+    expect(published.correlationId).toBe(`00-${'a'.repeat(32)}-${'b'.repeat(16)}-01`);
   });
 });

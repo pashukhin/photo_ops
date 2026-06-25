@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { LoggerModule } from 'nestjs-pino';
+import { LoggerModule, PinoLogger } from 'nestjs-pino';
 import { makeLoggerOptions } from '@photoops/observability';
 import type { Options } from 'pino-http';
 import { HealthController } from './health/health.controller';
@@ -34,9 +34,9 @@ const RABBITMQ_BUS = 'RABBITMQ_BUS';
     },
     {
       provide: PhotoDomainService,
-      useFactory: (repository: PhotoRepository, storage: MinioStorageService, publisher: MessagePublisher) =>
-        new PhotoDomainService(repository, storage, publisher),
-      inject: [PhotoRepository, MinioStorageService, MESSAGE_PUBLISHER]
+      useFactory: (repository: PhotoRepository, storage: MinioStorageService, publisher: MessagePublisher, logger: PinoLogger) =>
+        new PhotoDomainService(repository, storage, publisher, logger),
+      inject: [PhotoRepository, MinioStorageService, MESSAGE_PUBLISHER, PinoLogger]
     },
     // ProcessingResultConsumer wired with the same bus instance as its consumer
     // source and the domain service as the finalize handler.

@@ -1,8 +1,16 @@
 import { join } from 'path';
 import * as protobuf from 'protobufjs';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { context, propagation, trace } from '@opentelemetry/api';
+import { AsyncLocalStorageContextManager } from '@opentelemetry/context-async-hooks';
+import { W3CTraceContextPropagator } from '@opentelemetry/core';
 import { InMemoryBus } from '../messaging/in-memory-bus';
 import { ProcessingResultConsumer, PROCESS_RESULT_SOURCE } from './processing.consumer';
+
+beforeAll(() => {
+  context.setGlobalContextManager(new AsyncLocalStorageContextManager().enable());
+  propagation.setGlobalPropagator(new W3CTraceContextPropagator());
+});
 
 const root = protobuf.loadSync(join(process.cwd(), '../../proto/photo/v1/processing.proto'));
 const PhotoProcessingResultType = root.lookupType('photoops.photo.v1.PhotoProcessingResult');
@@ -68,5 +76,35 @@ describe('ProcessingResultConsumer', () => {
 
     // Should have been called MAX_ATTEMPTS (3) times due to retries
     expect(service.finalizeResult).toHaveBeenCalledTimes(3);
+  });
+
+  it('finalizes within the trace context carried by correlation_id', async () => {
+    let seenTraceId: string | undefined;
+    const service = {
+      finalizeResult: vi.fn(async () => {
+        seenTraceId = trace.getActiveSpan()?.spanContext().traceId;
+      })
+    };
+    const bus = new InMemoryBus();
+    const consumer = new ProcessingResultConsumer(bus, service);
+    await consumer.start();
+
+    const tp = `00-${'e'.repeat(32)}-${'f'.repeat(16)}-01`;
+    // Build a real serialized PhotoProcessingResult whose correlationId == tp,
+    // using the same encode approach as the other tests in this file.
+    const body = PhotoProcessingResultType.encode(
+      PhotoProcessingResultType.fromObject({
+        jobId: 'j',
+        photoId: 'p',
+        correlationId: tp,
+        outcome: 1,
+        variants: [],
+        metadataJson: '{}'
+      })
+    ).finish();
+    await bus.publish(PROCESS_RESULT_SOURCE, { body, correlationId: tp });
+    await bus.drain();
+
+    expect(seenTraceId).toBe('e'.repeat(32));
   });
 });

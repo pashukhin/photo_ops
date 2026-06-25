@@ -30,6 +30,9 @@
   },
   "devDependencies": {
     "@nestjs/cli": "^10.4.8",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/context-async-hooks": "^1.30.0",
+    "@opentelemetry/core": "^1.30.0",
     "@types/amqplib": "^0.10.8",
     "@types/node": "^22.10.5",
     "@types/pg": "^8.11.10",
