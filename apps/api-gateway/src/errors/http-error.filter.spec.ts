@@ -1,4 +1,4 @@
-import { ArgumentsHost, UnauthorizedException } from '@nestjs/common';
+import { ArgumentsHost, HttpException, HttpStatus, UnauthorizedException } from '@nestjs/common';
 import { status } from '@grpc/grpc-js';
 import { describe, expect, it, vi } from 'vitest';
 import { HttpErrorFilter } from './http-error.filter';
@@ -12,6 +12,10 @@ function createHost() {
     switchToHttp: () => ({ getResponse: () => response })
   } as unknown as ArgumentsHost;
   return { host, response };
+}
+
+function fakeLogger() {
+  return { warn: vi.fn(), error: vi.fn() } as unknown as import('pino').Logger;
 }
 
 describe('HttpErrorFilter', () => {
@@ -74,5 +78,23 @@ describe('HttpErrorFilter', () => {
 
     expect(response.status).toHaveBeenCalledWith(400);
     expect(response.json).toHaveBeenCalledWith({ code: 'bad_request', message: 'password too short' });
+  });
+});
+
+describe('HttpErrorFilter logging', () => {
+  it('logs 4xx as warn', () => {
+    const logger = fakeLogger();
+    new HttpErrorFilter(logger).catch(
+      new HttpException('nope', HttpStatus.UNAUTHORIZED),
+      createHost().host
+    );
+    expect(logger.warn).toHaveBeenCalled();
+    expect(logger.error).not.toHaveBeenCalled();
+  });
+
+  it('logs unexpected errors as error', () => {
+    const logger = fakeLogger();
+    new HttpErrorFilter(logger).catch(new Error('boom'), createHost().host);
+    expect(logger.error).toHaveBeenCalled();
   });
 });
