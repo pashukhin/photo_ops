@@ -26,17 +26,31 @@ export class PhotoController {
     @Headers('cookie') cookieHeader: string | undefined,
     @Query() _query: { page?: string; pageSize?: string; sort?: string; dir?: string; status?: string | string[]; q?: string }
   ): Promise<{ photos: unknown[]; totalCount: number }> {
-    await this.authService.requireSession(cookieHeader);
-    // GREEN obligation (session 011): map _query onto a ListPhotosInput
-    // (pinned by photo.controller.spec.ts): page/pageSize -> Number (0 when
-    // absent); sort -> proto PhotoSortField number (created_at 1, taken_at 2,
-    // filename 3, size_bytes 4; 0 when absent); dir -> SortDirection (asc 1,
-    // desc 2; 0 when absent); status (string | string[]) -> numeric PhotoStatus
-    // array preserving order (uploading 1..failed 5); q -> filenameQuery (''
-    // when absent). Call photoClient.listPhotos with userId from the session,
-    // then return { photos: (response.photos ?? []).map((p) => mapPhoto(p)),
-    // totalCount: response.totalCount ?? 0 }.
-    throw new Error('NotImplemented: PhotoController.listPhotos'); // GREEN is the implementer's job
+    const auth = await this.authService.requireSession(cookieHeader);
+
+    const sortByMap: Record<string, number> = { created_at: 1, taken_at: 2, filename: 3, size_bytes: 4 };
+    const sortDirMap: Record<string, number> = { asc: 1, desc: 2 };
+    const statusMap: Record<string, number> = { uploading: 1, uploaded: 2, processing: 3, ready: 4, failed: 5 };
+
+    const rawStatus = _query.status;
+    const statusStrings: string[] = rawStatus === undefined ? [] : Array.isArray(rawStatus) ? rawStatus : [rawStatus];
+    const statusFilter = statusStrings.map((s) => statusMap[s] ?? 0);
+
+    const input = {
+      userId: auth.userId,
+      page: _query.page !== undefined ? Number(_query.page) : 0,
+      pageSize: _query.pageSize !== undefined ? Number(_query.pageSize) : 0,
+      sortBy: _query.sort !== undefined ? (sortByMap[_query.sort] ?? 0) : 0,
+      sortDir: _query.dir !== undefined ? (sortDirMap[_query.dir] ?? 0) : 0,
+      statusFilter,
+      filenameQuery: _query.q ?? ''
+    };
+
+    const response = (await this.photoClient.listPhotos(input)) as { photos?: unknown[]; totalCount?: number };
+    return {
+      photos: (response.photos ?? []).map((p) => this.mapPhoto(p)),
+      totalCount: response.totalCount ?? 0
+    };
   }
 
   @Get(':photoId')
