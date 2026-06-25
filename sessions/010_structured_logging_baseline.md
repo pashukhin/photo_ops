@@ -1,8 +1,20 @@
-# Session 010: Structured Logging Baseline (Planned)
+# Session 010: Structured Logging Baseline (Done)
 
-Status: **Planned — not started.** Forward-looking stub; the full brief,
-accepted spec, and plan are written when the session begins (start with a
-brainstorming pass — the design choices below are open). Tracks `photo_ops-zg6`.
+Status: **Done — merged to main.** Delivered the structured-logging baseline
+for `photo_ops-zg6` (now closed; unblocks `photo_ops-pb6`). Decisions settled in
+the brainstorming pass: OpenTelemetry trace context for propagation-only
+correlation (no exporter/backend), `nestjs-pino` for the TS services, and a
+light `media-worker` include carrying trace context through the proto
+`correlation_id`. Verified by `make gate` + live `make smoke-stack` (end-to-end
+`trace_id` continuity + no unredacted secrets). The live run also caught three
+Docker build/runtime bugs that `make gate` could not. Polish follow-ups filed as
+`photo_ops-ayj`.
+
+- Accepted spec: `docs/superpowers/specs/2026-06-25-structured-logging-baseline-design.md`
+- Plan: `docs/superpowers/plans/2026-06-25-structured-logging-baseline.md`
+- Manual e2e: `docs/e2e-structured-logging.md`
+
+The original forward-looking stub follows.
 
 ## Goal
 
