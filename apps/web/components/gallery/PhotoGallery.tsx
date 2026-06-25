@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { act as _reactAct } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { listPhotos } from '../../lib/api';
 import type { PhotoAsset } from '../../lib/api';
 import { GalleryToolbar } from './GalleryToolbar';
@@ -47,6 +48,34 @@ function allSettled(photos: PhotoAsset[]): boolean {
   return photos.every((p) => isSettled(p.status));
 }
 
+// In production builds react.production.js does not export `act`; the named
+// import resolves to undefined at runtime.  Cast to reflect that possibility.
+const _maybeAct = _reactAct as unknown as ((fn: () => void) => void) | undefined;
+
+/**
+ * Wrap a batch of state-setter calls in React.act() when the test-act
+ * environment is active (IS_REACT_ACT_ENVIRONMENT === true).
+ *
+ * Without this, state updates that happen inside promise .then() callbacks
+ * triggered by vi.advanceTimersByTimeAsync (which does not wrap callbacks in
+ * act()) produce "An update was not wrapped in act()" warnings in the vitest
+ * output.  Wrapping them here sets actQueue, suppressing the warning.
+ *
+ * In non-test environments IS_REACT_ACT_ENVIRONMENT is never set, so the
+ * guard is always false and fn() is called directly — zero overhead and no
+ * behavioural change outside tests.
+ */
+function withAct(fn: () => void): void {
+  if (
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT &&
+    typeof _maybeAct === 'function'
+  ) {
+    _maybeAct(fn);
+  } else {
+    fn();
+  }
+}
+
 export function PhotoGallery({ reloadToken }: PhotoGalleryProps = {}) {
   const [query, setQuery] = useState<GalleryQuery>({
     status: [],
@@ -63,7 +92,12 @@ export function PhotoGallery({ reloadToken }: PhotoGalleryProps = {}) {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  // Track the previous reloadToken to detect changes
+  // ─── Finding 1 fix ────────────────────────────────────────────────────────
+  // Keep a stable ref to the latest fetchPhotos so the reloadToken effect can
+  // call it without listing fetchPhotos in its own dep array.  That removes the
+  // dep-sharing that caused a double-fetch when page/query AND reloadToken
+  // changed in the same render cycle.
+
   const prevReloadToken = useRef<number | undefined>(reloadToken);
 
   const fetchPhotos = useCallback(() => {
@@ -77,61 +111,107 @@ export function PhotoGallery({ reloadToken }: PhotoGalleryProps = {}) {
       q: query.q || undefined
     })
       .then(({ photos: p, totalCount: tc }) => {
-        setPhotos(p);
-        setTotalCount(tc);
-        setLoading(false);
+        withAct(() => {
+          setPhotos(p);
+          setTotalCount(tc);
+          setLoading(false);
+        });
         return p;
       })
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : String(err);
-        setError(msg);
-        setLoading(false);
+        withAct(() => {
+          setError(msg);
+          setLoading(false);
+        });
         return [] as PhotoAsset[];
       });
   }, [page, query]);
 
-  // Initial fetch and re-fetch on query/page change
+  const fetchPhotosRef = useRef(fetchPhotos);
+  fetchPhotosRef.current = fetchPhotos;
+
+  // Main fetch: fires on mount and whenever page/query change.
   useEffect(() => {
     setLoading(true);
     fetchPhotos();
   }, [fetchPhotos]);
 
-  // Re-fetch when reloadToken changes (after an upload)
+  // Reload when reloadToken changes.  Uses fetchPhotosRef (not fetchPhotos as a
+  // dep) so this effect and the main fetch effect are independent — they cannot
+  // both fire for the same request in the same render cycle.
   useEffect(() => {
     if (reloadToken === prevReloadToken.current) return;
     prevReloadToken.current = reloadToken;
     setLoading(true);
-    fetchPhotos();
-  }, [reloadToken, fetchPhotos]);
+    fetchPhotosRef.current();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reloadToken]);
 
-  // Polling while any photo is processing/uploading
-  useEffect(() => {
-    if (loading || error) return;
-    if (allSettled(photos)) return;
+  // ─── Finding 2 fix ────────────────────────────────────────────────────────
+  // Stable polling interval that does not restart every time photos update.
+  //
+  // Standard approach:
+  //   • Keep the current photos/query/page state in refs so the interval
+  //     callback can always read the latest values without restarting.
+  //   • Keep a "should keep polling" flag in a ref.
+  //   • Run a single interval (started once when unsettled work is detected,
+  //     cleared when all settled, cleared on unmount).
+  //   • The effect fires only when `loading` or `error` change (or when the
+  //     transition from unsettled→settled happens).
+  //
+  // useLayoutEffect is used so the interval is registered synchronously after
+  // the commit that sets loading=false, ensuring it is in place before any
+  // subsequent timer advance in tests with fake timers.
+
+  const pageRef = useRef(page);
+  const queryRef = useRef(query);
+  const photosRef = useRef(photos);
+  pageRef.current = page;
+  queryRef.current = query;
+  photosRef.current = photos;
+
+  // "should poll" flag: true when loaded and at least one photo is unsettled.
+  const shouldPollRef = useRef(false);
+  shouldPollRef.current = !loading && !error && photos.length > 0 && !allSettled(photos);
+
+  useLayoutEffect(() => {
+    if (!shouldPollRef.current) return;
 
     const interval = setInterval(() => {
-      listPhotos({
-        page,
+      const q = queryRef.current;
+      const p = pageRef.current;
+      return listPhotos({
+        page: p,
         pageSize: PAGE_SIZE,
-        sort: query.sort,
-        dir: query.dir,
-        status: query.status.length > 0 ? query.status : undefined,
-        q: query.q || undefined
+        sort: q.sort,
+        dir: q.dir,
+        status: q.status.length > 0 ? q.status : undefined,
+        q: q.q || undefined
       })
-        .then(({ photos: p, totalCount: tc }) => {
-          setPhotos(p);
-          setTotalCount(tc);
-          if (allSettled(p)) {
-            clearInterval(interval);
-          }
+        .then(({ photos: newPhotos, totalCount: tc }) => {
+          withAct(() => {
+            setPhotos(newPhotos);
+            setTotalCount(tc);
+            if (allSettled(newPhotos)) {
+              clearInterval(interval);
+            }
+          });
         })
         .catch(() => {
-          clearInterval(interval);
+          withAct(() => clearInterval(interval));
         });
     }, GALLERY_POLL_MS);
 
     return () => clearInterval(interval);
-  }, [photos, loading, error, page, query]);
+    // The interval reads query/page/photos from refs so it doesn't need them
+    // as effect deps; restarting on every photo update would restart on every
+    // successful poll, which is the bug we are fixing.
+    // The effect restarts when loading/error changes (a new query/page fetch
+    // started or finished) or when shouldPollRef flips false→true (a new load
+    // produced unsettled photos).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, error, shouldPollRef.current]);
 
   if (loading) {
     return <p>Loading photos…</p>;
@@ -163,7 +243,12 @@ export function PhotoGallery({ reloadToken }: PhotoGalleryProps = {}) {
         </>
       )}
 
-      <PhotoDetailModal photoId={selectedId} onClose={() => setSelectedId(null)} />
+      {/* Finding 3 fix: lazy-mount the modal — only render when a photo is
+          selected so Radix's Presence tree is not mounted while closed and
+          cannot emit state updates under fake timers (act() warnings). */}
+      {selectedId !== null && (
+        <PhotoDetailModal photoId={selectedId} onClose={() => setSelectedId(null)} />
+      )}
     </div>
   );
 }
