@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PhotoAsset } from '../../lib/api';
 import * as api from '../../lib/api';
@@ -126,13 +126,15 @@ describe('PhotoGallery (session 011)', () => {
       .mockResolvedValue({ photos: [READY_PHOTO], totalCount: 1 });
 
     render(<PhotoGallery />);
-    await vi.advanceTimersByTimeAsync(0); // initial load resolves
+    // act() wraps the fake-timer advances because they flush promise callbacks
+    // that call setState outside React's auto-act scopes; assertions unchanged.
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); }); // initial load resolves
     expect(api.listPhotos).toHaveBeenCalledTimes(1);
 
-    await vi.advanceTimersByTimeAsync(GALLERY_POLL_MS); // still processing -> one poll
+    await act(async () => { await vi.advanceTimersByTimeAsync(GALLERY_POLL_MS); }); // still processing -> one poll
     expect(api.listPhotos).toHaveBeenCalledTimes(2);
 
-    await vi.advanceTimersByTimeAsync(GALLERY_POLL_MS * 3); // now settled -> no more polls
+    await act(async () => { await vi.advanceTimersByTimeAsync(GALLERY_POLL_MS * 3); }); // now settled -> no more polls
     expect(api.listPhotos).toHaveBeenCalledTimes(2);
 
     vi.useRealTimers();
