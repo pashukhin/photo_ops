@@ -100,6 +100,8 @@ Short, behavior-anchored, **consolidating** rules already scattered across Scope
 Guardrails + `bd remember` — not a new file (a separate `constitution.md` would
 be the exact prose-duplication we are removing). Keep ≤ ~8 one-liners.
 
+**Status: applied** in AGENTS.md (`## Principles`) on this branch.
+
 1. **Don't reinvent the wheel** — prefer existing libs/tools/patterns; justify any bespoke build. *(fortification "Keep" decisions; tooling-research deferrals)*
 2. **Don't argue with reality** — when tooling/tests/runtime disagree with the plan, make the smallest working adjustment and keep the boundary; escalate infra problems, don't self-fix. *(AGENTS.md + s008 directive)*
 3. **Don't plan far ahead** — thinnest slice that ships; defer work that depends on not-yet-real services. *(prioritization memory; roadmap)*
@@ -191,17 +193,19 @@ on structural metrics. Out of scope for this repo.
    **project level** (pins methodology, makes it diffable/reviewable; verify the
    SessionStart `using-superpowers` hook still fires; ensure no double-load with
    global).
-2. **Session 011, first commit (reviewable):** apply the nap. to project-level
-   `writing-plans` + `subagent-driven-development` (Decision 1); add `## Principles`
-   to AGENTS.md (Decision 3). Pre-register the metrics above in the session brief.
+2. **Session 011, first commit (reviewable):** apply the executable-spec
+   skill-edit pass (`photo_ops-657`) to project-level `writing-plans` +
+   `subagent-driven-development` (Decision 1). Constitution already applied — see
+   AGENTS.md `## Principles`. Pre-register the metrics above in the session brief.
 3. **Same session (011):** run the UI gallery under executable-spec (product
    primary, method the lens). Measure. Apply the kill-criterion.
 4. **Cheap retro** (not a full session): short comparison vs the 010 artifact set,
    appended to the 011 brief, scored on the pre-registered metrics.
-5. **Backlog (own sessions / quick wins):** `.mise.toml` (Decision 5); `4vg`
-   integration tests; targeted `8d5` hook (or skip); native `/code-review`;
-   bd version pin; file the new bd issues (executable-spec nap. follow-ups,
-   constitution, beads-trigger).
+5. **Backlog (own sessions / quick wins), now filed:** mise/ADR-0002
+   (`photo_ops-lz1`); beads pin + trigger (`photo_ops-d62`); native `/code-review`
+   (`photo_ops-41q`); executable-spec skill-edit pass (`photo_ops-657`). Existing:
+   `photo_ops-8d5` (targeted hook, or skip), `photo_ops-4vg` (integration tests,
+   session-sized).
 6. **A/B portfolio experiment:** separate repo, later.
 
 **Branches/A-B anchors:** merge `--no-ff` (preserves topology); tag comparison

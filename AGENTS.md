@@ -2,6 +2,20 @@
 
 This file defines how coding agents work on this project. It is a guardrail, not a project description. For what the project is and how it is built, read the documents below.
 
+## Principles
+
+Compass for ambiguous moments; each cashes out into a behavior detailed below or
+in `docs/agent-workflow-evolution.md`. They consolidate — not replace — the
+operational rules in this file.
+
+1. **Don't reinvent the wheel.** Prefer existing libs/tools/patterns; justify any bespoke build.
+2. **Don't argue with reality.** When tooling/tests/runtime disagree with the plan, make the smallest working adjustment and keep the boundary; escalate infra problems, do not self-fix.
+3. **Don't plan far ahead.** Ship the thinnest slice; defer work that depends on not-yet-real services.
+4. **One canonical way.** One gate, one workflow, one source of truth; no duplicate mechanisms.
+5. **Simplicity over sophistication.** Document retained imperfections as trade-offs.
+6. **Evidence before claims.** Verify with commands/tests; "feels done" is not done.
+7. **Single source of truth.** Put a fact where it can fail on drift (types, tests, proto, config); don't duplicate one thought in two places.
+
 ## Required Reading
 
 Before implementing, read:
