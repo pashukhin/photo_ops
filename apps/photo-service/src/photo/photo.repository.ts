@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, asc, count, desc, eq, ilike, inArray } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
 import { createDb } from '../db/client';
 import { photoAssets, photoVariants, processingJobs } from '../db/schema';
@@ -46,15 +46,47 @@ export class PhotoRepository implements PhotoRepositoryPort {
     return row ? this.toRecord(row) : null;
   }
 
-  async list(_params: ListPhotosParams): Promise<{ rows: PhotoAssetRecord[]; totalCount: number }> {
-    // GREEN obligation (session 011): build one filtered query scoped to
-    // _params.userId — status IN (_params.statusFilter) when non-empty, filename
-    // ILIKE %_params.filenameQuery% when non-empty — ORDER BY the column mapped
-    // from _params.sortBy in _params.sortDir, then LIMIT _params.pageSize OFFSET
-    // (_params.page - 1) * _params.pageSize; plus a COUNT(*) over the same filter
-    // (ignoring pagination) for totalCount. SQL correctness is verified by the
-    // live UI smoke + manual e2e (no in-process DB in this session; see 4vg).
-    throw new Error('NotImplemented: PhotoRepository.list'); // GREEN is the implementer's job
+  async list(params: ListPhotosParams): Promise<{ rows: PhotoAssetRecord[]; totalCount: number }> {
+    const sortColumnMap = {
+      created_at: photoAssets.createdAt,
+      taken_at: photoAssets.takenAtUtc,
+      filename: photoAssets.filename,
+      size_bytes: photoAssets.sizeBytes
+    } as const;
+
+    const conditions = [eq(photoAssets.userId, params.userId)];
+
+    if (params.statusFilter.length > 0) {
+      conditions.push(inArray(photoAssets.status, params.statusFilter));
+    }
+
+    if (params.filenameQuery !== '') {
+      conditions.push(ilike(photoAssets.filename, `%${params.filenameQuery}%`));
+    }
+
+    const where = and(...conditions);
+
+    const sortCol = sortColumnMap[params.sortBy];
+    const orderExpr = params.sortDir === 'asc' ? asc(sortCol) : desc(sortCol);
+
+    const offset = (params.page - 1) * params.pageSize;
+
+    const [rows, countResult] = await Promise.all([
+      this.db
+        .select()
+        .from(photoAssets)
+        .where(where)
+        .orderBy(orderExpr)
+        .limit(params.pageSize)
+        .offset(offset),
+      this.db
+        .select({ value: count() })
+        .from(photoAssets)
+        .where(where)
+    ]);
+
+    const totalCount = Number(countResult[0]?.value ?? 0);
+    return { rows: rows.map((r) => this.toRecord(r)), totalCount };
   }
 
   async createProcessingJob(input: { photoId: string; userId: string; type: 'initial' | 'reprocess'; correlationId: string }): Promise<ProcessingJobRecord> {

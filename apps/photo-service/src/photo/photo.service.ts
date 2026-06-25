@@ -122,13 +122,32 @@ export class PhotoDomainService {
     return { photo: result.photo, variants };
   }
 
-  // GREEN obligation (session 011): call repository.list(params), compose each
-  // returned row with its presigned variant views (preserve the existing
-  // grouping behavior — guarded by the RED test in photo.service.spec.ts), and
-  // thread repository totalCount through unchanged. An empty page must still
-  // return the real totalCount.
-  async listPhotos(_params: ListPhotosParams): Promise<ListPhotosResult> {
-    throw new Error('NotImplemented: PhotoDomainService.listPhotos'); // GREEN is the implementer's job
+  async listPhotos(params: ListPhotosParams): Promise<ListPhotosResult> {
+    const { rows, totalCount } = await this.repository.list(params);
+
+    const photoIds = rows.map((r) => r.id);
+    const allVariants = await this.repository.listVariantsForPhotos(photoIds);
+
+    // Group variants by photoId for efficient lookup.
+    const variantsByPhotoId = new Map<string, typeof allVariants>();
+    for (const v of allVariants) {
+      const existing = variantsByPhotoId.get(v.photoId);
+      if (existing) {
+        existing.push(v);
+      } else {
+        variantsByPhotoId.set(v.photoId, [v]);
+      }
+    }
+
+    const photos = await Promise.all(
+      rows.map(async (photo) => {
+        const photoVariantRecords = variantsByPhotoId.get(photo.id) ?? [];
+        const variants = await Promise.all(photoVariantRecords.map((v) => this.toVariantView(v)));
+        return { photo, variants };
+      })
+    );
+
+    return { photos, totalCount };
   }
 
   private async toVariantView(v: PhotoVariantRecord): Promise<PhotoVariantView> {

@@ -40,7 +40,7 @@ export class PhotoGrpcController {
   }
 
   @GrpcMethod('PhotoService', 'ListPhotos')
-  async listPhotos(_request: {
+  async listPhotos(request: {
     userId: string;
     pageSize?: number;
     page?: number;
@@ -49,16 +49,50 @@ export class PhotoGrpcController {
     statusFilter?: number[]; // proto PhotoStatus numbers; [] -> all
     filenameQuery?: string;
   }): Promise<{ photos: unknown[]; totalCount: number }> {
-    // GREEN obligation (session 011): map this proto request onto a
-    // ListPhotosParams and return the mapped page. Defaults/clamps (pinned by
-    // photo.grpc.controller.spec.ts): page 0/absent -> 1; pageSize 0/absent ->
-    // 24 then clamp to 1..100; sortBy 0 -> 'created_at' (1 created_at, 2 taken_at,
-    // 3 filename, 4 size_bytes); sortDir 0 -> 'desc' (1 asc, 2 desc); statusFilter
-    // numbers -> status strings (1 uploading..5 failed) dropping unknown/0;
-    // filenameQuery -> ''. Then call photoService.listPhotos(params) and return
-    // { photos: result.photos.map((pwv) => this.toProtoPhoto(pwv)), totalCount:
-    // result.totalCount }.
-    throw new Error('NotImplemented: PhotoGrpcController.listPhotos'); // GREEN is the implementer's job
+    const sortByMap: Record<number, 'created_at' | 'taken_at' | 'filename' | 'size_bytes'> = {
+      1: 'created_at',
+      2: 'taken_at',
+      3: 'filename',
+      4: 'size_bytes'
+    };
+    const statusMap: Record<number, 'uploading' | 'uploaded' | 'processing' | 'ready' | 'failed'> = {
+      1: 'uploading',
+      2: 'uploaded',
+      3: 'processing',
+      4: 'ready',
+      5: 'failed'
+    };
+
+    const rawPage = request.page ?? 0;
+    const page = rawPage < 1 ? 1 : rawPage;
+
+    const rawPageSize = request.pageSize ?? 0;
+    const defaultedPageSize = rawPageSize < 1 ? 24 : rawPageSize;
+    const pageSize = Math.min(Math.max(defaultedPageSize, 1), 100);
+
+    const sortBy = sortByMap[request.sortBy ?? 0] ?? 'created_at';
+    const sortDir = request.sortDir === 1 ? 'asc' : 'desc';
+
+    const statusFilter = (request.statusFilter ?? [])
+      .map((n) => statusMap[n])
+      .filter((s): s is NonNullable<typeof s> => s !== undefined);
+
+    const filenameQuery = request.filenameQuery ?? '';
+
+    const result = await this.photoService.listPhotos({
+      userId: request.userId,
+      page,
+      pageSize,
+      sortBy,
+      sortDir,
+      statusFilter,
+      filenameQuery
+    });
+
+    return {
+      photos: result.photos.map((pwv) => this.toProtoPhoto(pwv)),
+      totalCount: result.totalCount
+    };
   }
 
   @GrpcMethod('PhotoService', 'GetPhoto')
