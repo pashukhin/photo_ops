@@ -7,9 +7,10 @@ superpowers**. Same product + same locked decisions (see
 
 ## Measurement honesty
 
-- **Controller / main-loop token usage is NOT exposed to the agent** and is not
-  in this file. Read it from the harness/transcript for the full picture; the
-  numbers below are **subagent-only** plus structural counts.
+- **Controller / main-loop token usage is not exposed to the agent at runtime**,
+  but it IS recoverable post-hoc from the session transcript JSONL — captured in
+  the "Controller / main-loop tokens" section below. The per-subagent rows
+  remain output-only (what each Agent call's `usage` returned).
 - Subagent rows are the `usage` blocks each Agent call returned (output tokens,
   tool calls, wall-clock). Durations overlap where agents ran in parallel (the
   8 review finders ran concurrently), so the duration column does **not** sum to
@@ -37,6 +38,33 @@ superpowers**. Same product + same locked decisions (see
 | 15 | finder G (altitude) | sonnet | 78,882 | 13 | 84.3 |
 | 16 | finder H (conventions) | sonnet | 53,725 | 51 | 180.6 |
 | | **Total** | | **815,704** | **571** | (parallel) |
+
+## Controller / main-loop tokens (from the session JSONL — verified)
+
+Source: `~/.claude/projects/-home-gss-projects-photo-ops/5a4aef1c-1254-4dfe-a06c-cf6aaf62f6e8.jsonl`
+(this session). Every `assistant` entry carries `message.usage`. Summed over the
+**541** assistant turns in the file:
+
+| Token type | Count | Notes |
+|---|---:|---|
+| output | **1,103,378** | the clean single-axis count |
+| input (new, uncached) | 230,159 | genuinely new prompt tokens |
+| cache-create | 4,852,676 | written to the prompt cache |
+| cache-read | 178,046,991 | ⚠️ NOT consumption — see below |
+
+⚠️ **cache-read is re-counted every turn.** The growing cached context (~system
+prompt + transcript) is re-read on each of the 541 turns and reported each time;
+priced ~0.1×. Never sum it as "tokens used" — naively adding input+cache-read
+gave a meaningless ~317M earlier. Use **output** for a count, or a cost-weighted
+total: `input×1 + cache_create×1.25 + cache_read×0.1 + output×5`, × model rate.
+
+**Main-loop vs subagent split is approximate here.** `isSidechain` was `false`
+on all 541 turns (it did not separate subagents), so these 541 turns / 1.10M
+output **include the subagents' inline turns**. Subtracting the captured
+subagent output (~816k) leaves **≈290k output for the controller alone**
+(approximate — both figures are output-only). For a clean split use `parentUuid`
+chaining or `ccusage`'s per-agent breakdown (see the harness-surfaces note at
+the end).
 
 ## Cost decomposition (for fair A/B)
 
@@ -78,3 +106,23 @@ Separate method-attributable cost from costs any arm would also pay:
    subagents need the same strong-model checkpoint as implementers.
 4. n=1. The structural metrics (doc-to-code, spec-layer-home) are order-immune
    and the most trustworthy comparison axis; tokens/time are order-sensitive.
+
+## Where to pull token data (harness surfaces, for future arms)
+
+1. **`/cost` (and `/usage`)** — in-session, human-readable: session cost
+   estimate, API duration, breakdown by subagents/skills/plugins/MCP. Not cleanly
+   exportable (text). Version-dependent.
+2. **OpenTelemetry** (`CLAUDE_CODE_ENABLE_TELEMETRY=1` + an OTLP exporter) — best
+   for a structured multi-run A/B: metric `claude_code.token.usage` (Counter,
+   attribute `type` ∈ input/output/cacheRead/cacheCreation) + `claude_code.cost.usage`;
+   event `claude_code.api_request` carries per-request input/output/cache; attributes
+   include `session.id`, `model`. Confirm exact names on the running version.
+3. **Parse the session JSONL** (what produced the table above) — most
+   reproducible post-hoc; or **`ccusage`** (third-party npm, not first-party),
+   which does per-session/day cost-weighted breakdown — including per-agent — from
+   these same JSONL files. For the controller-vs-subagent split, chain `parentUuid`
+   (do not rely on `isSidechain`).
+
+Recommendation: enable OTel for the comparison runs OR run `ccusage` over each
+arm's session JSONL; report **output tokens + cost-weighted total** (never raw
+summed cache-read).
