@@ -6,7 +6,7 @@ import { makeLoggerOptions, REDACT_PATHS, traceMixin } from './logger';
 function captureLine(fn: (logger: pino.Logger) => void): Record<string, unknown> {
   const lines: string[] = [];
   const stream = { write: (s: string) => lines.push(s) };
-  const logger = pino(makeLoggerOptions('test-service'), stream);
+  const logger = pino({ ...makeLoggerOptions('test-service'), level: 'trace' }, stream);
   fn(logger);
   return JSON.parse(lines[lines.length - 1]);
 }
@@ -24,7 +24,9 @@ describe('makeLoggerOptions', () => {
           password: 'hunter2',
           passwordHash: '$argon2id$abc',
           uploadUrl: 'https://minio/put?X-Amz-Signature=secret',
-          nested: { password: 'inner' }
+          nested: { password: 'inner' },
+          presignedUrl: 'https://x',
+          res: { headers: { 'set-cookie': 'photoops_session=abc' } }
         },
         'sensitive'
       )
@@ -33,6 +35,10 @@ describe('makeLoggerOptions', () => {
     expect(line.passwordHash).toBe('[REDACTED]');
     expect(line.uploadUrl).toBe('[REDACTED]');
     expect((line.nested as Record<string, unknown>).password).toBe('[REDACTED]');
+    expect(line.presignedUrl).toBe('[REDACTED]');
+    expect(
+      ((line.res as Record<string, unknown>).headers as Record<string, unknown>)['set-cookie']
+    ).toBe('[REDACTED]');
   });
 });
 
