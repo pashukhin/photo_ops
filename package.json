@@ -5,7 +5,7 @@
   "scripts": {
     "build": "pnpm -r build",
     "typecheck": "pnpm -r --if-present typecheck",
-    "test": "sh scripts/test-smoke-upload-contract.sh && pnpm --filter './apps/*' --if-present test",
+    "test": "sh scripts/test-smoke-upload-contract.sh && pnpm --filter './apps/*' --filter './packages/*' --if-present test",
     "lint": "eslint .",
     "proto": "cd proto && buf generate --template buf.gen.yaml && buf generate --template buf.gen.python.yaml --path photo/v1/processing.proto"
   },

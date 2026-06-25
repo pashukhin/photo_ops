@@ -1,0 +1,35 @@
+{
+  "name": "@photoops/observability",
+  "private": true,
+  "version": "0.0.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/core": "^1.30.0",
+    "@opentelemetry/instrumentation": "^0.57.0",
+    "@opentelemetry/instrumentation-amqplib": "^0.46.0",
+    "@opentelemetry/instrumentation-express": "^0.47.0",
+    "@opentelemetry/instrumentation-grpc": "^0.57.0",
+    "@opentelemetry/instrumentation-http": "^0.57.0",
+    "@opentelemetry/resources": "^1.30.0",
+    "@opentelemetry/sdk-trace-node": "^1.30.0",
+    "@opentelemetry/semantic-conventions": "^1.28.0",
+    "pino": "^9.6.0"
+  },
+  "peerDependencies": {
+    "@nestjs/common": "^10.4.15",
+    "rxjs": "^7.8.1"
+  },
+  "devDependencies": {
+    "@nestjs/common": "^10.4.15",
+    "rxjs": "^7.8.1",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
