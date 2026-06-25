@@ -125,13 +125,47 @@ export async function completeUpload(photoId: string) {
 // GET it with credentials, then return { photos: body.photos ?? [], totalCount:
 // body.totalCount ?? 0 }.
 export async function listPhotos(_params: ListPhotosParams = {}): Promise<ListPhotosResult> {
-  throw new Error('NotImplemented: listPhotos'); // GREEN is the implementer's job
+  const params = _params;
+  const qs = new URLSearchParams();
+
+  if (params.page !== undefined) {
+    qs.append('page', String(params.page));
+  }
+  if (params.pageSize !== undefined) {
+    qs.append('pageSize', String(params.pageSize));
+  }
+  if (params.sort !== undefined) {
+    qs.append('sort', params.sort);
+  }
+  if (params.dir !== undefined) {
+    qs.append('dir', params.dir);
+  }
+  if (params.status && params.status.length > 0) {
+    params.status.forEach(s => qs.append('status', s));
+  }
+  if (params.q !== undefined) {
+    qs.append('q', params.q);
+  }
+
+  const queryString = qs.toString();
+  const url = queryString ? `${API_BASE_URL}/photos?${queryString}` : `${API_BASE_URL}/photos`;
+
+  const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, `ListPhotos failed: ${response.status}`));
+  }
+  const body = (await response.json()) as { photos?: PhotoAsset[]; totalCount?: number };
+  return { photos: body.photos ?? [], totalCount: body.totalCount ?? 0 };
 }
 
 // GREEN obligation (session 011): GET `${API_BASE_URL}/photos/${photoId}` with
 // credentials and return the parsed PhotoAsset (throw readErrorMessage on !ok).
 export async function getPhoto(_photoId: string): Promise<PhotoAsset> {
-  throw new Error('NotImplemented: getPhoto'); // GREEN is the implementer's job
+  const response = await fetch(`${API_BASE_URL}/photos/${_photoId}`, { credentials: 'include', cache: 'no-store' });
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, `GetPhoto failed: ${response.status}`));
+  }
+  return response.json() as Promise<PhotoAsset>;
 }
 
 export async function uploadFileToPresignedUrl(uploadUrl: string, file: File) {
