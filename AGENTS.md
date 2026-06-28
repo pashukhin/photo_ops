@@ -25,7 +25,8 @@ Before implementing, read:
 - `project_description.md`
 - `docs/architecture.md`
 - `docs/domain-model.md`
-- the accepted spec, plan, and e2e scenario for the active session
+- `docs/agent-workflow-evolution.md` — accepted workflow method (executable-spec / skeleton-first SDD; Decision 1 layer-routing)
+- the accepted ADR(s)/plan and e2e scenario for the active session
 
 ## Scope Guardrails
 
@@ -51,6 +52,7 @@ Before implementing, read:
 - Do not use git worktrees in this project; they conflict with the beads workflow.
 - Prefer running project commands through `Makefile` targets when a suitable target exists.
 - Before implementation starts, write the manual e2e scenario for the target change and get it approved.
+- Record per-session design as a **code-free ADR** in `docs/adr` (the *why* — decisions, rationale, rejected alternatives). Route contracts/structure (signatures, fields, schemas, proto, DDL) and behavior to the **skeleton** (proto/migrations/stubs/tests), not a prose design doc that duplicates them. See `docs/agent-workflow-evolution.md` Decision 1 (executable-spec / skeleton-first SDD).
 - Follow the accepted implementation plan task-by-task.
 - Keep commits small and aligned with plan tasks.
 - When you change a unit of code, re-verify and update that unit's `CLAUDE.md`
@@ -100,7 +102,7 @@ Write durable knowledge in the right place so the next agent can find it:
 | Claude Code specifics + pointer | root `CLAUDE.md` |
 | Local code context + local invariants | nested `CLAUDE.md` (`## Local context` / `## Local invariants`) |
 | Durable facts/decisions not tied to a file | `bd remember` (search with `bd memories <kw>`) |
-| Decisions with rationale / per-session design | `docs/adr`, `docs/superpowers/specs` & `plans` |
+| Decisions with rationale / rejected alternatives (the *why*) | `docs/adr` — **code-free**; contracts/structure/behavior live in the skeleton (proto/migrations/stubs/tests), not a prose twin (`docs/agent-workflow-evolution.md` Decision 1). `docs/superpowers/{specs,plans}` hold pre-Decision-1 design docs + plans. |
 
 Nested `CLAUDE.md` files exist for real services and key directories
 (`apps/api-gateway`, `apps/identity-service`, `apps/photo-service`, `apps/web`,

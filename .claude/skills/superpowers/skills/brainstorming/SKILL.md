@@ -26,7 +26,7 @@ You MUST create a task for each of these items and complete them in order:
 3. **Ask clarifying questions** — one at a time, understand purpose/constraints/success criteria
 4. **Propose 2-3 approaches** — with trade-offs and your recommendation
 5. **Present design** — in sections scaled to their complexity, get user approval after each section
-6. **Write design doc** — save to `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` and commit
+6. **Record the design (why only)** — see Documentation below. **Project routing** (`AGENTS.md` → `docs/agent-workflow-evolution.md` Decision 1): the durable *why* goes to an ADR in `docs/adr/`; contracts/structure (signatures, fields, schemas, proto, DDL) go to the skeleton at the writing-plans step — **never** a code-laden design doc. Commit.
 7. **Spec self-review** — quick inline check for placeholders, contradictions, ambiguity, scope (see below)
 8. **User reviews written spec** — ask user to review the spec file before proceeding
 9. **Transition to implementation** — invoke writing-plans skill to create implementation plan
@@ -103,10 +103,20 @@ digraph brainstorming {
 
 **Documentation:**
 
-- Write the validated design (spec) to `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md`
-  - (User preferences for spec location override this default)
+- **Project override (this repo) — executable-spec / skeleton-first SDD**
+  (`AGENTS.md`, `docs/agent-workflow-evolution.md` Decision 1): the validated
+  design is *why only*. Route by layer to its cheapest fail-on-drift home — the
+  durable *why / invariants / rejected alternatives* → an **ADR in `docs/adr/`**;
+  *contracts/structure* (signatures, fields, enums, schemas, proto, DDL) →
+  code/stubs/proto/migrations (the skeleton, at writing-plans); *behavior* →
+  tests. Do **not** write a `docs/superpowers/specs/…-design.md` that embeds
+  proto/SQL/RPC/field-tables — that prose twin is the anti-pattern this routing
+  removes ("no duplicate truth"). Use the `docs/adr` style (see existing ADRs).
+- *(Absent that project override, the default is a single design doc at
+  `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md`; user preferences for
+  location override either default.)*
 - Use elements-of-style:writing-clearly-and-concisely skill if available
-- Commit the design document to git
+- Commit the design (ADR) to git
 
 **Spec Self-Review:**
 After writing the spec document, look at it with fresh eyes:
