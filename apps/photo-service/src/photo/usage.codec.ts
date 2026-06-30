@@ -28,8 +28,20 @@ export interface ConsumptionEventInput {
 }
 
 export function encodeConsumptionEvent(event: ConsumptionEventInput): Uint8Array {
-  // GREEN: ConsumptionEventType.encode(ConsumptionEventType.fromObject({ ...event })).finish()
-  void ConsumptionEventType;
-  void event;
-  throw new Error('not implemented'); // GREEN is the implementer's job
+  const message = ConsumptionEventType.fromObject({
+    idempotencyKey: event.idempotencyKey,
+    userId: event.userId,
+    provider: event.provider,
+    occurredAt: event.occurredAt,
+    measurements: event.measurements.map((m) => ({
+      eventType: m.eventType,
+      resourceType: m.resourceType,
+      quantity: m.quantity,
+      unit: m.unit,
+      sourceEntityType: m.sourceEntityType,
+      sourceEntityId: m.sourceEntityId
+    })),
+    correlationId: event.correlationId
+  });
+  return ConsumptionEventType.encode(message).finish();
 }

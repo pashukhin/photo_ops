@@ -5,6 +5,7 @@ import { currentTraceparent } from '@photoops/observability';
 import { MessagePublisher } from '../messaging/messaging.port';
 import { CreateUploadIntentInput, ListPhotosParams, ListPhotosResult, PhotoAssetRecord, PhotoVariantRecord, PhotoVariantView, PhotoWithVariants, ProcessingJobRecord, ProcessingResultInput } from './photo.types';
 import { encodeJob } from './processing.codec';
+import { UsageEmitter } from './usage.emitter';
 
 function parseMetadata(raw: string): unknown {
   if (!raw) return null;
@@ -32,6 +33,7 @@ export interface PhotoRepositoryPort {
   createProcessingJob(input: { photoId: string; userId: string; type: 'initial' | 'reprocess'; correlationId: string }): Promise<ProcessingJobRecord>;
   markProcessingForUser(userId: string, photoId: string): Promise<boolean>;
   finalizeJob(jobId: string, outcome: 'succeeded' | 'failed', errorMessage?: string): Promise<boolean>;
+  findJobById(jobId: string): Promise<ProcessingJobRecord | null>;
   upsertVariant(v: { photoId: string; variantType: 'thumbnail' | 'preview'; objectKey: string; width: number; height: number; sizeBytes: bigint; contentType: string }): Promise<void>;
   applyAttributes(photoId: string, attrs: { width: number | null; height: number | null; takenAtLocal: string | null; takenAtUtc: Date | null; takenAtTzSource: string | null; cameraMake: string | null; cameraModel: string | null; orientation: number | null; lat: number | null; lon: number | null; metadataJson: unknown }): Promise<void>;
   setStatus(photoId: string, status: 'ready' | 'failed' | 'processing'): Promise<void>;
@@ -51,7 +53,8 @@ export class PhotoDomainService {
     private readonly repository: PhotoRepositoryPort,
     private readonly storage: ObjectStoragePort,
     private readonly publisher: MessagePublisher,
-    private readonly logger: PinoLogger
+    private readonly logger: PinoLogger,
+    private readonly usageEmitter: UsageEmitter
   ) {}
 
   async createUploadIntent(input: CreateUploadIntentInput) {
@@ -84,6 +87,14 @@ export class PhotoDomainService {
     }
 
     const uploaded = await this.repository.markUploadedForUser(userId, photoId);
+
+    // Best-effort: emit usage for original storage. A publish failure must not
+    // break the upload flow — log it and continue.
+    try {
+      await this.usageEmitter.emitOriginalStored({ photoId, userId, sizeBytes: photo.sizeBytes });
+    } catch (err) {
+      this.logger.warn({ msg: 'usage.emit.failed', event: 'original_stored', photo_id: photoId, err }, 'usage emit failed');
+    }
 
     // Kick off async processing: move uploaded -> processing, and only if this
     // call won that guarded transition, record the run and publish the job.
@@ -188,6 +199,18 @@ export class PhotoDomainService {
       });
 
       await this.repository.setStatus(result.photoId, 'ready');
+
+      // Best-effort: emit usage for processing consumption. A publish failure
+      // must not break the finalize flow — log it and continue.
+      try {
+        // userId is not on ProcessingResultInput; look it up from the job record
+        // persisted at job-creation time (stores userId alongside jobId).
+        const job = await this.repository.findJobById(result.jobId);
+        const userId = job?.userId ?? 'unknown';
+        await this.usageEmitter.emitProcessingConsumption({ result, userId });
+      } catch (err) {
+        this.logger.warn({ msg: 'usage.emit.failed', event: 'processing_consumption', job_id: result.jobId, err }, 'usage emit failed');
+      }
     } else {
       await this.repository.setStatus(result.photoId, 'failed');
     }

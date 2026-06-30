@@ -86,6 +86,7 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
       MINIO_BUCKET: ${MINIO_BUCKET}
       RABBITMQ_URL: ${RABBITMQ_URL}
+      USAGE_PROVIDER: local-demo
     depends_on:
       postgres:
         condition: service_healthy

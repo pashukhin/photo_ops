@@ -8,6 +8,7 @@ import { PhotoGrpcController } from './photo/photo.grpc.controller';
 import { PhotoRepository } from './photo/photo.repository';
 import { PhotoDomainService } from './photo/photo.service';
 import { ProcessingResultConsumer } from './photo/processing.consumer';
+import { UsageEmitter } from './photo/usage.emitter';
 import { MinioStorageService } from './storage/minio.service';
 
 // DI token for the single shared RabbitMqBus instance (used as both publisher
@@ -32,10 +33,16 @@ const RABBITMQ_BUS = 'RABBITMQ_BUS';
       useExisting: RABBITMQ_BUS
     },
     {
+      provide: UsageEmitter,
+      useFactory: (publisher: MessagePublisher) =>
+        new UsageEmitter(publisher, process.env.USAGE_PROVIDER ?? 'local-demo'),
+      inject: [MESSAGE_PUBLISHER]
+    },
+    {
       provide: PhotoDomainService,
-      useFactory: (repository: PhotoRepository, storage: MinioStorageService, publisher: MessagePublisher, logger: PinoLogger) =>
-        new PhotoDomainService(repository, storage, publisher, logger),
-      inject: [PhotoRepository, MinioStorageService, MESSAGE_PUBLISHER, PinoLogger]
+      useFactory: (repository: PhotoRepository, storage: MinioStorageService, publisher: MessagePublisher, logger: PinoLogger, usageEmitter: UsageEmitter) =>
+        new PhotoDomainService(repository, storage, publisher, logger, usageEmitter),
+      inject: [PhotoRepository, MinioStorageService, MESSAGE_PUBLISHER, PinoLogger, UsageEmitter]
     },
     // ProcessingResultConsumer wired with the same bus instance as its consumer
     // source and the domain service as the finalize handler.
