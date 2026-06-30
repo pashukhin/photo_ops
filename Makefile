@@ -1,4 +1,4 @@
-.PHONY: install proto proto-check build typecheck test lint gate gate-media gate-usage vet-usage test-usage test-api test-identity test-photo test-web test-media-worker lint-media-worker dev down reset logs status ps-all logs-svc sh restart-svc up-svc migrate migrate-identity migrate-photo migrate-usage smoke-upload smoke-auth smoke-contract smoke-media smoke-stack smoke-ui
+.PHONY: install proto proto-check build typecheck test lint gate gate-media gate-usage vet-usage lint-usage test-usage test-api test-identity test-photo test-web test-media-worker lint-media-worker dev down reset logs status ps-all logs-svc sh restart-svc up-svc migrate migrate-identity migrate-photo migrate-usage smoke-upload smoke-auth smoke-contract smoke-media smoke-stack smoke-ui smoke-usage
 
 ifneq (,$(wildcard .env))
 include .env
@@ -46,12 +46,15 @@ gate: proto-check typecheck lint build test gate-media gate-usage
 gate-media: lint-media-worker test-media-worker
 
 # Go half of the gate: usage-service (first Go service, s012). Mirrors CI's
-# usage-service job. golangci-lint joins this recipe at GREEN, once the stub
-# bodies are real (linting panic-only stubs only flags not-yet-read fields).
-gate-usage: vet-usage test-usage
+# usage-service job. golangci-lint promoted to GREEN (Task 7): bodies are real,
+# generated pb/ excluded via .golangci.yml.
+gate-usage: vet-usage lint-usage test-usage
 
 vet-usage:
 	cd apps/usage-service && go vet ./...
+
+lint-usage:
+	cd apps/usage-service && GOTOOLCHAIN=local golangci-lint run ./...
 
 test-usage:
 	cd apps/usage-service && go test ./...
@@ -148,6 +151,11 @@ smoke-stack:
 
 smoke-ui:
 	scripts/smoke-ui.sh
+
+# Local-only — requires `make dev` + `make migrate` to be running.
+# Do NOT add to `gate` or CI targets.
+smoke-usage:
+	scripts/smoke-usage.sh
 
 # media-worker venv: created/refreshed only when pyproject.toml changes. The
 # stamp is a REAL file target (not .PHONY), so make skips the venv+install on

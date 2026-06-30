@@ -110,9 +110,11 @@ services:
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE}
       WEB_ORIGIN: ${WEB_ORIGIN}
       PHOTO_SERVICE_GRPC_URL: photo-service:${PHOTO_SERVICE_GRPC_PORT}
+      USAGE_SERVICE_GRPC_URL: usage-service:${USAGE_SERVICE_GRPC_PORT}
     depends_on:
       - identity-service
       - photo-service
+      - usage-service
     ports:
       - "3001:3001"
 

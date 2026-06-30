@@ -32,8 +32,9 @@ function decode(body: Uint8Array): DecodedEvent {
 
 class CapturingPublisher implements MessagePublisher {
   public sent: Array<{ destination: string; msg: BusMessage }> = [];
-  async publish(destination: string, msg: BusMessage): Promise<void> {
+  publish(destination: string, msg: BusMessage): Promise<void> {
     this.sent.push({ destination, msg });
+    return Promise.resolve();
   }
 }
 

@@ -90,13 +90,13 @@ func (c *Consumer) Start(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("amqp.Consumer.Start: dial %s: %w", c.brokerURL, err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	ch, err := conn.Channel()
 	if err != nil {
 		return fmt.Errorf("amqp.Consumer.Start: open channel: %w", err)
 	}
-	defer ch.Close()
+	defer func() { _ = ch.Close() }()
 
 	if err := declareToplogy(ch, Source); err != nil {
 		return err
