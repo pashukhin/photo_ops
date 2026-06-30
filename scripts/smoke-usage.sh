@@ -257,3 +257,71 @@ if cost1 != cost2:
 
 print(f"IDEMPOTENCY OK — summary stable across two fetches (photo_processed qty={qty1}, cost={cost1})")
 PY
+
+# ---------------------------------------------------------------------------
+# 9. Itemized report: GET /v1/usage/events — line items with per-row cost,
+#    plus a resource_type filter (session 012 add-on).
+# ---------------------------------------------------------------------------
+echo "[smoke-usage] fetching itemized usage events" >&2
+
+EVENTS_PATH="$TMP/events.json"
+curl -fsS -b "$COOKIE_PATH" "$API_BASE_URL/v1/usage/events" > "$EVENTS_PATH"
+
+EVENTS_FILTERED_PATH="$TMP/events_processing.json"
+curl -fsS -b "$COOKIE_PATH" "$API_BASE_URL/v1/usage/events?resource_type=processing" > "$EVENTS_FILTERED_PATH"
+
+"$VENV_PYTHON" - "$EVENTS_PATH" "$EVENTS_FILTERED_PATH" <<'PY'
+import json, sys
+
+events = json.load(open(sys.argv[1]))
+filtered = json.load(open(sys.argv[2]))
+
+
+def fail(msg, doc):
+    print(f"ASSERTION FAILED: {msg}", file=sys.stderr)
+    print(json.dumps(doc, indent=2), file=sys.stderr)
+    sys.exit(1)
+
+
+def is_money(s):
+    parts = str(s).split(".")
+    return len(parts) == 2 and parts[0].isdigit() and len(parts[1]) == 2 and parts[1].isdigit()
+
+
+lines = events.get("lines", [])
+if not lines:
+    fail("expected at least one usage event line", events)
+
+types = {l["eventType"] for l in lines}
+for required in ("photo_original_stored", "photo_processed", "photo_variant_generated"):
+    if required not in types:
+        fail(f"expected a {required!r} line; got event_types {sorted(types)}", events)
+
+for l in lines:
+    for field in ("occurredAt", "eventType", "resourceType", "unit", "amount", "currency"):
+        if not l.get(field):
+            fail(f"line missing {field!r}: {l!r}", events)
+    if not is_money(l["amount"]):
+        fail(f"line amount is not a 2-decimal string: {l['amount']!r}", events)
+
+if not is_money(events.get("filteredTotalAmount", "")):
+    fail(f"filteredTotalAmount is not a 2-decimal string: {events.get('filteredTotalAmount')!r}", events)
+if events.get("totalCount", 0) < 3:
+    fail(f"expected totalCount >= 3, got {events.get('totalCount')}", events)
+
+# The resource_type=processing filter must return ONLY processing lines, and
+# include the photo_processed operation.
+flines = filtered.get("lines", [])
+if not flines:
+    fail("resource_type=processing filter returned no lines", filtered)
+if any(l["resourceType"] != "processing" for l in flines):
+    fail("resource_type=processing filter leaked non-processing lines", filtered)
+if "photo_processed" not in {l["eventType"] for l in flines}:
+    fail("resource_type=processing filter dropped photo_processed", filtered)
+
+print(
+    f"SMOKE EVENTS OK — {events['totalCount']} line items, "
+    f"filtered_total={events['filteredTotalAmount']} {events.get('currency')}; "
+    f"resource_type=processing → {len(flines)} processing line(s)"
+)
+PY

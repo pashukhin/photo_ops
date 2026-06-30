@@ -34,6 +34,14 @@ make migrate      # now also runs migrate-usage (billing_events + processed_even
    the broker redelivers).
    - Expectation: the summary is unchanged — `processed_events` dedups by
      `idempotency_key`, so the ledger is not double-counted (charge-once).
+6. Itemized report (s012 add-on): `GET /v1/usage/events` (authed).
+   - Expectation (HTTP 200): `lines` is one entry per ledger measurement
+     (`photo_original_stored`, `photo_variant_generated`, `photo_processed`), each
+     with its `amount` (= quantity × unit_price, 2-dp) + `currency`;
+     `filtered_total_amount` is a 2-dp decimal; `total_count` ≥ 3. Filtering by
+     `?resource_type=processing` returns only processing lines. In the UI, the
+     `/usage` page renders the summary header, the filter bar (date range,
+     resource type, operation type), and the paginated line-items table.
 
 ## Negative checks
 
