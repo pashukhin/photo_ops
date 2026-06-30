@@ -12,11 +12,11 @@ import (
 //   - storage/byte:          $0.000000023 per byte·month  (~$23/TB·month, typical object-storage ballpark)
 //   - processing/operation:  $0.000050000 per operation   (~$0.05 per photo processed)
 var demoRateTable = map[string]*big.Rat{
-	"storage/byte":           new(big.Rat).SetFrac(
+	"storage/byte": new(big.Rat).SetFrac(
 		big.NewInt(23),
 		new(big.Int).Exp(big.NewInt(10), big.NewInt(9), nil), // 23 / 1_000_000_000
 	),
-	"processing/operation":   new(big.Rat).SetFrac(
+	"processing/operation": new(big.Rat).SetFrac(
 		big.NewInt(5),
 		big.NewInt(100_000), // 5 / 100_000 = 0.00005
 	),

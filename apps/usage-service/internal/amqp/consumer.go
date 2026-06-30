@@ -63,7 +63,7 @@ func Decode(body []byte) (usage.ConsumptionEvent, error) {
 // Consumer consumes the usage.events stream and records each event. A redelivery
 // is harmless: Recorder.Record is charge-once by idempotency_key.
 type Consumer struct {
-	rec    Recorder
+	rec       Recorder
 	brokerURL string
 }
 
@@ -81,7 +81,7 @@ func NewConsumer(rec Recorder, brokerURL string) *Consumer {
 //   - exchange N+".dlx"        — direct, durable
 //   - queue    N+".dlq"        — durable; bound to N+".dlx" with routing key N
 //   - queue    N               — durable, x-dead-letter-exchange=N+".dlx";
-//                                bound to exchange N with routing key N
+//     bound to exchange N with routing key N
 //
 // On success the delivery is acked. On decode or record error the delivery is
 // nacked(requeue=false) so it dead-letters to the DLQ.
