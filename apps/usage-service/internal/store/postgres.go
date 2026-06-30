@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/photoops/usage-service/internal/usage"
 )
@@ -25,6 +26,17 @@ func NewPostgresStore(pool *pgxpool.Pool) *PostgresStore {
 
 // Compile-time contract pin: PostgresStore must satisfy usage.Store.
 var _ usage.Store = (*PostgresStore)(nil)
+
+// uuidParam converts a canonical UUID string into a pgtype.UUID, which pgx v5
+// encodes correctly in binary/extended protocol. Plain Go strings are NOT
+// accepted for uuid-OID columns under pgx v5 binary mode.
+func uuidParam(s string) (pgtype.UUID, error) {
+	var u pgtype.UUID
+	if err := u.Scan(s); err != nil {
+		return u, fmt.Errorf("invalid uuid %q: %w", s, err)
+	}
+	return u, nil
+}
 
 // RecordOnce implements charge-once semantics in a single transaction:
 //  1. INSERT INTO processed_events (idempotency_key) … ON CONFLICT DO NOTHING.
@@ -66,20 +78,30 @@ func (s *PostgresStore) RecordOnce(ctx context.Context, key string, rows []usage
 		}
 
 		r := &rows[i]
+
+		userIDParam, err := uuidParam(r.UserID)
+		if err != nil {
+			return false, fmt.Errorf("store.RecordOnce: row %d user_id: %w", i, err)
+		}
+		sourceEntityIDParam, err := uuidParam(r.SourceEntityID)
+		if err != nil {
+			return false, fmt.Errorf("store.RecordOnce: row %d source_entity_id: %w", i, err)
+		}
+
 		_, err = tx.Exec(ctx,
 			`INSERT INTO billing_events
 				(id, user_id, event_type, resource_type, quantity, unit,
 				 provider, source_entity_type, source_entity_id, occurred_at)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-			id.String(),
-			r.UserID,
+			pgtype.UUID{Bytes: id, Valid: true},
+			userIDParam,
 			r.EventType,
 			r.ResourceType,
 			r.Quantity,
 			r.Unit,
 			r.Provider,
 			r.SourceEntityType,
-			r.SourceEntityID,
+			sourceEntityIDParam,
 			r.OccurredAt,
 		)
 		if err != nil {
