@@ -98,7 +98,7 @@ func (c *Consumer) Start(ctx context.Context) error {
 	}
 	defer func() { _ = ch.Close() }()
 
-	if err := declareToplogy(ch, Source); err != nil {
+	if err := declareTopology(ch, Source); err != nil {
 		return err
 	}
 
@@ -141,10 +141,10 @@ func (c *Consumer) Start(ctx context.Context) error {
 	}
 }
 
-// declareToplogy asserts the canonical broker layout for the given logical name.
+// declareTopology asserts the canonical broker layout for the given logical name.
 // This must match EXACTLY what the TS publisher asserts for usage.events; any
 // mismatch in durable flags or DLX args causes PRECONDITION_FAILED.
-func declareToplogy(ch *amqp091.Channel, name string) error {
+func declareTopology(ch *amqp091.Channel, name string) error {
 	dlxName := name + ".dlx"
 	dlqName := name + ".dlq"
 

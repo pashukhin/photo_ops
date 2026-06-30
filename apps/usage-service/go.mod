@@ -4,10 +4,10 @@ go 1.23.0
 
 toolchain go1.23.1
 
-// External adapters (pgx, amqp091-go, grpc) and their require block are added
-// during GREEN, when the boundary packages are wired. The session-012 skeleton's
-// tested core (internal/usage) is stdlib-only so its RED tests run without a
-// network fetch.
+// The provider-independent core (internal/usage) is stdlib-only; the require
+// blocks below are pulled in only by the boundary adapters (store/amqp/grpcserver)
+// and the generated proto. Pinned go-1.23-compatible — the newest grpc/genproto/
+// x/net require go 1.25, so keep the `go 1.23.0` directive when updating deps.
 
 require (
 	github.com/google/uuid v1.6.0

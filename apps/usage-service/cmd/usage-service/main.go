@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -23,7 +24,7 @@ import (
 )
 
 func main() {
-	log := slog.New(slog.NewJSONHandler(os.Stderr, nil))
+	log := slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: logLevel(os.Getenv("LOG_LEVEL"))}))
 
 	// --- config from env ---
 	dbURL := requireEnv("USAGE_DATABASE_URL")
@@ -94,4 +95,18 @@ func envOr(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// logLevel maps the LOG_LEVEL env (debug|info|warn|error; default info) to a slog.Level.
+func logLevel(s string) slog.Level {
+	switch strings.ToLower(s) {
+	case "debug":
+		return slog.LevelDebug
+	case "warn":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
 }
