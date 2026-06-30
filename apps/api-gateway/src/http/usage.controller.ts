@@ -29,13 +29,15 @@ export class UsageController {
     @Headers('cookie') cookieHeader: string | undefined,
     @Query() query: UsageEventsQuery
   ): Promise<UsageEventsDto> {
-    // GREEN: requireSession → userId; map query → ListUsageEventsInput:
-    //   occurredFrom = query.from ?? '', occurredTo = query.to ?? '',
-    //   resourceType = query.resource_type ?? '', eventType = query.event_type ?? '',
-    //   page = query.page ? Number(query.page) : 0, pageSize = query.page_size ? Number(query.page_size) : 0;
-    // return usageClient.listUsageEvents({ userId, ...mapped }).
-    void cookieHeader;
-    void query;
-    throw new Error('not implemented'); // GREEN is the implementer's job
+    const auth = await this.authService.requireSession(cookieHeader);
+    return this.usageClient.listUsageEvents({
+      userId: auth.userId,
+      occurredFrom: query.from ?? '',
+      occurredTo: query.to ?? '',
+      resourceType: query.resource_type ?? '',
+      eventType: query.event_type ?? '',
+      page: query.page !== undefined ? Number(query.page) : 0,
+      pageSize: query.page_size !== undefined ? Number(query.page_size) : 0
+    });
   }
 }
