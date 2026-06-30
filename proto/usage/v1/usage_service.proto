@@ -15,8 +15,22 @@ service UsageService {
   }
 }
 
-message GetUsageSummaryRequest {}
+message GetUsageSummaryRequest {
+  string user_id = 1; // caller-supplied from the validated session in api-gateway
+}
 
+// Per-user usage rollup: raw per-resource lines + an estimated monthly cost.
+// Lines are general (event_type/resource_type) so new producers (clusters in
+// s013, posts later) surface automatically without a schema change.
 message GetUsageSummaryResponse {
-  string estimated_monthly_cost = 1;
+  repeated UsageLine lines = 1;
+  string estimated_monthly_cost = 2; // decimal string, e.g. "0.37"; resolved from the pricing layer
+  string currency = 3;               // e.g. "USD"
+}
+
+message UsageLine {
+  string event_type = 1;
+  string resource_type = 2;
+  int64 total_quantity = 3;
+  string unit = 4;
 }

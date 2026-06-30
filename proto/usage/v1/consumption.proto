@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package photoops.usage.v1;
+
+// Async resource-consumption contract. This message is the payload schema for
+// the RabbitMQ `usage.events` flow (serialized into the AMQP body); it is NOT a
+// gRPC method. Cross-language producers: TS (photo-service now, others later)
+// and Python (cluster-service, s013); consumer: Go (usage-service).
+//
+// It carries RAW provider-independent units + physical provenance — never money.
+// Pricing is resolved at read inside usage-service (a replaceable layer), so a
+// tariff change never has to mutate an immutable ledger row. See ADR-0004.
+
+// One raw measurement within an operation. An operation may consume several
+// resources at once (e.g. storage bytes + a processing count) → several
+// Measurements under a single event/idempotency_key.
+message Measurement {
+  string event_type = 1;          // photo_original_stored | photo_variant_generated | photo_processed | cluster_generated | ...
+  string resource_type = 2;       // storage | processing | ...
+  int64 quantity = 3;             // raw amount expressed in `unit`
+  string unit = 4;                // byte | operation | byte_second | cpu_second | ...
+  string source_entity_type = 5;  // photo | photo_variant | processing_job | cluster_result | ...
+  string source_entity_id = 6;    // typed UUID; may reference another service's entity (no cross-service FK)
+}
+
+// Published by an operation's runtime when the operation completes; consumed by
+// usage-service. The whole event is all-or-nothing under `idempotency_key`.
+message ConsumptionEvent {
+  string idempotency_key = 1;     // charge-once key (media job_id, "original:{photo_id}", cluster result_id)
+  string user_id = 2;             // UUID v7; no cross-service FK
+  string provider = 3;            // physical provenance: where this run executed (instance env), e.g. "local-demo"
+  string occurred_at = 4;         // ISO-8601 instant the operation completed (pricing-resolution epoch)
+  repeated Measurement measurements = 5;
+  string correlation_id = 6;      // W3C traceparent for log/trace threading; NOT an idempotency key
+}

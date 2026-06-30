@@ -14,20 +14,41 @@ import { HealthCheckRequest, HealthCheckResponse } from "../../common/v1/common"
 export const protobufPackage = "photoops.usage.v1";
 
 export interface GetUsageSummaryRequest {
+  /** caller-supplied from the validated session in api-gateway */
+  userId: string;
 }
 
+/**
+ * Per-user usage rollup: raw per-resource lines + an estimated monthly cost.
+ * Lines are general (event_type/resource_type) so new producers (clusters in
+ * s013, posts later) surface automatically without a schema change.
+ */
 export interface GetUsageSummaryResponse {
+  lines: UsageLine[];
+  /** decimal string, e.g. "0.37"; resolved from the pricing layer */
   estimatedMonthlyCost: string;
+  /** e.g. "USD" */
+  currency: string;
+}
+
+export interface UsageLine {
+  eventType: string;
+  resourceType: string;
+  totalQuantity: string;
+  unit: string;
 }
 
 export const PHOTOOPS_USAGE_V1_PACKAGE_NAME = "photoops.usage.v1";
 
 function createBaseGetUsageSummaryRequest(): GetUsageSummaryRequest {
-  return {};
+  return { userId: "" };
 }
 
 export const GetUsageSummaryRequest: MessageFns<GetUsageSummaryRequest> = {
-  encode(_: GetUsageSummaryRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+  encode(message: GetUsageSummaryRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.userId !== "") {
+      writer.uint32(10).string(message.userId);
+    }
     return writer;
   },
 
@@ -38,6 +59,14 @@ export const GetUsageSummaryRequest: MessageFns<GetUsageSummaryRequest> = {
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.userId = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -49,13 +78,19 @@ export const GetUsageSummaryRequest: MessageFns<GetUsageSummaryRequest> = {
 };
 
 function createBaseGetUsageSummaryResponse(): GetUsageSummaryResponse {
-  return { estimatedMonthlyCost: "" };
+  return { lines: [], estimatedMonthlyCost: "", currency: "" };
 }
 
 export const GetUsageSummaryResponse: MessageFns<GetUsageSummaryResponse> = {
   encode(message: GetUsageSummaryResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.lines) {
+      UsageLine.encode(v!, writer.uint32(10).fork()).join();
+    }
     if (message.estimatedMonthlyCost !== "") {
-      writer.uint32(10).string(message.estimatedMonthlyCost);
+      writer.uint32(18).string(message.estimatedMonthlyCost);
+    }
+    if (message.currency !== "") {
+      writer.uint32(26).string(message.currency);
     }
     return writer;
   },
@@ -72,7 +107,93 @@ export const GetUsageSummaryResponse: MessageFns<GetUsageSummaryResponse> = {
             break;
           }
 
+          message.lines.push(UsageLine.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
           message.estimatedMonthlyCost = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.currency = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBaseUsageLine(): UsageLine {
+  return { eventType: "", resourceType: "", totalQuantity: "0", unit: "" };
+}
+
+export const UsageLine: MessageFns<UsageLine> = {
+  encode(message: UsageLine, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.eventType !== "") {
+      writer.uint32(10).string(message.eventType);
+    }
+    if (message.resourceType !== "") {
+      writer.uint32(18).string(message.resourceType);
+    }
+    if (message.totalQuantity !== "0") {
+      writer.uint32(24).int64(message.totalQuantity);
+    }
+    if (message.unit !== "") {
+      writer.uint32(34).string(message.unit);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UsageLine {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUsageLine();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.eventType = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.resourceType = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.totalQuantity = reader.int64().toString();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.unit = reader.string();
           continue;
         }
       }
