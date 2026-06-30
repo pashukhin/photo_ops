@@ -50,6 +50,10 @@ func (r *Reader) EventsForUser(ctx context.Context, filter EventFilter) (EventRe
 		return EventReport{}, err
 	}
 
+	// NOTE: the filtered total is priced with this Reader's configured provider
+	// (single-provider in s012), while each line in BuildEventLines is priced by
+	// its OWN row.Provider. They agree while all rows share one provider; under
+	// the multi-provider rate-card seam (ADR-0004) they would diverge — not a bug.
 	summary := BuildSummary(totals, r.provider, r.now(), r.resolver)
 
 	return EventReport{

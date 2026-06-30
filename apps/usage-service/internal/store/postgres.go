@@ -205,7 +205,7 @@ func (s *PostgresStore) ListEvents(ctx context.Context, filter usage.EventFilter
 		`SELECT user_id::text, event_type, resource_type, quantity, unit, provider,
 		        source_entity_type, source_entity_id::text, occurred_at
 		 FROM billing_events%s
-		 ORDER BY occurred_at DESC
+		 ORDER BY occurred_at DESC, id DESC
 		 LIMIT $%d OFFSET $%d`,
 		where, len(args)-1, len(args),
 	)
