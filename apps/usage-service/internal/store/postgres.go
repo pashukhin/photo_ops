@@ -145,13 +145,126 @@ func (s *PostgresStore) SumByResource(ctx context.Context, userID string) ([]usa
 	return totals, nil
 }
 
+// buildWhereClause constructs a parameterized WHERE clause from the filter
+// fields that are set (non-empty / non-nil). The returned args slice starts
+// at $1; the caller appends any further positional parameters after them.
+// The initial args slice should contain any values prepended before the WHERE
+// (e.g., none for a bare WHERE; but here we always start with user_id as $1).
+func buildWhereClause(filter usage.EventFilter) (string, []any) {
+	args := []any{filter.UserID} // $1 is always user_id
+	where := " WHERE user_id = $1"
+
+	if filter.From != nil {
+		args = append(args, *filter.From)
+		where += fmt.Sprintf(" AND occurred_at >= $%d", len(args))
+	}
+	if filter.To != nil {
+		args = append(args, *filter.To)
+		where += fmt.Sprintf(" AND occurred_at <= $%d", len(args))
+	}
+	if filter.ResourceType != "" {
+		args = append(args, filter.ResourceType)
+		where += fmt.Sprintf(" AND resource_type = $%d", len(args))
+	}
+	if filter.EventType != "" {
+		args = append(args, filter.EventType)
+		where += fmt.Sprintf(" AND event_type = $%d", len(args))
+	}
+	return where, args
+}
+
 // ListEvents returns one filtered, paginated page of billing_events rows
 // (ORDER BY occurred_at DESC) plus the total count matching the filter.
 func (s *PostgresStore) ListEvents(ctx context.Context, filter usage.EventFilter) ([]usage.BillingRow, int, error) {
-	panic("not implemented") // GREEN: WHERE user_id + occurred_at range + resource_type + event_type; LIMIT/OFFSET + COUNT(*)
+	// Defensive clamp — callers should already enforce these but guard at the boundary.
+	page := filter.Page
+	if page < 1 {
+		page = 1
+	}
+	pageSize := filter.PageSize
+	if pageSize < 1 {
+		pageSize = 25
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+
+	where, args := buildWhereClause(filter)
+
+	// Count query — same WHERE, no ORDER/LIMIT.
+	countQuery := "SELECT COUNT(*) FROM billing_events" + where
+	var totalCount int
+	if err := s.pool.QueryRow(ctx, countQuery, args...).Scan(&totalCount); err != nil {
+		return nil, 0, fmt.Errorf("store.ListEvents: count: %w", err)
+	}
+
+	// Pagination args.
+	offset := (page - 1) * pageSize
+	args = append(args, pageSize, offset)
+	dataQuery := fmt.Sprintf(
+		`SELECT user_id::text, event_type, resource_type, quantity, unit, provider,
+		        source_entity_type, source_entity_id::text, occurred_at
+		 FROM billing_events%s
+		 ORDER BY occurred_at DESC
+		 LIMIT $%d OFFSET $%d`,
+		where, len(args)-1, len(args),
+	)
+
+	rows, err := s.pool.Query(ctx, dataQuery, args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("store.ListEvents: query: %w", err)
+	}
+	defer rows.Close()
+
+	var result []usage.BillingRow
+	for rows.Next() {
+		var r usage.BillingRow
+		if err := rows.Scan(
+			&r.UserID,
+			&r.EventType,
+			&r.ResourceType,
+			&r.Quantity,
+			&r.Unit,
+			&r.Provider,
+			&r.SourceEntityType,
+			&r.SourceEntityID,
+			&r.OccurredAt,
+		); err != nil {
+			return nil, 0, fmt.Errorf("store.ListEvents: scan: %w", err)
+		}
+		result = append(result, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("store.ListEvents: rows: %w", err)
+	}
+	return result, totalCount, nil
 }
 
 // SumByResourceFiltered is SumByResource restricted to the report filter.
 func (s *PostgresStore) SumByResourceFiltered(ctx context.Context, filter usage.EventFilter) ([]usage.ResourceTotal, error) {
-	panic("not implemented") // GREEN: SumByResource query + the same WHERE filter
+	where, args := buildWhereClause(filter)
+
+	query := `SELECT event_type, resource_type, SUM(quantity)::bigint, unit
+	          FROM billing_events` + where + `
+	          GROUP BY event_type, resource_type, unit
+	          ORDER BY event_type, resource_type`
+
+	rows, err := s.pool.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("store.SumByResourceFiltered: query: %w", err)
+	}
+	defer rows.Close()
+
+	var totals []usage.ResourceTotal
+	for rows.Next() {
+		var t usage.ResourceTotal
+		if err := rows.Scan(&t.EventType, &t.ResourceType, &t.TotalQuantity, &t.Unit); err != nil {
+			return nil, fmt.Errorf("store.SumByResourceFiltered: scan: %w", err)
+		}
+		totals = append(totals, t)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("store.SumByResourceFiltered: rows: %w", err)
+	}
+	return totals, nil
 }

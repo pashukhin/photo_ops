@@ -1,6 +1,9 @@
 package usage
 
-import "time"
+import (
+	"math/big"
+	"time"
+)
 
 // EventFilter is the query for the itemized usage report. Page/PageSize are
 // already defaulted/clamped by the boundary (page>=1, pageSize 1..100).
@@ -35,5 +38,34 @@ type EventLine struct {
 // (provider,resource_type,unit) is unpriced yields unit_price/amount "0.00"
 // (a well-formed line, not dropped).
 func BuildEventLines(rows []BillingRow, r Resolver) []EventLine {
-	panic("not implemented") // GREEN is the implementer's job
+	lines := make([]EventLine, 0, len(rows))
+	for _, row := range rows {
+		line := EventLine{
+			OccurredAt:       row.OccurredAt,
+			EventType:        row.EventType,
+			ResourceType:     row.ResourceType,
+			Quantity:         row.Quantity,
+			Unit:             row.Unit,
+			SourceEntityType: row.SourceEntityType,
+			SourceEntityID:   row.SourceEntityID,
+		}
+
+		rate, ok := r.Resolve(row.Provider, row.ResourceType, row.Unit, row.OccurredAt)
+		if !ok {
+			line.UnitPrice = "0.00"
+			line.Amount = "0.00"
+			line.Currency = "USD"
+		} else {
+			line.UnitPrice = rate.UnitPrice
+			line.Currency = rate.Currency
+
+			unitRate := new(big.Rat)
+			unitRate.SetString(rate.UnitPrice) //nolint:errcheck // formatRat always produces a valid decimal
+			amount := new(big.Rat).Mul(unitRate, new(big.Rat).SetInt64(row.Quantity))
+			line.Amount = formatRatFixed(amount)
+		}
+
+		lines = append(lines, line)
+	}
+	return lines
 }

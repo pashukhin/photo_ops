@@ -40,5 +40,22 @@ type EventReport struct {
 // EventsForUser returns one filtered, paginated page of itemized usage lines
 // (each priced by its own provenance) plus the cost total over the whole filter.
 func (r *Reader) EventsForUser(ctx context.Context, filter EventFilter) (EventReport, error) {
-	panic("not implemented") // GREEN: store.ListEvents -> BuildEventLines; store.SumByResourceFiltered -> BuildSummary -> filtered total
+	rows, totalCount, err := r.store.ListEvents(ctx, filter)
+	if err != nil {
+		return EventReport{}, err
+	}
+
+	totals, err := r.store.SumByResourceFiltered(ctx, filter)
+	if err != nil {
+		return EventReport{}, err
+	}
+
+	summary := BuildSummary(totals, r.provider, r.now(), r.resolver)
+
+	return EventReport{
+		Lines:               BuildEventLines(rows, r.resolver),
+		TotalCount:          totalCount,
+		FilteredTotalAmount: summary.EstimatedMonthlyCost,
+		Currency:            summary.Currency,
+	}, nil
 }
