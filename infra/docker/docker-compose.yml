@@ -163,8 +163,19 @@ services:
     build:
       context: ../..
       dockerfile: apps/usage-service/Dockerfile
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      USAGE_DATABASE_URL: ${USAGE_DATABASE_URL}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+      USAGE_SERVICE_GRPC_PORT: ${USAGE_SERVICE_GRPC_PORT}
+      USAGE_PROVIDER: ${USAGE_PROVIDER:-local-demo}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     ports:
-      - "3013:3013"
+      - "${USAGE_SERVICE_GRPC_PORT}:${USAGE_SERVICE_GRPC_PORT}"
 
   connector-service:
     build:
