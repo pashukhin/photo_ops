@@ -16,14 +16,46 @@ export interface UsageSummaryDto {
   currency: string;
 }
 
+export interface UsageEventLineDto {
+  occurredAt: string;
+  eventType: string;
+  resourceType: string;
+  quantity: number;
+  unit: string;
+  unitPrice: string;
+  amount: string;
+  currency: string;
+  sourceEntityType: string;
+  sourceEntityId: string;
+}
+
+export interface UsageEventsDto {
+  lines: UsageEventLineDto[];
+  totalCount: number;
+  filteredTotalAmount: string;
+  currency: string;
+}
+
+export interface ListUsageEventsInput {
+  userId: string;
+  occurredFrom: string;
+  occurredTo: string;
+  resourceType: string;
+  eventType: string;
+  page: number;
+  pageSize: number;
+}
+
 export interface UsageGatewayClient {
   getUsageSummary(userId: string): Promise<UsageSummaryDto>;
+  listUsageEvents(input: ListUsageEventsInput): Promise<UsageEventsDto>;
 }
 
 type Callback<T> = (error: Error | null, value: T) => void;
 
 interface GrpcUsageServiceClient {
   GetUsageSummary(input: { userId: string }, callback: Callback<UsageSummaryDto>): void;
+  ListUsageEvents(input: ListUsageEventsInput, callback: Callback<UsageEventsDto>): void;
 }
 
 @Injectable()
@@ -50,6 +82,18 @@ export class UsageClient implements UsageGatewayClient {
   getUsageSummary(userId: string): Promise<UsageSummaryDto> {
     return new Promise((resolve, reject) => {
       this.client.GetUsageSummary({ userId }, (error, value) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(value);
+      });
+    });
+  }
+
+  listUsageEvents(input: ListUsageEventsInput): Promise<UsageEventsDto> {
+    return new Promise((resolve, reject) => {
+      this.client.ListUsageEvents(input, (error, value) => {
         if (error) {
           reject(error);
           return;

@@ -13,20 +13,20 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// SummaryReader is the port the handler drives: fetch a user's raw totals and
-// build the priced summary. GREEN wires this to Store.SumByResource +
-// usage.BuildSummary with the instance's configured pricing provider.
-type SummaryReader interface {
+// UsageReader is the read-path port the handlers drive: the priced summary and
+// the itemized event report. *usage.Reader satisfies it.
+type UsageReader interface {
 	SummaryForUser(ctx context.Context, userID string) (usage.Summary, error)
+	EventsForUser(ctx context.Context, filter usage.EventFilter) (usage.EventReport, error)
 }
 
-// Server adapts SummaryReader to the generated UsageService gRPC interface.
+// Server adapts UsageReader to the generated UsageService gRPC interface.
 type Server struct {
 	pb.UnimplementedUsageServiceServer
-	reader SummaryReader
+	reader UsageReader
 }
 
-func NewServer(reader SummaryReader) *Server {
+func NewServer(reader UsageReader) *Server {
 	return &Server{reader: reader}
 }
 
@@ -61,4 +61,12 @@ func (s *Server) Health(_ context.Context, _ *commonpb.HealthCheckRequest) (*com
 		Status:  "ok",
 		Service: "usage-service",
 	}, nil
+}
+
+// ListUsageEvents fetches one filtered, paginated page of itemized usage lines.
+func (s *Server) ListUsageEvents(ctx context.Context, req *pb.ListUsageEventsRequest) (*pb.ListUsageEventsResponse, error) {
+	// GREEN: map req → usage.EventFilter (parse occurred_from/to RFC3339; page 0→1;
+	// page_size 0→25, clamp 1..100), call s.reader.EventsForUser, map EventReport →
+	// pb response (lines + total_count + filtered_total_amount + currency).
+	panic("not implemented")
 }

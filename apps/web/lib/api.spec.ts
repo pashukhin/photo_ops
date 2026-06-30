@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { completeUpload, createUploadIntent, getPhoto, listPhotos, signUp, uploadFileToPresignedUrl } from './api';
+import { completeUpload, createUploadIntent, getPhoto, getUsageSummary, listPhotos, listUsageEvents, signUp, uploadFileToPresignedUrl } from './api';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -81,6 +81,35 @@ describe('web API helper', () => {
       headers: { 'content-type': 'image/jpeg' },
       body: file
     });
+  });
+
+  it('listUsageEvents builds the events query string from filter params (s012 add-on)', async () => {
+    // why: the report drives date-range / resource / event-type / pagination
+    // server-side; each filter must reach the gateway as its query param.
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(JSON.stringify({ lines: [], totalCount: 0, filteredTotalAmount: '0.00', currency: 'USD' })));
+
+    const result = await listUsageEvents({ from: '2026-01-01', to: '2026-02-01', resourceType: 'storage', eventType: 'photo_processed', page: 2, pageSize: 50 });
+
+    expect(result).toEqual({ lines: [], totalCount: 0, filteredTotalAmount: '0.00', currency: 'USD' });
+    const url = fetchMock.mock.calls[0][0] as string;
+    expect(url).toContain('/v1/usage/events?');
+    expect(url).toContain('from=2026-01-01');
+    expect(url).toContain('to=2026-02-01');
+    expect(url).toContain('resource_type=storage');
+    expect(url).toContain('event_type=photo_processed');
+    expect(url).toContain('page=2');
+    expect(url).toContain('page_size=50');
+  });
+
+  it('getUsageSummary fetches the summary endpoint with credentials (s012 add-on)', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ lines: [], estimatedMonthlyCost: '0.00', currency: 'USD' })));
+
+    const result = await getUsageSummary();
+
+    expect(result).toEqual({ lines: [], estimatedMonthlyCost: '0.00', currency: 'USD' });
+    expect(fetchMock).toHaveBeenCalledWith('http://localhost:3001/v1/usage/summary', expect.objectContaining({ credentials: 'include' }));
   });
 
   it('uses backend error messages for signup failures', async () => {

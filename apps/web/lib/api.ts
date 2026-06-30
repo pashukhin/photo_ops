@@ -168,6 +168,64 @@ export async function getPhoto(_photoId: string): Promise<PhotoAsset> {
   return response.json() as Promise<PhotoAsset>;
 }
 
+// --- Usage report (session 012 add-on) --------------------------------------
+
+export interface UsageSummaryLine {
+  eventType: string;
+  resourceType: string;
+  totalQuantity: number;
+  unit: string;
+}
+
+export interface UsageSummary {
+  lines: UsageSummaryLine[];
+  estimatedMonthlyCost: string;
+  currency: string;
+}
+
+export interface UsageEventLine {
+  occurredAt: string;
+  eventType: string;
+  resourceType: string;
+  quantity: number;
+  unit: string;
+  unitPrice: string;
+  amount: string;
+  currency: string;
+  sourceEntityType: string;
+  sourceEntityId: string;
+}
+
+export interface UsageEvents {
+  lines: UsageEventLine[];
+  totalCount: number;
+  filteredTotalAmount: string;
+  currency: string;
+}
+
+export interface ListUsageEventsParams {
+  from?: string; // ISO date/instant lower bound on occurred_at
+  to?: string; // ISO date/instant upper bound
+  resourceType?: string;
+  eventType?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+// GREEN obligation (s012 add-on): GET `${API_BASE_URL}/v1/usage/summary` with
+// credentials; parse and return the UsageSummary (throw readErrorMessage on !ok).
+export async function getUsageSummary(): Promise<UsageSummary> {
+  throw new Error('not implemented'); // GREEN is the implementer's job
+}
+
+// GREEN obligation (s012 add-on): build a query string from params — `from`,
+// `to`, `resource_type`, `event_type`, `page`, `page_size` — appending each only
+// when present, then GET `${API_BASE_URL}/v1/usage/events[?<query>]` with
+// credentials and parse the UsageEvents (query construction pinned by api.spec.ts).
+export async function listUsageEvents(_params: ListUsageEventsParams = {}): Promise<UsageEvents> {
+  throw new Error('not implemented'); // GREEN is the implementer's job
+}
+
 export async function uploadFileToPresignedUrl(uploadUrl: string, file: File) {
   const response = await fetch(uploadUrl, {
     method: 'PUT',

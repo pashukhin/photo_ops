@@ -14,6 +14,10 @@ type fakeStore struct {
 	seen   map[string]bool
 	rows   []BillingRow
 	totals map[string][]ResourceTotal // per-user aggregates returned by SumByResource
+	// ListEvents / SumByResourceFiltered fixtures (report path):
+	listRows       []BillingRow
+	listTotalCount int
+	filteredTotals []ResourceTotal
 }
 
 func newFakeStore() *fakeStore { return &fakeStore{seen: map[string]bool{}} }
@@ -29,6 +33,14 @@ func (f *fakeStore) RecordOnce(_ context.Context, key string, rows []BillingRow)
 
 func (f *fakeStore) SumByResource(_ context.Context, userID string) ([]ResourceTotal, error) {
 	return f.totals[userID], nil
+}
+
+func (f *fakeStore) ListEvents(_ context.Context, _ EventFilter) ([]BillingRow, int, error) {
+	return f.listRows, f.listTotalCount, nil
+}
+
+func (f *fakeStore) SumByResourceFiltered(_ context.Context, _ EventFilter) ([]ResourceTotal, error) {
+	return f.filteredTotals, nil
 }
 
 func sampleEvent(key string) ConsumptionEvent {

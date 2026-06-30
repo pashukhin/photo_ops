@@ -198,6 +198,283 @@ func (x *UsageLine) GetUnit() string {
 	return ""
 }
 
+type ListUsageEventsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`                   // caller-supplied from the validated session in api-gateway
+	OccurredFrom  string                 `protobuf:"bytes,2,opt,name=occurred_from,json=occurredFrom,proto3" json:"occurred_from,omitempty"` // ISO-8601 inclusive lower bound on occurred_at; "" = unbounded
+	OccurredTo    string                 `protobuf:"bytes,3,opt,name=occurred_to,json=occurredTo,proto3" json:"occurred_to,omitempty"`       // ISO-8601 inclusive upper bound on occurred_at; "" = unbounded
+	ResourceType  string                 `protobuf:"bytes,4,opt,name=resource_type,json=resourceType,proto3" json:"resource_type,omitempty"` // exact match; "" = all
+	EventType     string                 `protobuf:"bytes,5,opt,name=event_type,json=eventType,proto3" json:"event_type,omitempty"`          // exact match; "" = all
+	Page          uint32                 `protobuf:"varint,6,opt,name=page,proto3" json:"page,omitempty"`                                    // 1-based; 0 → 1
+	PageSize      uint32                 `protobuf:"varint,7,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`            // 0 → server default (25), clamped server-side
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListUsageEventsRequest) Reset() {
+	*x = ListUsageEventsRequest{}
+	mi := &file_usage_v1_usage_service_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListUsageEventsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListUsageEventsRequest) ProtoMessage() {}
+
+func (x *ListUsageEventsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_usage_v1_usage_service_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListUsageEventsRequest.ProtoReflect.Descriptor instead.
+func (*ListUsageEventsRequest) Descriptor() ([]byte, []int) {
+	return file_usage_v1_usage_service_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *ListUsageEventsRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *ListUsageEventsRequest) GetOccurredFrom() string {
+	if x != nil {
+		return x.OccurredFrom
+	}
+	return ""
+}
+
+func (x *ListUsageEventsRequest) GetOccurredTo() string {
+	if x != nil {
+		return x.OccurredTo
+	}
+	return ""
+}
+
+func (x *ListUsageEventsRequest) GetResourceType() string {
+	if x != nil {
+		return x.ResourceType
+	}
+	return ""
+}
+
+func (x *ListUsageEventsRequest) GetEventType() string {
+	if x != nil {
+		return x.EventType
+	}
+	return ""
+}
+
+func (x *ListUsageEventsRequest) GetPage() uint32 {
+	if x != nil {
+		return x.Page
+	}
+	return 0
+}
+
+func (x *ListUsageEventsRequest) GetPageSize() uint32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+// One itemized ledger entry with its read-time resolved cost.
+type UsageEventLine struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	OccurredAt       string                 `protobuf:"bytes,1,opt,name=occurred_at,json=occurredAt,proto3" json:"occurred_at,omitempty"` // ISO-8601 instant the operation completed
+	EventType        string                 `protobuf:"bytes,2,opt,name=event_type,json=eventType,proto3" json:"event_type,omitempty"`
+	ResourceType     string                 `protobuf:"bytes,3,opt,name=resource_type,json=resourceType,proto3" json:"resource_type,omitempty"`
+	Quantity         int64                  `protobuf:"varint,4,opt,name=quantity,proto3" json:"quantity,omitempty"`
+	Unit             string                 `protobuf:"bytes,5,opt,name=unit,proto3" json:"unit,omitempty"`
+	UnitPrice        string                 `protobuf:"bytes,6,opt,name=unit_price,json=unitPrice,proto3" json:"unit_price,omitempty"` // decimal string; resolved at read for (provider,resource,unit,occurred_at)
+	Amount           string                 `protobuf:"bytes,7,opt,name=amount,proto3" json:"amount,omitempty"`                        // decimal string: quantity × unit_price
+	Currency         string                 `protobuf:"bytes,8,opt,name=currency,proto3" json:"currency,omitempty"`
+	SourceEntityType string                 `protobuf:"bytes,9,opt,name=source_entity_type,json=sourceEntityType,proto3" json:"source_entity_type,omitempty"`
+	SourceEntityId   string                 `protobuf:"bytes,10,opt,name=source_entity_id,json=sourceEntityId,proto3" json:"source_entity_id,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *UsageEventLine) Reset() {
+	*x = UsageEventLine{}
+	mi := &file_usage_v1_usage_service_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UsageEventLine) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UsageEventLine) ProtoMessage() {}
+
+func (x *UsageEventLine) ProtoReflect() protoreflect.Message {
+	mi := &file_usage_v1_usage_service_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UsageEventLine.ProtoReflect.Descriptor instead.
+func (*UsageEventLine) Descriptor() ([]byte, []int) {
+	return file_usage_v1_usage_service_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *UsageEventLine) GetOccurredAt() string {
+	if x != nil {
+		return x.OccurredAt
+	}
+	return ""
+}
+
+func (x *UsageEventLine) GetEventType() string {
+	if x != nil {
+		return x.EventType
+	}
+	return ""
+}
+
+func (x *UsageEventLine) GetResourceType() string {
+	if x != nil {
+		return x.ResourceType
+	}
+	return ""
+}
+
+func (x *UsageEventLine) GetQuantity() int64 {
+	if x != nil {
+		return x.Quantity
+	}
+	return 0
+}
+
+func (x *UsageEventLine) GetUnit() string {
+	if x != nil {
+		return x.Unit
+	}
+	return ""
+}
+
+func (x *UsageEventLine) GetUnitPrice() string {
+	if x != nil {
+		return x.UnitPrice
+	}
+	return ""
+}
+
+func (x *UsageEventLine) GetAmount() string {
+	if x != nil {
+		return x.Amount
+	}
+	return ""
+}
+
+func (x *UsageEventLine) GetCurrency() string {
+	if x != nil {
+		return x.Currency
+	}
+	return ""
+}
+
+func (x *UsageEventLine) GetSourceEntityType() string {
+	if x != nil {
+		return x.SourceEntityType
+	}
+	return ""
+}
+
+func (x *UsageEventLine) GetSourceEntityId() string {
+	if x != nil {
+		return x.SourceEntityId
+	}
+	return ""
+}
+
+type ListUsageEventsResponse struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	Lines               []*UsageEventLine      `protobuf:"bytes,1,rep,name=lines,proto3" json:"lines,omitempty"`
+	TotalCount          uint32                 `protobuf:"varint,2,opt,name=total_count,json=totalCount,proto3" json:"total_count,omitempty"`                             // total rows matching the filter, ignoring pagination
+	FilteredTotalAmount string                 `protobuf:"bytes,3,opt,name=filtered_total_amount,json=filteredTotalAmount,proto3" json:"filtered_total_amount,omitempty"` // decimal string: summed cost over the WHOLE filter (not just this page)
+	Currency            string                 `protobuf:"bytes,4,opt,name=currency,proto3" json:"currency,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *ListUsageEventsResponse) Reset() {
+	*x = ListUsageEventsResponse{}
+	mi := &file_usage_v1_usage_service_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListUsageEventsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListUsageEventsResponse) ProtoMessage() {}
+
+func (x *ListUsageEventsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_usage_v1_usage_service_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListUsageEventsResponse.ProtoReflect.Descriptor instead.
+func (*ListUsageEventsResponse) Descriptor() ([]byte, []int) {
+	return file_usage_v1_usage_service_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *ListUsageEventsResponse) GetLines() []*UsageEventLine {
+	if x != nil {
+		return x.Lines
+	}
+	return nil
+}
+
+func (x *ListUsageEventsResponse) GetTotalCount() uint32 {
+	if x != nil {
+		return x.TotalCount
+	}
+	return 0
+}
+
+func (x *ListUsageEventsResponse) GetFilteredTotalAmount() string {
+	if x != nil {
+		return x.FilteredTotalAmount
+	}
+	return ""
+}
+
+func (x *ListUsageEventsResponse) GetCurrency() string {
+	if x != nil {
+		return x.Currency
+	}
+	return ""
+}
+
 var File_usage_v1_usage_service_proto protoreflect.FileDescriptor
 
 const file_usage_v1_usage_service_proto_rawDesc = "" +
@@ -214,10 +491,42 @@ const file_usage_v1_usage_service_proto_rawDesc = "" +
 	"event_type\x18\x01 \x01(\tR\teventType\x12#\n" +
 	"\rresource_type\x18\x02 \x01(\tR\fresourceType\x12%\n" +
 	"\x0etotal_quantity\x18\x03 \x01(\x03R\rtotalQuantity\x12\x12\n" +
-	"\x04unit\x18\x04 \x01(\tR\x04unit2\x89\x02\n" +
+	"\x04unit\x18\x04 \x01(\tR\x04unit\"\xec\x01\n" +
+	"\x16ListUsageEventsRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12#\n" +
+	"\roccurred_from\x18\x02 \x01(\tR\foccurredFrom\x12\x1f\n" +
+	"\voccurred_to\x18\x03 \x01(\tR\n" +
+	"occurredTo\x12#\n" +
+	"\rresource_type\x18\x04 \x01(\tR\fresourceType\x12\x1d\n" +
+	"\n" +
+	"event_type\x18\x05 \x01(\tR\teventType\x12\x12\n" +
+	"\x04page\x18\x06 \x01(\rR\x04page\x12\x1b\n" +
+	"\tpage_size\x18\a \x01(\rR\bpageSize\"\xd0\x02\n" +
+	"\x0eUsageEventLine\x12\x1f\n" +
+	"\voccurred_at\x18\x01 \x01(\tR\n" +
+	"occurredAt\x12\x1d\n" +
+	"\n" +
+	"event_type\x18\x02 \x01(\tR\teventType\x12#\n" +
+	"\rresource_type\x18\x03 \x01(\tR\fresourceType\x12\x1a\n" +
+	"\bquantity\x18\x04 \x01(\x03R\bquantity\x12\x12\n" +
+	"\x04unit\x18\x05 \x01(\tR\x04unit\x12\x1d\n" +
+	"\n" +
+	"unit_price\x18\x06 \x01(\tR\tunitPrice\x12\x16\n" +
+	"\x06amount\x18\a \x01(\tR\x06amount\x12\x1a\n" +
+	"\bcurrency\x18\b \x01(\tR\bcurrency\x12,\n" +
+	"\x12source_entity_type\x18\t \x01(\tR\x10sourceEntityType\x12(\n" +
+	"\x10source_entity_id\x18\n" +
+	" \x01(\tR\x0esourceEntityId\"\xc3\x01\n" +
+	"\x17ListUsageEventsResponse\x127\n" +
+	"\x05lines\x18\x01 \x03(\v2!.photoops.usage.v1.UsageEventLineR\x05lines\x12\x1f\n" +
+	"\vtotal_count\x18\x02 \x01(\rR\n" +
+	"totalCount\x122\n" +
+	"\x15filtered_total_amount\x18\x03 \x01(\tR\x13filteredTotalAmount\x12\x1a\n" +
+	"\bcurrency\x18\x04 \x01(\tR\bcurrency2\x8e\x03\n" +
 	"\fUsageService\x12s\n" +
 	"\x06Health\x12&.photoops.common.v1.HealthCheckRequest\x1a'.photoops.common.v1.HealthCheckResponse\"\x18\x82\xd3\xe4\x93\x02\x12\x12\x10/v1/usage/health\x12\x83\x01\n" +
-	"\x0fGetUsageSummary\x12).photoops.usage.v1.GetUsageSummaryRequest\x1a*.photoops.usage.v1.GetUsageSummaryResponse\"\x19\x82\xd3\xe4\x93\x02\x13\x12\x11/v1/usage/summaryB\xd0\x01\n" +
+	"\x0fGetUsageSummary\x12).photoops.usage.v1.GetUsageSummaryRequest\x1a*.photoops.usage.v1.GetUsageSummaryResponse\"\x19\x82\xd3\xe4\x93\x02\x13\x12\x11/v1/usage/summary\x12\x82\x01\n" +
+	"\x0fListUsageEvents\x12).photoops.usage.v1.ListUsageEventsRequest\x1a*.photoops.usage.v1.ListUsageEventsResponse\"\x18\x82\xd3\xe4\x93\x02\x12\x12\x10/v1/usage/eventsB\xd0\x01\n" +
 	"\x15com.photoops.usage.v1B\x11UsageServiceProtoP\x01Z>github.com/photoops/usage-service/internal/pb/usage/v1;usagev1\xa2\x02\x03PUX\xaa\x02\x11Photoops.Usage.V1\xca\x02\x11Photoops\\Usage\\V1\xe2\x02\x1dPhotoops\\Usage\\V1\\GPBMetadata\xea\x02\x13Photoops::Usage::V1b\x06proto3"
 
 var (
@@ -232,25 +541,31 @@ func file_usage_v1_usage_service_proto_rawDescGZIP() []byte {
 	return file_usage_v1_usage_service_proto_rawDescData
 }
 
-var file_usage_v1_usage_service_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_usage_v1_usage_service_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_usage_v1_usage_service_proto_goTypes = []any{
 	(*GetUsageSummaryRequest)(nil),  // 0: photoops.usage.v1.GetUsageSummaryRequest
 	(*GetUsageSummaryResponse)(nil), // 1: photoops.usage.v1.GetUsageSummaryResponse
 	(*UsageLine)(nil),               // 2: photoops.usage.v1.UsageLine
-	(*v1.HealthCheckRequest)(nil),   // 3: photoops.common.v1.HealthCheckRequest
-	(*v1.HealthCheckResponse)(nil),  // 4: photoops.common.v1.HealthCheckResponse
+	(*ListUsageEventsRequest)(nil),  // 3: photoops.usage.v1.ListUsageEventsRequest
+	(*UsageEventLine)(nil),          // 4: photoops.usage.v1.UsageEventLine
+	(*ListUsageEventsResponse)(nil), // 5: photoops.usage.v1.ListUsageEventsResponse
+	(*v1.HealthCheckRequest)(nil),   // 6: photoops.common.v1.HealthCheckRequest
+	(*v1.HealthCheckResponse)(nil),  // 7: photoops.common.v1.HealthCheckResponse
 }
 var file_usage_v1_usage_service_proto_depIdxs = []int32{
 	2, // 0: photoops.usage.v1.GetUsageSummaryResponse.lines:type_name -> photoops.usage.v1.UsageLine
-	3, // 1: photoops.usage.v1.UsageService.Health:input_type -> photoops.common.v1.HealthCheckRequest
-	0, // 2: photoops.usage.v1.UsageService.GetUsageSummary:input_type -> photoops.usage.v1.GetUsageSummaryRequest
-	4, // 3: photoops.usage.v1.UsageService.Health:output_type -> photoops.common.v1.HealthCheckResponse
-	1, // 4: photoops.usage.v1.UsageService.GetUsageSummary:output_type -> photoops.usage.v1.GetUsageSummaryResponse
-	3, // [3:5] is the sub-list for method output_type
-	1, // [1:3] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	4, // 1: photoops.usage.v1.ListUsageEventsResponse.lines:type_name -> photoops.usage.v1.UsageEventLine
+	6, // 2: photoops.usage.v1.UsageService.Health:input_type -> photoops.common.v1.HealthCheckRequest
+	0, // 3: photoops.usage.v1.UsageService.GetUsageSummary:input_type -> photoops.usage.v1.GetUsageSummaryRequest
+	3, // 4: photoops.usage.v1.UsageService.ListUsageEvents:input_type -> photoops.usage.v1.ListUsageEventsRequest
+	7, // 5: photoops.usage.v1.UsageService.Health:output_type -> photoops.common.v1.HealthCheckResponse
+	1, // 6: photoops.usage.v1.UsageService.GetUsageSummary:output_type -> photoops.usage.v1.GetUsageSummaryResponse
+	5, // 7: photoops.usage.v1.UsageService.ListUsageEvents:output_type -> photoops.usage.v1.ListUsageEventsResponse
+	5, // [5:8] is the sub-list for method output_type
+	2, // [2:5] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_usage_v1_usage_service_proto_init() }
@@ -264,7 +579,7 @@ func file_usage_v1_usage_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_usage_v1_usage_service_proto_rawDesc), len(file_usage_v1_usage_service_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

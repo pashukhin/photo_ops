@@ -144,3 +144,14 @@ func (s *PostgresStore) SumByResource(ctx context.Context, userID string) ([]usa
 	}
 	return totals, nil
 }
+
+// ListEvents returns one filtered, paginated page of billing_events rows
+// (ORDER BY occurred_at DESC) plus the total count matching the filter.
+func (s *PostgresStore) ListEvents(ctx context.Context, filter usage.EventFilter) ([]usage.BillingRow, int, error) {
+	panic("not implemented") // GREEN: WHERE user_id + occurred_at range + resource_type + event_type; LIMIT/OFFSET + COUNT(*)
+}
+
+// SumByResourceFiltered is SumByResource restricted to the report filter.
+func (s *PostgresStore) SumByResourceFiltered(ctx context.Context, filter usage.EventFilter) ([]usage.ResourceTotal, error) {
+	panic("not implemented") // GREEN: SumByResource query + the same WHERE filter
+}

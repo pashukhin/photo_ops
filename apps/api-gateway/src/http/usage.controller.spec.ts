@@ -15,7 +15,8 @@ const SUMMARY = {
 
 function createController() {
   const usageClient = {
-    getUsageSummary: vi.fn()
+    getUsageSummary: vi.fn(),
+    listUsageEvents: vi.fn()
   } as unknown as UsageClient;
   const authService = { requireSession: vi.fn().mockResolvedValue({ userId: 'user-1' }) };
   return { controller: new UsageController(usageClient, authService as never), usageClient, authService };
@@ -55,5 +56,60 @@ describe('UsageController', () => {
     vi.mocked(usageClient.getUsageSummary).mockRejectedValue(grpcError);
 
     await expect(controller.getUsageSummary('photoops_session=session-1')).rejects.toMatchObject({ code: GrpcStatus.INTERNAL });
+  });
+
+  const EMPTY_EVENTS = { lines: [], totalCount: 0, filteredTotalAmount: '0.00', currency: 'USD' };
+
+  it('maps the events query to ListUsageEventsInput with the authenticated userId', async () => {
+    // why: the filter query (date range, resource/event type, pagination) maps to
+    // the gRPC input; userId comes from the validated session, not the query.
+    const { controller, usageClient } = createController();
+    vi.mocked(usageClient.listUsageEvents).mockResolvedValue(EMPTY_EVENTS);
+
+    await controller.listUsageEvents('photoops_session=session-1', {
+      from: '2026-01-01T00:00:00Z',
+      to: '2026-02-01T00:00:00Z',
+      resource_type: 'storage',
+      event_type: 'photo_processed',
+      page: '2',
+      page_size: '50'
+    });
+
+    expect(usageClient.listUsageEvents).toHaveBeenCalledWith({
+      userId: 'user-1',
+      occurredFrom: '2026-01-01T00:00:00Z',
+      occurredTo: '2026-02-01T00:00:00Z',
+      resourceType: 'storage',
+      eventType: 'photo_processed',
+      page: 2,
+      pageSize: 50
+    });
+  });
+
+  it('defaults empty events query fields (empty filters; page/pageSize 0 → server clamps)', async () => {
+    // why: absent filters become empty strings / 0; the server applies page→1 and
+    // page_size→25. The gateway does not invent defaults.
+    const { controller, usageClient } = createController();
+    vi.mocked(usageClient.listUsageEvents).mockResolvedValue(EMPTY_EVENTS);
+
+    await controller.listUsageEvents('photoops_session=session-1', {});
+
+    expect(usageClient.listUsageEvents).toHaveBeenCalledWith({
+      userId: 'user-1',
+      occurredFrom: '',
+      occurredTo: '',
+      resourceType: '',
+      eventType: '',
+      page: 0,
+      pageSize: 0
+    });
+  });
+
+  it('rejects unauthenticated events requests with 401', async () => {
+    // why: the events report is session-scoped like the summary.
+    const { controller, authService } = createController();
+    vi.mocked(authService.requireSession).mockRejectedValue(new UnauthorizedException('authentication required'));
+
+    await expect(controller.listUsageEvents(undefined, {})).rejects.toBeInstanceOf(UnauthorizedException);
   });
 });

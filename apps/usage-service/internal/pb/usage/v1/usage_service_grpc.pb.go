@@ -22,6 +22,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	UsageService_Health_FullMethodName          = "/photoops.usage.v1.UsageService/Health"
 	UsageService_GetUsageSummary_FullMethodName = "/photoops.usage.v1.UsageService/GetUsageSummary"
+	UsageService_ListUsageEvents_FullMethodName = "/photoops.usage.v1.UsageService/ListUsageEvents"
 )
 
 // UsageServiceClient is the client API for UsageService service.
@@ -30,6 +31,10 @@ const (
 type UsageServiceClient interface {
 	Health(ctx context.Context, in *v1.HealthCheckRequest, opts ...grpc.CallOption) (*v1.HealthCheckResponse, error)
 	GetUsageSummary(ctx context.Context, in *GetUsageSummaryRequest, opts ...grpc.CallOption) (*GetUsageSummaryResponse, error)
+	// Detailed itemized report: one line per ledger entry (measurement), filtered
+	// and paginated, with per-row resolved cost. The aggregate rollup is
+	// GetUsageSummary; this is the "what and how much" detail.
+	ListUsageEvents(ctx context.Context, in *ListUsageEventsRequest, opts ...grpc.CallOption) (*ListUsageEventsResponse, error)
 }
 
 type usageServiceClient struct {
@@ -60,12 +65,26 @@ func (c *usageServiceClient) GetUsageSummary(ctx context.Context, in *GetUsageSu
 	return out, nil
 }
 
+func (c *usageServiceClient) ListUsageEvents(ctx context.Context, in *ListUsageEventsRequest, opts ...grpc.CallOption) (*ListUsageEventsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListUsageEventsResponse)
+	err := c.cc.Invoke(ctx, UsageService_ListUsageEvents_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // UsageServiceServer is the server API for UsageService service.
 // All implementations should embed UnimplementedUsageServiceServer
 // for forward compatibility.
 type UsageServiceServer interface {
 	Health(context.Context, *v1.HealthCheckRequest) (*v1.HealthCheckResponse, error)
 	GetUsageSummary(context.Context, *GetUsageSummaryRequest) (*GetUsageSummaryResponse, error)
+	// Detailed itemized report: one line per ledger entry (measurement), filtered
+	// and paginated, with per-row resolved cost. The aggregate rollup is
+	// GetUsageSummary; this is the "what and how much" detail.
+	ListUsageEvents(context.Context, *ListUsageEventsRequest) (*ListUsageEventsResponse, error)
 }
 
 // UnimplementedUsageServiceServer should be embedded to have
@@ -80,6 +99,9 @@ func (UnimplementedUsageServiceServer) Health(context.Context, *v1.HealthCheckRe
 }
 func (UnimplementedUsageServiceServer) GetUsageSummary(context.Context, *GetUsageSummaryRequest) (*GetUsageSummaryResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetUsageSummary not implemented")
+}
+func (UnimplementedUsageServiceServer) ListUsageEvents(context.Context, *ListUsageEventsRequest) (*ListUsageEventsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListUsageEvents not implemented")
 }
 func (UnimplementedUsageServiceServer) testEmbeddedByValue() {}
 
@@ -137,6 +159,24 @@ func _UsageService_GetUsageSummary_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _UsageService_ListUsageEvents_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListUsageEventsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UsageServiceServer).ListUsageEvents(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UsageService_ListUsageEvents_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UsageServiceServer).ListUsageEvents(ctx, req.(*ListUsageEventsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // UsageService_ServiceDesc is the grpc.ServiceDesc for UsageService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -151,6 +191,10 @@ var UsageService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetUsageSummary",
 			Handler:    _UsageService_GetUsageSummary_Handler,
+		},
+		{
+			MethodName: "ListUsageEvents",
+			Handler:    _UsageService_ListUsageEvents_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

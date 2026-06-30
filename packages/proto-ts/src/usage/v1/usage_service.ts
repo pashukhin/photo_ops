@@ -38,6 +38,49 @@ export interface UsageLine {
   unit: string;
 }
 
+export interface ListUsageEventsRequest {
+  /** caller-supplied from the validated session in api-gateway */
+  userId: string;
+  /** ISO-8601 inclusive lower bound on occurred_at; "" = unbounded */
+  occurredFrom: string;
+  /** ISO-8601 inclusive upper bound on occurred_at; "" = unbounded */
+  occurredTo: string;
+  /** exact match; "" = all */
+  resourceType: string;
+  /** exact match; "" = all */
+  eventType: string;
+  /** 1-based; 0 → 1 */
+  page: number;
+  /** 0 → server default (25), clamped server-side */
+  pageSize: number;
+}
+
+/** One itemized ledger entry with its read-time resolved cost. */
+export interface UsageEventLine {
+  /** ISO-8601 instant the operation completed */
+  occurredAt: string;
+  eventType: string;
+  resourceType: string;
+  quantity: string;
+  unit: string;
+  /** decimal string; resolved at read for (provider,resource,unit,occurred_at) */
+  unitPrice: string;
+  /** decimal string: quantity × unit_price */
+  amount: string;
+  currency: string;
+  sourceEntityType: string;
+  sourceEntityId: string;
+}
+
+export interface ListUsageEventsResponse {
+  lines: UsageEventLine[];
+  /** total rows matching the filter, ignoring pagination */
+  totalCount: number;
+  /** decimal string: summed cost over the WHOLE filter (not just this page) */
+  filteredTotalAmount: string;
+  currency: string;
+}
+
 export const PHOTOOPS_USAGE_V1_PACKAGE_NAME = "photoops.usage.v1";
 
 function createBaseGetUsageSummaryRequest(): GetUsageSummaryRequest {
@@ -206,10 +249,338 @@ export const UsageLine: MessageFns<UsageLine> = {
   },
 };
 
+function createBaseListUsageEventsRequest(): ListUsageEventsRequest {
+  return { userId: "", occurredFrom: "", occurredTo: "", resourceType: "", eventType: "", page: 0, pageSize: 0 };
+}
+
+export const ListUsageEventsRequest: MessageFns<ListUsageEventsRequest> = {
+  encode(message: ListUsageEventsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.userId !== "") {
+      writer.uint32(10).string(message.userId);
+    }
+    if (message.occurredFrom !== "") {
+      writer.uint32(18).string(message.occurredFrom);
+    }
+    if (message.occurredTo !== "") {
+      writer.uint32(26).string(message.occurredTo);
+    }
+    if (message.resourceType !== "") {
+      writer.uint32(34).string(message.resourceType);
+    }
+    if (message.eventType !== "") {
+      writer.uint32(42).string(message.eventType);
+    }
+    if (message.page !== 0) {
+      writer.uint32(48).uint32(message.page);
+    }
+    if (message.pageSize !== 0) {
+      writer.uint32(56).uint32(message.pageSize);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListUsageEventsRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListUsageEventsRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.userId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.occurredFrom = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.occurredTo = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.resourceType = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.eventType = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.page = reader.uint32();
+          continue;
+        }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.pageSize = reader.uint32();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBaseUsageEventLine(): UsageEventLine {
+  return {
+    occurredAt: "",
+    eventType: "",
+    resourceType: "",
+    quantity: "0",
+    unit: "",
+    unitPrice: "",
+    amount: "",
+    currency: "",
+    sourceEntityType: "",
+    sourceEntityId: "",
+  };
+}
+
+export const UsageEventLine: MessageFns<UsageEventLine> = {
+  encode(message: UsageEventLine, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.occurredAt !== "") {
+      writer.uint32(10).string(message.occurredAt);
+    }
+    if (message.eventType !== "") {
+      writer.uint32(18).string(message.eventType);
+    }
+    if (message.resourceType !== "") {
+      writer.uint32(26).string(message.resourceType);
+    }
+    if (message.quantity !== "0") {
+      writer.uint32(32).int64(message.quantity);
+    }
+    if (message.unit !== "") {
+      writer.uint32(42).string(message.unit);
+    }
+    if (message.unitPrice !== "") {
+      writer.uint32(50).string(message.unitPrice);
+    }
+    if (message.amount !== "") {
+      writer.uint32(58).string(message.amount);
+    }
+    if (message.currency !== "") {
+      writer.uint32(66).string(message.currency);
+    }
+    if (message.sourceEntityType !== "") {
+      writer.uint32(74).string(message.sourceEntityType);
+    }
+    if (message.sourceEntityId !== "") {
+      writer.uint32(82).string(message.sourceEntityId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UsageEventLine {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUsageEventLine();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.occurredAt = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.eventType = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.resourceType = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.quantity = reader.int64().toString();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.unit = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.unitPrice = reader.string();
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.amount = reader.string();
+          continue;
+        }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.currency = reader.string();
+          continue;
+        }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.sourceEntityType = reader.string();
+          continue;
+        }
+        case 10: {
+          if (tag !== 82) {
+            break;
+          }
+
+          message.sourceEntityId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBaseListUsageEventsResponse(): ListUsageEventsResponse {
+  return { lines: [], totalCount: 0, filteredTotalAmount: "", currency: "" };
+}
+
+export const ListUsageEventsResponse: MessageFns<ListUsageEventsResponse> = {
+  encode(message: ListUsageEventsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.lines) {
+      UsageEventLine.encode(v!, writer.uint32(10).fork()).join();
+    }
+    if (message.totalCount !== 0) {
+      writer.uint32(16).uint32(message.totalCount);
+    }
+    if (message.filteredTotalAmount !== "") {
+      writer.uint32(26).string(message.filteredTotalAmount);
+    }
+    if (message.currency !== "") {
+      writer.uint32(34).string(message.currency);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListUsageEventsResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListUsageEventsResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.lines.push(UsageEventLine.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.totalCount = reader.uint32();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.filteredTotalAmount = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.currency = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
 export interface UsageServiceClient {
   health(request: HealthCheckRequest): Observable<HealthCheckResponse>;
 
   getUsageSummary(request: GetUsageSummaryRequest): Observable<GetUsageSummaryResponse>;
+
+  /**
+   * Detailed itemized report: one line per ledger entry (measurement), filtered
+   * and paginated, with per-row resolved cost. The aggregate rollup is
+   * GetUsageSummary; this is the "what and how much" detail.
+   */
+
+  listUsageEvents(request: ListUsageEventsRequest): Observable<ListUsageEventsResponse>;
 }
 
 export interface UsageServiceController {
@@ -220,11 +591,21 @@ export interface UsageServiceController {
   getUsageSummary(
     request: GetUsageSummaryRequest,
   ): Promise<GetUsageSummaryResponse> | Observable<GetUsageSummaryResponse> | GetUsageSummaryResponse;
+
+  /**
+   * Detailed itemized report: one line per ledger entry (measurement), filtered
+   * and paginated, with per-row resolved cost. The aggregate rollup is
+   * GetUsageSummary; this is the "what and how much" detail.
+   */
+
+  listUsageEvents(
+    request: ListUsageEventsRequest,
+  ): Promise<ListUsageEventsResponse> | Observable<ListUsageEventsResponse> | ListUsageEventsResponse;
 }
 
 export function UsageServiceControllerMethods() {
   return function (constructor: Function) {
-    const grpcMethods: string[] = ["health", "getUsageSummary"];
+    const grpcMethods: string[] = ["health", "getUsageSummary", "listUsageEvents"];
     for (const method of grpcMethods) {
       const descriptor: any = Reflect.getOwnPropertyDescriptor(constructor.prototype, method);
       GrpcMethod("UsageService", method)(constructor.prototype[method], method, descriptor);
@@ -261,11 +642,33 @@ export const UsageServiceService = {
       Buffer.from(GetUsageSummaryResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer): GetUsageSummaryResponse => GetUsageSummaryResponse.decode(value),
   },
+  /**
+   * Detailed itemized report: one line per ledger entry (measurement), filtered
+   * and paginated, with per-row resolved cost. The aggregate rollup is
+   * GetUsageSummary; this is the "what and how much" detail.
+   */
+  listUsageEvents: {
+    path: "/photoops.usage.v1.UsageService/ListUsageEvents" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: ListUsageEventsRequest): Buffer =>
+      Buffer.from(ListUsageEventsRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ListUsageEventsRequest => ListUsageEventsRequest.decode(value),
+    responseSerialize: (value: ListUsageEventsResponse): Buffer =>
+      Buffer.from(ListUsageEventsResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ListUsageEventsResponse => ListUsageEventsResponse.decode(value),
+  },
 } as const;
 
 export interface UsageServiceServer extends UntypedServiceImplementation {
   health: handleUnaryCall<HealthCheckRequest, HealthCheckResponse>;
   getUsageSummary: handleUnaryCall<GetUsageSummaryRequest, GetUsageSummaryResponse>;
+  /**
+   * Detailed itemized report: one line per ledger entry (measurement), filtered
+   * and paginated, with per-row resolved cost. The aggregate rollup is
+   * GetUsageSummary; this is the "what and how much" detail.
+   */
+  listUsageEvents: handleUnaryCall<ListUsageEventsRequest, ListUsageEventsResponse>;
 }
 
 export interface MessageFns<T> {

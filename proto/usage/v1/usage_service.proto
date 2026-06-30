@@ -13,6 +13,13 @@ service UsageService {
   rpc GetUsageSummary(GetUsageSummaryRequest) returns (GetUsageSummaryResponse) {
     option (google.api.http) = {get: "/v1/usage/summary"};
   }
+
+  // Detailed itemized report: one line per ledger entry (measurement), filtered
+  // and paginated, with per-row resolved cost. The aggregate rollup is
+  // GetUsageSummary; this is the "what and how much" detail.
+  rpc ListUsageEvents(ListUsageEventsRequest) returns (ListUsageEventsResponse) {
+    option (google.api.http) = {get: "/v1/usage/events"};
+  }
 }
 
 message GetUsageSummaryRequest {
@@ -33,4 +40,35 @@ message UsageLine {
   string resource_type = 2;
   int64 total_quantity = 3;
   string unit = 4;
+}
+
+message ListUsageEventsRequest {
+  string user_id = 1;        // caller-supplied from the validated session in api-gateway
+  string occurred_from = 2;  // ISO-8601 inclusive lower bound on occurred_at; "" = unbounded
+  string occurred_to = 3;    // ISO-8601 inclusive upper bound on occurred_at; "" = unbounded
+  string resource_type = 4;  // exact match; "" = all
+  string event_type = 5;     // exact match; "" = all
+  uint32 page = 6;           // 1-based; 0 → 1
+  uint32 page_size = 7;      // 0 → server default (25), clamped server-side
+}
+
+// One itemized ledger entry with its read-time resolved cost.
+message UsageEventLine {
+  string occurred_at = 1;        // ISO-8601 instant the operation completed
+  string event_type = 2;
+  string resource_type = 3;
+  int64 quantity = 4;
+  string unit = 5;
+  string unit_price = 6;         // decimal string; resolved at read for (provider,resource,unit,occurred_at)
+  string amount = 7;             // decimal string: quantity × unit_price
+  string currency = 8;
+  string source_entity_type = 9;
+  string source_entity_id = 10;
+}
+
+message ListUsageEventsResponse {
+  repeated UsageEventLine lines = 1;
+  uint32 total_count = 2;            // total rows matching the filter, ignoring pagination
+  string filtered_total_amount = 3; // decimal string: summed cost over the WHOLE filter (not just this page)
+  string currency = 4;
 }

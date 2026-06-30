@@ -28,3 +28,17 @@ func (r *Reader) SummaryForUser(ctx context.Context, userID string) (Summary, er
 	}
 	return BuildSummary(totals, r.provider, r.now(), r.resolver), nil
 }
+
+// EventReport is the itemized usage report for one filtered page.
+type EventReport struct {
+	Lines               []EventLine
+	TotalCount          int    // rows matching the filter, ignoring pagination
+	FilteredTotalAmount string // decimal string: summed cost over the WHOLE filter
+	Currency            string
+}
+
+// EventsForUser returns one filtered, paginated page of itemized usage lines
+// (each priced by its own provenance) plus the cost total over the whole filter.
+func (r *Reader) EventsForUser(ctx context.Context, filter EventFilter) (EventReport, error) {
+	panic("not implemented") // GREEN: store.ListEvents -> BuildEventLines; store.SumByResourceFiltered -> BuildSummary -> filtered total
+}

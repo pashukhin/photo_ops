@@ -3,6 +3,7 @@ package usage
 import (
 	"context"
 	"testing"
+	"time"
 )
 
 func TestReaderSummaryForUser_readsThatUsersTotalsAndPricesThem(t *testing.T) {
@@ -44,5 +45,34 @@ func TestReaderSummaryForUser_unknownUserYieldsAWellFormedZeroSummary(t *testing
 	}
 	if s.EstimatedMonthlyCost == "" {
 		t.Error("summary must still carry a decimal cost estimate")
+	}
+}
+
+func TestReaderEventsForUser_pricedPageLinesPlusFilteredTotal(t *testing.T) {
+	// why: the report path returns priced itemized lines for the page plus the
+	// cost total over the WHOLE filter (and the count ignoring pagination).
+	at := time.Date(2026, 6, 30, 12, 0, 0, 0, time.UTC)
+	store := newFakeStore()
+	store.listRows = []BillingRow{
+		{UserID: "u-1", EventType: "photo_original_stored", ResourceType: "storage", Quantity: 5_000_000, Unit: "byte", Provider: "local-demo", SourceEntityType: "photo", SourceEntityID: "p-1", OccurredAt: at},
+	}
+	store.listTotalCount = 7 // more rows match than fit on the page
+	store.filteredTotals = []ResourceTotal{
+		{EventType: "photo_original_stored", ResourceType: "storage", TotalQuantity: 5_000_000, Unit: "byte"},
+	}
+
+	rep, err := NewReader(store, StaticResolver{}, "local-demo").
+		EventsForUser(context.Background(), EventFilter{UserID: "u-1", Page: 1, PageSize: 25})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rep.Lines) != 1 || rep.Lines[0].Quantity != 5_000_000 {
+		t.Fatalf("expected one priced line for the page, got %+v", rep.Lines)
+	}
+	if rep.TotalCount != 7 {
+		t.Errorf("total_count must reflect the full filter (7), got %d", rep.TotalCount)
+	}
+	if rep.FilteredTotalAmount == "" || rep.Currency == "" {
+		t.Errorf("filtered total amount + currency must be set, got %+v", rep)
 	}
 }

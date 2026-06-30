@@ -21,6 +21,13 @@ type Store interface {
 	RecordOnce(ctx context.Context, key string, rows []BillingRow) (recorded bool, err error)
 	// SumByResource returns the per-(event_type, resource_type) totals for a user.
 	SumByResource(ctx context.Context, userID string) ([]ResourceTotal, error)
+	// ListEvents returns one page of ledger rows matching the filter (ORDER BY
+	// occurred_at DESC, paginated) plus the total count matching the filter
+	// (ignoring pagination).
+	ListEvents(ctx context.Context, filter EventFilter) (rows []BillingRow, totalCount int, err error)
+	// SumByResourceFiltered is SumByResource restricted to the same filter — the
+	// basis for the report's filtered-total cost.
+	SumByResourceFiltered(ctx context.Context, filter EventFilter) ([]ResourceTotal, error)
 }
 
 // Ledger records consumption events into an append-only store with charge-once
