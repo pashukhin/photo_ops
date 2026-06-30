@@ -215,7 +215,11 @@ export interface ListUsageEventsParams {
 // GREEN obligation (s012 add-on): GET `${API_BASE_URL}/v1/usage/summary` with
 // credentials; parse and return the UsageSummary (throw readErrorMessage on !ok).
 export async function getUsageSummary(): Promise<UsageSummary> {
-  throw new Error('not implemented'); // GREEN is the implementer's job
+  const response = await fetch(`${API_BASE_URL}/v1/usage/summary`, { credentials: 'include', cache: 'no-store' });
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, `GetUsageSummary failed: ${response.status}`));
+  }
+  return response.json() as Promise<UsageSummary>;
 }
 
 // GREEN obligation (s012 add-on): build a query string from params — `from`,
@@ -223,7 +227,24 @@ export async function getUsageSummary(): Promise<UsageSummary> {
 // when present, then GET `${API_BASE_URL}/v1/usage/events[?<query>]` with
 // credentials and parse the UsageEvents (query construction pinned by api.spec.ts).
 export async function listUsageEvents(_params: ListUsageEventsParams = {}): Promise<UsageEvents> {
-  throw new Error('not implemented'); // GREEN is the implementer's job
+  const params = _params;
+  const qs = new URLSearchParams();
+
+  if (params.from !== undefined) qs.append('from', params.from);
+  if (params.to !== undefined) qs.append('to', params.to);
+  if (params.resourceType !== undefined) qs.append('resource_type', params.resourceType);
+  if (params.eventType !== undefined) qs.append('event_type', params.eventType);
+  if (params.page !== undefined) qs.append('page', String(params.page));
+  if (params.pageSize !== undefined) qs.append('page_size', String(params.pageSize));
+
+  const queryString = qs.toString();
+  const url = queryString ? `${API_BASE_URL}/v1/usage/events?${queryString}` : `${API_BASE_URL}/v1/usage/events`;
+
+  const response = await fetch(url, { credentials: 'include', cache: 'no-store' });
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, `ListUsageEvents failed: ${response.status}`));
+  }
+  return response.json() as Promise<UsageEvents>;
 }
 
 export async function uploadFileToPresignedUrl(uploadUrl: string, file: File) {

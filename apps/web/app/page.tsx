@@ -85,6 +85,7 @@ export default function HomePage() {
     <main>
       <h1>PhotoOps Architecture Frame</h1>
       <p>This is the first executable frame, not the full MVP. It ends with upload/list.</p>
+      <p><a href="/usage">View usage report →</a></p>
       {currentUser ? (
         <>
           <section className="panel">
