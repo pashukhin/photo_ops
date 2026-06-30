@@ -37,5 +37,6 @@ func NewLedger(store Store) *Ledger {
 // event's idempotency_key. A replay of the same key is a no-op
 // (recorded=false). All-or-nothing under the key.
 func (l *Ledger) Record(ctx context.Context, e ConsumptionEvent) (recorded bool, err error) {
-	panic("not implemented") // GREEN is the implementer's job
+	rows := Explode(e)
+	return l.store.RecordOnce(ctx, e.IdempotencyKey, rows)
 }

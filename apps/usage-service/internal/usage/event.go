@@ -47,5 +47,19 @@ type BillingRow struct {
 // Explode maps one ConsumptionEvent into N BillingRows (one per Measurement),
 // carrying the event-level user/provider/occurred_at onto each row. Pure; no I/O.
 func Explode(e ConsumptionEvent) []BillingRow {
-	panic("not implemented") // GREEN is the implementer's job
+	rows := make([]BillingRow, 0, len(e.Measurements))
+	for _, m := range e.Measurements {
+		rows = append(rows, BillingRow{
+			UserID:           e.UserID,
+			EventType:        m.EventType,
+			ResourceType:     m.ResourceType,
+			Quantity:         m.Quantity,
+			Unit:             m.Unit,
+			Provider:         e.Provider,
+			SourceEntityType: m.SourceEntityType,
+			SourceEntityID:   m.SourceEntityID,
+			OccurredAt:       e.OccurredAt,
+		})
+	}
+	return rows
 }
