@@ -44,3 +44,5 @@ playwright-report/
 
 # diff-based coverage report artifacts (make coverage-diff)
 .coverage/
+# pytest-cov binary data files (apps/media-worker/.coverage etc.)
+.coverage

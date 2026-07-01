@@ -1,4 +1,4 @@
-.PHONY: install proto proto-check build build-libs typecheck test lint gate gate-media gate-usage vet-usage lint-usage test-usage test-api test-identity test-photo test-web test-media-worker lint-media-worker dev down reset logs status ps-all logs-svc sh restart-svc up-svc migrate migrate-identity migrate-photo migrate-usage smoke-upload smoke-auth smoke-contract smoke-media smoke-stack smoke-ui smoke-usage coverage coverage-go coverage-diff coverage-selftest
+.PHONY: install proto proto-check build build-libs typecheck test lint gate gate-media gate-usage vet-usage lint-usage test-usage test-api test-identity test-photo test-web test-media-worker lint-media-worker dev down reset logs status ps-all logs-svc sh restart-svc up-svc migrate migrate-identity migrate-photo migrate-usage smoke-upload smoke-auth smoke-contract smoke-media smoke-stack smoke-ui smoke-usage coverage coverage-go coverage-py coverage-diff coverage-selftest
 
 ifneq (,$(wildcard .env))
 include .env
@@ -217,6 +217,23 @@ coverage-go: $(COV_STAMP)
 	  | ../../$(COV_DIR)/.venv/bin/python ../../scripts/coverage/normalize.py \
 	    remap "" apps/usage-service \
 	    > ../../.coverage/go.cobertura.xml'
+
+# Python coverage for media-worker → normalized Cobertura XML (photo_ops-osq Task 3b).
+# --cov=src/media_worker scopes to the REAL package; photoops_proto (generated) is
+# never measured because it is outside that scope.
+# pytest-cov emits bare filenames relative to src/media_worker (e.g. app.py);
+# normalize_cobertura prefixes apps/media-worker/src/media_worker to produce
+# repo-root-relative paths (apps/media-worker/src/media_worker/app.py).
+coverage-py: $(MW_STAMP)
+	@mkdir -p .coverage
+	bash -euo pipefail -c 'cd $(MW_DIR) && \
+	  .venv/bin/python -m pytest --cov=src/media_worker \
+	    --cov-report=xml:../../.coverage/py.cobertura.xml.raw -q && \
+	  python3 ../../scripts/coverage/normalize.py \
+	    apps/media-worker/src/media_worker \
+	    < ../../.coverage/py.cobertura.xml.raw \
+	    > ../../.coverage/py.cobertura.xml && \
+	  rm ../../.coverage/py.cobertura.xml.raw'
 
 # Self-test of the coverage tooling itself (Tasks 1-2 RED tests):
 coverage-selftest: $(COV_STAMP)
