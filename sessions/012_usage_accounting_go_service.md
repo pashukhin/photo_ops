@@ -1,97 +1,133 @@
 # Сессия 012: Go-сервис учёта потребления ресурсов (usage-плоскость)
 
-Статус: **Заготовка (planned).** Эпик: `bd` epic 012 (создаётся при аппруве).
-Блокирует сессию 013 (кластеризация эмитит в этот сервис).
+Статус: **Done — смёржена в `main` (`--no-ff`, PR #1) с ветки
+`session-012-usage-accounting-go-service`.** Выполнена как
+executable-spec / skeleton-first SDD: эфемерный брейншторм → апрувнутый
+skeleton-коммит (спека) → subagent-driven наполнение GREEN (per-task ревью;
+Important-фикс pgx-uuid пойман до smoke) → финальный whole-branch `/code-review`
+= ready-to-merge. `make gate` зелёный (TS + media-worker + usage-service,
+golangci-lint 0); **live e2e зелёный** (`make smoke-usage` против Docker-стека:
+upload → обработка → эмит → ledger → authed-сводка → итемизированные события +
+фильтр; идемпотентность стабильна); CI на `main` зелёный.
+Эпики `photo_ops-2c2` (core) + `photo_ops-pwf` (UI add-on) закрыты;
+`photo_ops-78z` (Go toolchain/CI) закрыт. ADR: `docs/adr/0004-usage-accounting-ledger.md`.
+Сессия **разблокировала 013** (кластеризация эмитит сюда).
 
-> Это **seed-заготовка**: дизайн ещё не выработан. Поэтому 012 стартует с
-> **эфемерного брейншторма → exSDD-skeleton**, а не «исполнить готовое». Ниже —
-> цель, метод и перенесённый контекст/решения (не код).
+> Исходно это была seed-заготовка (дизайн не выработан), поэтому 012 стартовала с
+> брейншторма. Ниже — итог: цель, принятые решения (why — в ADR-0004), что
+> отгружено, верификация и швы. Контракты/код не дублируются прозой — они в
+> proto/миграции/тестах.
 
-## Метод (ОБЯЗАТЕЛЬНО — executable-spec / skeleton-first SDD)
+## Метод (executable-spec / skeleton-first SDD — как исполнено)
 
-Канон: `docs/agent-workflow-evolution.md` Decision 1. Форма:
+Канон: `docs/agent-workflow-evolution.md` Decision 1. Форма (исполнена):
 `эфемерный брейншторм → skeleton-коммит (stub-сигнатуры + RED-тесты +
-proto/миграция) = спека, ревьюится как единица → наполнение GREEN → ADR на why`.
-Маршрутизация: контракты/структура → proto/stubs/миграции; поведение → тесты;
-why → `docs/adr`; **никакого прозо-двойника** (контракты/код не дублируются прозой
-в этом брифе). Чекпойнт — апрув skeleton-коммита. Архитектурно-чувствительно (новый
-bounded context + БД + кросс-сервисный учётный контракт) → полный финальный `/code-review`.
+proto + миграция) = спека, апрув как единица → наполнение GREEN (subagent-driven,
+свежий имплементер на задачу) → ADR на why`. Маршрутизация: контракты/структура →
+proto/stubs/миграции; поведение → тесты; why/инварианты/отвергнутое → `docs/adr` +
+`bd remember` + `## Local invariants`. Архитектурно-чувствительно (новый bounded
+context + БД + кросс-сервисный async-контракт + sync-RPC + новый язык) → полный
+финальный `/code-review`.
 
 ## Цель
 
 > Кросс-сервисная **usage-плоскость на Go**: принимать события потребления ресурсов
-> от операций (обработка, кластеризация, хранилище, публикации), хранить их в
-> append-only леджере с пооперационной атрибуцией и показывать потребление +
-> оценочную стоимость. Учёт, не реальные платежи.
+> от операций, хранить их в append-only леджере с пооперационной атрибуцией и
+> показывать потребление + оценочную стоимость. Учёт, не реальные платежи.
 
 ## Почему Go здесь (решение предыдущей сессии)
 
-Ключ — разнести **измерение** и **агрегацию/биллинг**:
-- **Измерение** идёт в рантайме самой операции (Python-кластеризатор, media-worker
-  и т.п. сами знают свой расход) — там Go не нужен.
-- **Агрегация/учёт/биллинг** — это **cross-cutting плоскость** (потребление идёт
-  отовсюду), которая сама обязана быть **дешёвой и конкурентной** (иначе метеринг
-  раздувает счёт провайдеру — против цели). Это **настоящая вотчина Go**: низкий
-  overhead, предсказуемая память, конкурентность. Сюда же тяготеют оркестровочные
-  шеллы §5 ТЗ (scheduler, billing-aggregator, storage-reconciler, publisher-worker).
-- Вывод: Go не пихаем в математику/CRUD ради полиглотности — его реальный дом здесь.
+Разнести **измерение** и **агрегацию/биллинг**:
+- **Измерение** — в рантайме самой операции (media-worker, кластеризатор сами знают
+  расход); Go там не нужен.
+- **Агрегация/учёт/биллинг** — cross-cutting плоскость (потребление отовсюду),
+  обязана быть дешёвой и конкурентной (иначе метеринг раздувает счёт против цели).
+  Это вотчина Go: низкий overhead, предсказуемая память, конкурентность. Сюда же
+  §5-ТЗ оркестровочные шеллы (scheduler, billing-aggregator, storage-reconciler).
+- Go не пихаем в математику/CRUD ради полиглотности — его дом здесь. (Первый Go-сервис репо.)
 
-## Перенесённый контекст и требования
+## Принятые решения (why — в `docs/adr/0004-usage-accounting-ledger.md`)
 
-- **Бизнес-модели (от владельца):**
-  - demo (бесплатно): лимиты по storage/memory/cpu;
-  - **pay-as-you-go (основная):** платят за реально потреблённые ресурсы (+ наша
-    комиссия), получают **пооперационно детализированные** отчёты;
-  - подписка: производная от pay-as-you-go (в среднем менее выгодна пользователю).
-- **Провайдеро-независимость (анти-vendor-lock):** провайдер неизвестен (возможно,
-  собственное железо). Поэтому учитываем потребление в **сырых провайдеро-независимых
-  единицах** — кандидаты: `byte_seconds` (интеграл памяти по времени, как GB-seconds
-  у Lambda), `cpu_seconds`, `wall_seconds`, объём storage·время, + доменные счётчики.
-  Перевод в деньги (`unit_price`, комиссия, план) — отдельный слой, провайдеро-/плано-
-  специфичный.
-- **ТЗ §3.10 — модель учёта:** события (`photo_original_stored`, `photo_variant_generated`,
-  `photo_processed`, `cluster_generated`, `post_published`, `external_share_created`, …);
-  `BillingEvent{user_id,event_type,resource_type,quantity,unit,unit_price,amount,currency,
-  source_entity_type,source_entity_id,created_at}` — **append-only**; usage dashboard
-  (загружено фото, объём оригиналов/превью, обработано, кластеров, постов, оценочная
-  стоимость/мес). **НЕ в объёме:** Stripe, реальные платежи, подписки-как-платёж,
-  invoices, налоги, обработка отказов оплаты.
-- **Домен-модель:** `usage-service` владеет `usage-db`; `BillingEvent` append-only;
-  `user_id` — UUID v7 без кросс-сервисного FK; source-ссылки — типизированные UUID,
-  могут указывать на чужие сущности.
-- **Готовые швы:** сессия 008 сделала обработку **usage-ready** (не usage-emitting):
-  `processing_jobs` (per-run, typed, succeeded/failed, timestamps), размеры вариантов/
-  оригиналов — usage-service выводит `BillingEvent` **charge-once by job_id**. Сессия 013
-  (кластеризация) **само-измеряется и эмитит событие потребления** сюда.
+- **Emit, не pull.** Операции публикуют `ConsumptionEvent` (proto) в RabbitMQ
+  `usage.events` (канон durable + DLX/DLQ); usage-service консьюмит. Чужие БД не
+  читает (DB-ownership). Зеркало паттерна `photo.process`/`photo.result`.
+- **Леджер — сырые провайдеро-независимые единицы + провенность; деньги — на чтении.**
+  `billing_events` хранит `resource_type/quantity/unit` + `provider` + `occurred_at`;
+  колонок `unit_price/amount/currency` **нет** (осознанное отклонение от ТЗ §6 —
+  ADR-0004). Прайсинг — резолвер на чтении, **отделимый модуль** (будущий pricing-service).
+- **Провенность штампует инстанс-продюсер** (`provider` из env + `occurred_at`);
+  тарифы владеет usage-service (time-effective rate-card по провайдеру — шов). Решает
+  кейс «разные сервисы/инстансы на разных провайдерах по разным сеткам в разное время».
+- **Charge-once** — inbox `processed_events` (`INSERT … ON CONFLICT DO NOTHING` в
+  одной tx с строками леджера); реплей over at-least-once брокера = no-op.
+- **Storage — bytes-level сейчас**, `byte_seconds`-интеграл = storage-reconciler (шов).
+- **Первый продюсер — photo-service** (эмитит на CompleteUpload + успехе обработки,
+  best-effort — эмит не ломает upload/обработку).
 
-## Открытые вопросы для брейншторма 012 (решить в сессии, не здесь)
+## Что отгружено
 
-- **Emit vs pull:** сервисы публикуют события потребления (RabbitMQ) или usage-service
-  тянет из доменных фактов? (008-шов намекает на emit/pull-гибрид; уважать DB-ownership —
-  usage-service не читает чужие БД напрямую.)
-- **Где меряются сырые единицы:** само-измерение в операции (Python) vs оценка из
-  доменных фактов (размеры/счётчики) vs гибрид. Что провайдеро-независимо и дёшево?
-- **Контракт события потребления** (cross-language, proto): поля, идемпотентность
-  (charge-once), атрибуция к операции/пользователю.
-- **Тонкий срез:** вероятно — приём событий + append-only леджер + сводка/оценка по
-  пользователю через gateway; ценообразование/планы/комиссия — швы. Без UI.
-- **Связь с pay-as-you-go отчётностью** (пооперационная детализация) — что минимально.
+- **usage-service (Go):** владеет `usage-db`. `billing_events` (append-only) +
+  `processed_events` (inbox); pgxpool-store; amqp091-consumer (`usage.events`);
+  gRPC `GetUsageSummary` + `ListUsageEvents` + `Health`; `StaticResolver` (прайсинг,
+  отделим). Ядро `internal/usage` — stdlib-only, провайдеро-независимое.
+- **Контракт (proto):** `usage/v1/consumption.proto` (`ConsumptionEvent`/`Measurement` —
+  сырьё + провенность, без денег) + `usage_service.proto` (summary + events RPC).
+- **photo-service:** эмитит события потребления (storage на CompleteUpload; варианты +
+  processed на успехе job), best-effort.
+- **api-gateway:** session-authed `GET /v1/usage/summary` + `GET /v1/usage/events`.
+- **Тулчейн:** Go-lane в `make gate` (`gate-usage`: go vet + golangci-lint + go test) +
+  CI-job + Dockerfile + compose + `migrate-usage`. (`mise` — отложен в `photo_ops-lz1`,
+  конфига нет.) **Bonus:** починен предсуществующий CI-баг `photo_ops-qwg` (typecheck
+  до build → `build-libs` пререквизит; main был красный с ~25 июня).
+- **Docs:** ADR-0004; `docs/domain-model.md` + `docs/architecture.md` обновлены;
+  `docs/e2e-usage-accounting.md`; 2 плана.
+
+## Add-on: детальный usage-отчёт по операциям (эпик `photo_ops-pwf`)
+
+По запросу владельца, тем же exSDD-циклом на той же ветке:
+- **`ListUsageEvents` RPC** — итемизированные строки леджера (одна строка = одно
+  измерение) со стоимостью на строку (`quantity × unit_price`, цена по провенности
+  **самой строки**), фильтры (диапазон `occurred_at`, `resource_type`, `event_type`),
+  пагинация, `filtered_total_amount` по всему фильтру. Гранулярность — line items
+  (без миграции; пооперационный rollup → `photo_ops-8t5`).
+- **gateway** `GET /v1/usage/events` (authed) + **web `/usage`** (Next.js): сводка-шапка +
+  фильтр-бар (даты / тип ресурса / тип операции) + таблица line items + пагинация.
+
+## Верификация (достигнуто)
+
+- Unit (Go): `Explode` (маппинг сырья), `Ledger.Record` (append-only + charge-once
+  реплей), `StaticResolver`, `BuildSummary`, `BuildEventLines`/`EventsForUser`.
+- Unit (TS): `UsageEmitter` (photo-service) — ключи/измерения; gateway query→gRPC
+  маппинг + auth; web `lib/api` query-строка + `UsageReport` (загрузка + рефетч по фильтру).
+- pg-SQL / amqp-топология / grpc / gateway / web-виджеты — smoke/e2e-pinned (in-process
+  DB-тесты = `photo_ops-4vg`, отложены), зеркалит паттерн репо.
+- **`make gate` зелёный**; **`make smoke-usage` зелёный** (полный e2e + events + фильтр);
+  финальный `/code-review` = ready-to-merge (0 Critical/Important; дешёвый id-тайбрейкер применён).
+
+## Follow-ups / швы (беды заведены)
+
+- **Сырые единицы (feedback владельца):** `photo_ops-9u5` (processing → `cpu_seconds`,
+  само-метеринг), `photo_ops-590` (RAM → `byte_seconds`), `photo_ops-n48`
+  (storage → `byte_seconds`, storage-reconciler). Сейчас processing = счётчик `operation`,
+  storage = одноразовый `byte`-уровень.
+- `photo_ops-8t5` (пооперационный rollup отчёта); `photo_ops-rh0` (UI-полиш фильтров:
+  shadcn Combobox, «0 результатов»-хинт, локализация дат).
+- `photo_ops-03x` (amqp-consumer initial-connect retry); `photo_ops-osq` (coverage-тулинг).
+- Прайсинг-швы (ADR-0004): версионируемые/мультипровайдерные rate-cards, материализация/
+  price-snapshot, отдельный pricing-service.
+- `photo_ops-pb6` (OTel/метрики) — **разблокирован** (первый Go gRPC-сервис существует).
 
 ## Зависит от / блокирует
 
-- Блокирует **013** (кластеризация эмитит сюда события потребления).
-- Опирается на: RabbitMQ-паттерн и session-auth gateway (на main); 008-швы (usage-ready).
-
-## Планка верификации (ориентир; финал — в брейншторме/skeleton)
-
-- Unit (Go): леджер append-only + идемпотентность приёма (charge-once); агрегация/
-  оценка по пользователю; маппинг сырых единиц.
-- Component: приём события → запись в леджер; повтор не дублирует.
-- e2e/API через gateway (authed): сводка потребления пользователя.
-- `make gate` (расширить под Go-lane; `photo_ops-78z` — toolchain Go) зелёный; финальный `/code-review`.
+- **Разблокировала 013** (кластеризация само-меряется и эмитит `ConsumptionEvent` в
+  `usage.events`, `idempotency_key = result_id`; контракт — в `bd remember` + ADR-0004).
+- Построена на: RabbitMQ-паттерн + session-auth gateway (main); 008-швы (usage-ready).
 
 ## Ссылки
 
+- ADR (why): `docs/adr/0004-usage-accounting-ledger.md`.
+- Планы (skeleton): `docs/superpowers/plans/2026-06-30-usage-accounting-go-service.md`,
+  `docs/superpowers/plans/2026-06-30-usage-report-ui-addon.md`.
+- e2e-сценарий: `docs/e2e-usage-accounting.md`.
 - Метод: `docs/agent-workflow-evolution.md` (Decision 1).
-- Границы/домен: `docs/architecture.md`, `docs/domain-model.md` (usage-service); ТЗ `project_description.md` §3.10, §4, §6.
-- Связанные беды: `photo_ops-78z` (Go+Python toolchain/CI), `photo_ops-pb6` (OTel/метрики — смежно).
+- Границы/домен: `docs/architecture.md`, `docs/domain-model.md`; ТЗ `project_description.md` §3.10, §4, §6.
