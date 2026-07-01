@@ -11,6 +11,9 @@ node_modules/
 .next/
 dist/
 coverage/
+# ...but keep the diff-coverage tooling package (photo_ops-osq); re-ignore its venv
+!scripts/coverage/
+scripts/coverage/.venv/
 *.tsbuildinfo
 .env
 .env.local
@@ -38,3 +41,6 @@ data/
 # Playwright UI-smoke artifacts (make smoke-ui)
 test-results/
 playwright-report/
+
+# diff-based coverage report artifacts (make coverage-diff)
+.coverage/

@@ -1,4 +1,4 @@
-.PHONY: install proto proto-check build build-libs typecheck test lint gate gate-media gate-usage vet-usage lint-usage test-usage test-api test-identity test-photo test-web test-media-worker lint-media-worker dev down reset logs status ps-all logs-svc sh restart-svc up-svc migrate migrate-identity migrate-photo migrate-usage smoke-upload smoke-auth smoke-contract smoke-media smoke-stack smoke-ui smoke-usage
+.PHONY: install proto proto-check build build-libs typecheck test lint gate gate-media gate-usage vet-usage lint-usage test-usage test-api test-identity test-photo test-web test-media-worker lint-media-worker dev down reset logs status ps-all logs-svc sh restart-svc up-svc migrate migrate-identity migrate-photo migrate-usage smoke-upload smoke-auth smoke-contract smoke-media smoke-stack smoke-ui smoke-usage coverage coverage-diff coverage-selftest
 
 ifneq (,$(wildcard .env))
 include .env
@@ -182,3 +182,25 @@ test-media-worker: $(MW_STAMP)
 
 lint-media-worker: $(MW_STAMP)
 	cd $(MW_DIR) && .venv/bin/ruff check src tests && .venv/bin/mypy src
+
+# Diff-based coverage tooling (photo_ops-osq). Self-contained venv + stamp,
+# mirroring the media-worker pattern above. NOT wired into `gate` (the gate /
+# threshold policy is photo_ops-q2n). See
+# docs/superpowers/specs/2026-07-01-coverage-diff-tooling-design.md
+COV_DIR := scripts/coverage
+COV_STAMP := $(COV_DIR)/.venv/.install-stamp
+
+$(COV_STAMP): $(COV_DIR)/requirements.txt
+	cd $(COV_DIR) && python3 -m venv .venv && .venv/bin/pip install -q -r requirements.txt
+	touch $@
+
+# Skeleton stubs (photo_ops-osq Task 3 fills these GREEN):
+coverage:
+	@echo "coverage: not implemented" >&2; exit 3
+
+coverage-diff: $(COV_STAMP)
+	@echo "coverage-diff target: not implemented" >&2; exit 3
+
+# Self-test of the coverage tooling itself (Tasks 1-2 RED tests):
+coverage-selftest: $(COV_STAMP)
+	$(COV_DIR)/.venv/bin/python -m pytest $(COV_DIR)/tests -q

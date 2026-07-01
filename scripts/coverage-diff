@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# coverage-diff — combine polyglot cobertura reports and score new/changed-code
+# coverage via diff-cover. Contract:
+# docs/superpowers/specs/2026-07-01-coverage-diff-tooling-design.md
+set -euo pipefail
+echo "coverage-diff: not implemented" >&2
+exit 3

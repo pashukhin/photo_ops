@@ -1,0 +1,2 @@
+diff-cover>=9.2
+pytest>=8.3
