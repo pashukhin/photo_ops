@@ -3,5 +3,87 @@
 # coverage via diff-cover. Contract:
 # docs/superpowers/specs/2026-07-01-coverage-diff-tooling-design.md
 set -euo pipefail
-echo "coverage-diff: not implemented" >&2
-exit 3
+
+# ---------------------------------------------------------------------------
+# Resolve diff-cover: prefer the venv next to this script, fall back to PATH
+# ---------------------------------------------------------------------------
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VENV_DIFF_COVER="${SCRIPT_DIR}/coverage/.venv/bin/diff-cover"
+if [[ -x "${VENV_DIFF_COVER}" ]]; then
+    DIFF_COVER="${VENV_DIFF_COVER}"
+elif command -v diff-cover &>/dev/null; then
+    DIFF_COVER="diff-cover"
+else
+    echo "coverage-diff: diff-cover not found (tried ${VENV_DIFF_COVER} and PATH)" >&2
+    exit 1
+fi
+
+# ---------------------------------------------------------------------------
+# Defaults from environment, overridable by flags
+# ---------------------------------------------------------------------------
+BASE="${COVERAGE_BASE:-main}"
+FAIL_UNDER="${COVERAGE_FAIL_UNDER:-0}"
+REPORT=".coverage/diff.md"
+SKIP_GENERATE=0
+COVERAGE_FILES=()
+
+# ---------------------------------------------------------------------------
+# Parse arguments
+# ---------------------------------------------------------------------------
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --base)
+            BASE="$2"; shift 2 ;;
+        --fail-under)
+            FAIL_UNDER="$2"; shift 2 ;;
+        --coverage-file)
+            COVERAGE_FILES+=("$2"); shift 2 ;;
+        --skip-generate)
+            SKIP_GENERATE=1; shift ;;
+        --report)
+            REPORT="$2"; shift 2 ;;
+        *)
+            echo "coverage-diff: unknown argument: $1" >&2
+            exit 1 ;;
+    esac
+done
+
+# ---------------------------------------------------------------------------
+# Collect coverage reports
+# ---------------------------------------------------------------------------
+if [[ "${SKIP_GENERATE}" -eq 0 ]]; then
+    # TODO(task-3): run per-language coverage generation here and collect
+    # auto-discovered Cobertura XML reports (with normalize.py), then append
+    # them to COVERAGE_FILES. For now, only --coverage-file is supported.
+    if [[ ${#COVERAGE_FILES[@]} -eq 0 ]]; then
+        echo "coverage-diff: no coverage files provided and --skip-generate not set; Task 3 generation not yet implemented" >&2
+        exit 1
+    fi
+fi
+
+if [[ ${#COVERAGE_FILES[@]} -eq 0 ]]; then
+    echo "coverage-diff: no coverage files provided (use --coverage-file)" >&2
+    exit 1
+fi
+
+# ---------------------------------------------------------------------------
+# Create report parent directory
+# ---------------------------------------------------------------------------
+REPORT_DIR="$(dirname "${REPORT}")"
+mkdir -p "${REPORT_DIR}"
+
+# ---------------------------------------------------------------------------
+# Run diff-cover, capture stdout (text report) and preserve exit code
+# ---------------------------------------------------------------------------
+set +e
+"${DIFF_COVER}" "${COVERAGE_FILES[@]}" \
+    --compare-branch "${BASE}" \
+    --fail-under "${FAIL_UNDER}" \
+    > "${REPORT}" 2>&1
+DC_EXIT=$?
+set -e
+
+# Echo the report to stdout so callers can see it
+cat "${REPORT}"
+
+exit "${DC_EXIT}"
