@@ -62,6 +62,7 @@ if [[ "${SKIP_GENERATE}" -eq 0 ]]; then
 fi
 
 if [[ ${#COVERAGE_FILES[@]} -eq 0 ]]; then
+    # guard for --skip-generate without any --coverage-file
     echo "coverage-diff: no coverage files provided (use --coverage-file)" >&2
     exit 1
 fi
@@ -73,17 +74,14 @@ REPORT_DIR="$(dirname "${REPORT}")"
 mkdir -p "${REPORT_DIR}"
 
 # ---------------------------------------------------------------------------
-# Run diff-cover, capture stdout (text report) and preserve exit code
+# Run diff-cover, write markdown report, and preserve exit code
 # ---------------------------------------------------------------------------
 set +e
 "${DIFF_COVER}" "${COVERAGE_FILES[@]}" \
     --compare-branch "${BASE}" \
     --fail-under "${FAIL_UNDER}" \
-    > "${REPORT}" 2>&1
+    --format "markdown:${REPORT}"
 DC_EXIT=$?
 set -e
-
-# Echo the report to stdout so callers can see it
-cat "${REPORT}"
 
 exit "${DC_EXIT}"
