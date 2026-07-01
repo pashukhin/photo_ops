@@ -9,21 +9,10 @@ def normalize_cobertura(xml_text: str, source_root: str) -> str:
     """Return `xml_text` with <sources> collapsed to the repo root ('.') and
     each <class filename=...> prefixed by `source_root` (the report's dir
     relative to the repo root, e.g. 'apps/web'), so diff-cover matches
-    git-diff paths. Line hit data is preserved unchanged."""
-    tree = ET.ElementTree(ET.fromstring(xml_text))
-    root = tree.getroot()
+    git-diff paths. Line hit data is preserved unchanged.
 
-    # Replace all <source> elements with "."
-    for source in root.findall(".//sources/source"):
-        source.text = "."
-
-    # Prefix each <class filename=...> with source_root
-    for cls in root.findall(".//class"):
-        filename = cls.get("filename")
-        if filename is not None:
-            cls.set("filename", f"{source_root}/{filename}")
-
-    return ET.tostring(root, encoding="unicode")
+    Thin alias for remap_cobertura_paths with an empty old_prefix."""
+    return remap_cobertura_paths(xml_text, "", source_root)
 
 
 def remap_cobertura_paths(xml_text: str, old_prefix: str, new_prefix: str) -> str:
@@ -66,6 +55,9 @@ if __name__ == "__main__":
     mode = sys.argv[1] if len(sys.argv) > 1 else "prefix"
     if mode == "remap":
         # Usage: normalize.py remap <old_prefix> <new_prefix> < report.xml
+        if len(sys.argv) < 4:
+            print("usage: normalize.py remap <old_prefix> <new_prefix> < report.xml", file=sys.stderr)
+            sys.exit(2)
         sys.stdout.write(remap_cobertura_paths(sys.stdin.read(), sys.argv[2], sys.argv[3]))
     else:
         # Usage: normalize.py <source_root> < report.xml  (original prefix mode)

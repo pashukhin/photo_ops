@@ -51,13 +51,20 @@ def _run(repo, *args):
 
 
 def test_fails_under_threshold_and_reports_uncovered_new_line(tmp_path):
-    # why: 50% new-code coverage < 100 must fail and the report must name the file.
+    # why: 50% new-code coverage < 100 must fail and the markdown report must
+    # name the file and the uncovered NEW line. diff-cover's markdown escapes
+    # the dot in the raw text (src/app&#46;py, which renders as src/app.py), so
+    # assert on artifacts that survive escaping: the "## <file>" markdown header
+    # (absent from diff-cover's plain-text format -> this pins markdown output)
+    # and the uncovered line number.
     repo = _make_repo(tmp_path)
     r = _run(repo, "--fail-under", "100")
     report = repo / ".coverage" / "diff.md"
     assert r.returncode != 0
     assert report.exists()
-    assert "src/app.py" in report.read_text()
+    content = report.read_text()
+    assert "## src/app" in content
+    assert "Missing lines 4" in content
 
 
 def test_passes_at_zero_threshold(tmp_path):

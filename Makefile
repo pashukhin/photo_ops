@@ -209,13 +209,14 @@ coverage-diff: $(COV_STAMP)
 # repo-root-relative paths (apps/usage-service/internal/…) for diff-cover.
 coverage-go: $(COV_STAMP)
 	@mkdir -p .coverage
-	cd apps/usage-service && \
-	  GOTOOLCHAIN=local go test -covermode=atomic -coverprofile=../../.coverage/go.out ./... && \
+	bash -euo pipefail -c 'cd apps/usage-service && \
+	  GOTOOLCHAIN=local go test -covermode=atomic -coverprofile=../../.coverage/go.out \
+	    $$(go list ./... | grep -v '"'"'/internal/pb'"'"') && \
 	  GOTOOLCHAIN=local go run github.com/boumenot/gocover-cobertura@v1.2.0 \
 	    < ../../.coverage/go.out \
 	  | ../../$(COV_DIR)/.venv/bin/python ../../scripts/coverage/normalize.py \
 	    remap "" apps/usage-service \
-	    > ../../.coverage/go.cobertura.xml
+	    > ../../.coverage/go.cobertura.xml'
 
 # Self-test of the coverage tooling itself (Tasks 1-2 RED tests):
 coverage-selftest: $(COV_STAMP)
