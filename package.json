@@ -13,6 +13,7 @@
     "@bufbuild/buf": "^1.50.0",
     "@eslint/js": "^10.0.1",
     "@next/eslint-plugin-next": "^16.2.9",
+    "@vitest/coverage-v8": "2.1.9",
     "eslint": "^10.5.0",
     "globals": "^17.7.0",
     "typescript-eslint": "^8.62.0"

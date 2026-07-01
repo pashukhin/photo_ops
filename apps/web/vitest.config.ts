@@ -1,5 +1,5 @@
 import path from 'path';
-import { configDefaults, defineConfig } from 'vitest/config';
+import { configDefaults, coverageConfigDefaults, defineConfig } from 'vitest/config';
 
 // Web tests run in jsdom so React component behavior (rendering, clicks, modal
 // open, polling) can be exercised with @testing-library/react. Pure helpers and
@@ -16,6 +16,21 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./vitest.setup.ts'],
-    exclude: [...configDefaults.exclude, 'smoke/**']
+    exclude: [...configDefaults.exclude, 'smoke/**'],
+    coverage: {
+      // Extend the default excludes with Next.js build artifacts and config
+      // files not included in vitest's default coverage exclude list.
+      // Required for `make coverage-ts` (photo_ops-osq Task 3c) to produce
+      // clean cobertura output with only real repo source paths.
+      exclude: [
+        ...coverageConfigDefaults.exclude,
+        '.next/**',
+        'next.config.js',
+        'postcss.config.mjs',
+        'playwright.config.ts',
+        'next-env.d.ts',
+        'smoke/**'
+      ]
+    }
   }
 });

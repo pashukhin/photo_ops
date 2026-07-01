@@ -1,4 +1,4 @@
-.PHONY: install proto proto-check build build-libs typecheck test lint gate gate-media gate-usage vet-usage lint-usage test-usage test-api test-identity test-photo test-web test-media-worker lint-media-worker dev down reset logs status ps-all logs-svc sh restart-svc up-svc migrate migrate-identity migrate-photo migrate-usage smoke-upload smoke-auth smoke-contract smoke-media smoke-stack smoke-ui smoke-usage coverage coverage-go coverage-py coverage-diff coverage-selftest
+.PHONY: install proto proto-check build build-libs typecheck test lint gate gate-media gate-usage vet-usage lint-usage test-usage test-api test-identity test-photo test-web test-media-worker lint-media-worker dev down reset logs status ps-all logs-svc sh restart-svc up-svc migrate migrate-identity migrate-photo migrate-usage smoke-upload smoke-auth smoke-contract smoke-media smoke-stack smoke-ui smoke-usage coverage coverage-go coverage-py coverage-ts coverage-diff coverage-selftest
 
 ifneq (,$(wildcard .env))
 include .env
@@ -234,6 +234,42 @@ coverage-py: $(MW_STAMP)
 	    < ../../.coverage/py.cobertura.xml.raw \
 	    > ../../.coverage/py.cobertura.xml && \
 	  rm ../../.coverage/py.cobertura.xml.raw'
+
+# TypeScript (vitest) coverage for the five TS workspaces → normalized Cobertura
+# XML (photo_ops-osq Task 3c). vitest v2.1.9 with @vitest/coverage-v8 emits
+# workspace-relative filenames (e.g. src/cors.ts) with the absolute workspace
+# dir as <source>; normalize_cobertura (prefix mode) converts to repo-root-
+# relative paths (apps/api-gateway/src/cors.ts) for diff-cover.
+# apps/web has an extended coverage.exclude in vitest.config.ts that adds .next/
+# and Next.js config files to the default exclude list.
+# apps/publication-service and apps/connector-service are skipped (no-op tests).
+# packages/proto-ts is skipped (generated code, no tests).
+coverage-ts: $(COV_STAMP)
+	@mkdir -p .coverage
+	bash -euo pipefail -c '\
+	  FAIL=0; \
+	  for WS_DIR in apps/api-gateway apps/photo-service apps/identity-service apps/web packages/observability; do \
+	    WS_SLUG=$$(basename $$WS_DIR); \
+	    TMP_DIR=.coverage/tmp-ts-$$WS_SLUG; \
+	    OUT_FILE=.coverage/ts-$$WS_SLUG.cobertura.xml; \
+	    echo "coverage-ts: running $$WS_DIR ..."; \
+	    if pnpm --filter @photoops/$$WS_SLUG exec vitest run \
+	        --coverage \
+	        --coverage.provider=v8 \
+	        --coverage.reporter=cobertura \
+	        "--coverage.reportsDirectory=../../$$TMP_DIR" \
+	        2>&1; then \
+	      python3 scripts/coverage/normalize.py $$WS_DIR \
+	        < $$TMP_DIR/cobertura-coverage.xml \
+	        > $$OUT_FILE && \
+	      rm -rf $$TMP_DIR && \
+	      echo "coverage-ts: $$WS_DIR -> $$OUT_FILE OK"; \
+	    else \
+	      echo "coverage-ts: WARN $$WS_DIR coverage failed (exit $$?), skipping" >&2; \
+	      FAIL=$$((FAIL + 1)); \
+	    fi; \
+	  done; \
+	  if [ $$FAIL -gt 0 ]; then echo "coverage-ts: $$FAIL workspace(s) failed" >&2; exit 1; fi'
 
 # Self-test of the coverage tooling itself (Tasks 1-2 RED tests):
 coverage-selftest: $(COV_STAMP)
