@@ -1,4 +1,4 @@
-.PHONY: install proto proto-check build build-libs typecheck test lint gate gate-media gate-usage vet-usage lint-usage test-usage test-api test-identity test-photo test-web test-media-worker lint-media-worker dev down reset logs status ps-all logs-svc sh restart-svc up-svc migrate migrate-identity migrate-photo migrate-usage smoke-upload smoke-auth smoke-contract smoke-media smoke-stack smoke-ui smoke-usage coverage coverage-diff coverage-selftest
+.PHONY: install proto proto-check build build-libs typecheck test lint gate gate-media gate-usage vet-usage lint-usage test-usage test-api test-identity test-photo test-web test-media-worker lint-media-worker dev down reset logs status ps-all logs-svc sh restart-svc up-svc migrate migrate-identity migrate-photo migrate-usage smoke-upload smoke-auth smoke-contract smoke-media smoke-stack smoke-ui smoke-usage coverage coverage-go coverage-diff coverage-selftest
 
 ifneq (,$(wildcard .env))
 include .env
@@ -200,6 +200,22 @@ coverage:
 
 coverage-diff: $(COV_STAMP)
 	@echo "coverage-diff target: not implemented" >&2; exit 3
+
+# Go coverage for usage-service → normalized Cobertura XML (photo_ops-osq Task 3a).
+# gocover-cobertura v1.2.0 is pinned (latest v1.5.0 requires go >=1.25; this
+# module is pinned to go 1.23 — do not bump the toolchain).
+# gocover-cobertura v1.2.0 emits workspace-relative filenames with the
+# absolute workspace dir as <source>; remap_cobertura_paths converts to
+# repo-root-relative paths (apps/usage-service/internal/…) for diff-cover.
+coverage-go: $(COV_STAMP)
+	@mkdir -p .coverage
+	cd apps/usage-service && \
+	  GOTOOLCHAIN=local go test -covermode=atomic -coverprofile=../../.coverage/go.out ./... && \
+	  GOTOOLCHAIN=local go run github.com/boumenot/gocover-cobertura@v1.2.0 \
+	    < ../../.coverage/go.out \
+	  | ../../$(COV_DIR)/.venv/bin/python ../../scripts/coverage/normalize.py \
+	    remap "" apps/usage-service \
+	    > ../../.coverage/go.cobertura.xml
 
 # Self-test of the coverage tooling itself (Tasks 1-2 RED tests):
 coverage-selftest: $(COV_STAMP)
