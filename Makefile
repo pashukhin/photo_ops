@@ -1,4 +1,4 @@
-.PHONY: install proto proto-check build typecheck test lint gate gate-media gate-usage vet-usage lint-usage test-usage test-api test-identity test-photo test-web test-media-worker lint-media-worker dev down reset logs status ps-all logs-svc sh restart-svc up-svc migrate migrate-identity migrate-photo migrate-usage smoke-upload smoke-auth smoke-contract smoke-media smoke-stack smoke-ui smoke-usage
+.PHONY: install proto proto-check build build-libs typecheck test lint gate gate-media gate-usage vet-usage lint-usage test-usage test-api test-identity test-photo test-web test-media-worker lint-media-worker dev down reset logs status ps-all logs-svc sh restart-svc up-svc migrate migrate-identity migrate-photo migrate-usage smoke-upload smoke-auth smoke-contract smoke-media smoke-stack smoke-ui smoke-usage
 
 ifneq (,$(wildcard .env))
 include .env
@@ -22,7 +22,15 @@ proto-check:
 build:
 	pnpm build
 
-typecheck:
+# Workspace libraries (packages/*) must be built before any service typechecks:
+# their package.json points types/main at dist/ (gitignored), so a clean env — CI
+# (typecheck runs before build) or local after a dist wipe — fails TS2307 on
+# @photoops/observability / @photoops/proto-ts. Building the libs first is the fix
+# (photo_ops-qwg); packages are small so the cost is negligible.
+build-libs:
+	pnpm -r --filter './packages/*' --if-present build
+
+typecheck: build-libs
 	pnpm typecheck
 
 test:
