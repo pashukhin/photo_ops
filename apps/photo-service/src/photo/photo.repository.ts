@@ -117,6 +117,11 @@ export class PhotoRepository implements PhotoRepositoryPort {
     return rows.length === 1;
   }
 
+  async findJobById(jobId: string): Promise<ProcessingJobRecord | null> {
+    const [row] = await this.db.select().from(processingJobs).where(eq(processingJobs.id, jobId)).limit(1);
+    return row ? this.toJobRecord(row) : null;
+  }
+
   async finalizeJob(jobId: string, outcome: 'succeeded' | 'failed', errorMessage?: string): Promise<boolean> {
     const rows = await this.db
       .update(processingJobs)

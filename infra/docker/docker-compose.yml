@@ -86,6 +86,7 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
       MINIO_BUCKET: ${MINIO_BUCKET}
       RABBITMQ_URL: ${RABBITMQ_URL}
+      USAGE_PROVIDER: local-demo
     depends_on:
       postgres:
         condition: service_healthy
@@ -109,9 +110,11 @@ services:
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE}
       WEB_ORIGIN: ${WEB_ORIGIN}
       PHOTO_SERVICE_GRPC_URL: photo-service:${PHOTO_SERVICE_GRPC_PORT}
+      USAGE_SERVICE_GRPC_URL: usage-service:${USAGE_SERVICE_GRPC_PORT}
     depends_on:
       - identity-service
       - photo-service
+      - usage-service
     ports:
       - "3001:3001"
 
@@ -163,8 +166,19 @@ services:
     build:
       context: ../..
       dockerfile: apps/usage-service/Dockerfile
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      USAGE_DATABASE_URL: ${USAGE_DATABASE_URL}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+      USAGE_SERVICE_GRPC_PORT: ${USAGE_SERVICE_GRPC_PORT}
+      USAGE_PROVIDER: ${USAGE_PROVIDER:-local-demo}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     ports:
-      - "3013:3013"
+      - "${USAGE_SERVICE_GRPC_PORT}:${USAGE_SERVICE_GRPC_PORT}"
 
   connector-service:
     build:

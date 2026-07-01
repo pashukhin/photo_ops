@@ -72,6 +72,7 @@ function createService() {
     createProcessingJob: vi.fn(),
     markProcessingForUser: vi.fn(),
     finalizeJob: vi.fn(),
+    findJobById: vi.fn(),
     upsertVariant: vi.fn(),
     applyAttributes: vi.fn(),
     setStatus: vi.fn(),
@@ -85,15 +86,19 @@ function createService() {
   };
   const publisher = { publish: vi.fn() };
   const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), setContext: vi.fn() };
+  const usageEmitter = { emitOriginalStored: vi.fn(), emitProcessingConsumption: vi.fn() };
   // Sensible defaults so completeUpload's processing kickoff runs in tests that
   // don't exercise it directly (won the uploaded->processing transition).
   repository.markProcessingForUser.mockResolvedValue(true);
   repository.createProcessingJob.mockResolvedValue({ id: 'job-default' });
+  repository.findJobById.mockResolvedValue({ id: 'job-default', userId: 'user-1' });
   // Default: no variants (so listPhotos tests don't crash).
   repository.listVariantsForPhotos.mockResolvedValue([]);
   storage.createPresignedGetUrl.mockResolvedValue('signed://x');
-  const service = new PhotoDomainService(repository, storage, publisher, logger as never);
-  return { service, repository, storage, publisher, logger };
+  usageEmitter.emitOriginalStored.mockResolvedValue(undefined);
+  usageEmitter.emitProcessingConsumption.mockResolvedValue(undefined);
+  const service = new PhotoDomainService(repository, storage, publisher, logger as never, usageEmitter as never);
+  return { service, repository, storage, publisher, logger, usageEmitter };
 }
 
 describe('PhotoDomainService', () => {
@@ -351,6 +356,59 @@ describe('PhotoDomainService', () => {
     repository.finalizeJob.mockResolvedValue(true);
     await service.finalizeResult({ jobId: 'j1', photoId: 'p1', outcome: 'failed', errorMessage: 'bad', variants: [], metadataJson: '' });
     expect(repository.setStatus).toHaveBeenCalledWith('p1', 'failed');
+  });
+
+  it('completeUpload success: emits emitOriginalStored once with correct args', async () => {
+    // why: usage accounting requires a usage event per upload completion;
+    // emitting is best-effort and must not block the upload flow.
+    const { service, repository, storage, usageEmitter } = createService();
+    const photo = { id: 'photo-1', userId: 'user-1', sizeBytes: 5000n, objectKey: 'originals/photo-1/photo.jpg', status: 'uploading', createdAt: new Date(), updatedAt: new Date() };
+    repository.findByIdForUser.mockResolvedValue(photo);
+    repository.markUploadedForUser.mockResolvedValue({ ...photo, status: 'uploaded' });
+    storage.objectExists.mockResolvedValue(true);
+
+    await service.completeUpload('user-1', 'photo-1');
+
+    expect(usageEmitter.emitOriginalStored).toHaveBeenCalledOnce();
+    expect(usageEmitter.emitOriginalStored).toHaveBeenCalledWith({ photoId: 'photo-1', userId: 'user-1', sizeBytes: 5000n });
+  });
+
+  it('completeUpload: emit failure is swallowed (best-effort)', async () => {
+    // why: a usage publish failure must not break the upload flow.
+    const { service, repository, storage, usageEmitter } = createService();
+    const photo = { id: 'photo-1', userId: 'user-1', sizeBytes: 100n, objectKey: 'originals/photo-1/photo.jpg', status: 'uploading', createdAt: new Date(), updatedAt: new Date() };
+    repository.findByIdForUser.mockResolvedValue(photo);
+    repository.markUploadedForUser.mockResolvedValue({ ...photo, status: 'uploaded' });
+    storage.objectExists.mockResolvedValue(true);
+    usageEmitter.emitOriginalStored.mockRejectedValue(new Error('broker down'));
+
+    // Should NOT throw even though the emitter failed.
+    await expect(service.completeUpload('user-1', 'photo-1')).resolves.not.toThrow();
+  });
+
+  it('finalizeResult SUCCEEDED: emits emitProcessingConsumption once', async () => {
+    // why: processing consumption must be reported on success.
+    const { service, repository, usageEmitter } = createService();
+    repository.finalizeJob.mockResolvedValue(true);
+    repository.findJobById.mockResolvedValue({ id: 'job-1', userId: 'u-2' });
+
+    const result = { jobId: 'job-1', photoId: 'p-1', outcome: 'succeeded' as const,
+      attributes: {}, variants: [{ variantType: 'thumbnail' as const, objectKey: 'k', width: 10, height: 10, sizeBytes: 100n, contentType: 'image/jpeg' }], metadataJson: '{}' };
+
+    await service.finalizeResult(result);
+
+    expect(usageEmitter.emitProcessingConsumption).toHaveBeenCalledOnce();
+    expect(usageEmitter.emitProcessingConsumption).toHaveBeenCalledWith({ result, userId: 'u-2' });
+  });
+
+  it('finalizeResult FAILED: does NOT emit emitProcessingConsumption', async () => {
+    // why: failed processing must not generate a usage charge.
+    const { service, repository, usageEmitter } = createService();
+    repository.finalizeJob.mockResolvedValue(true);
+
+    await service.finalizeResult({ jobId: 'job-1', photoId: 'p-1', outcome: 'failed', errorMessage: 'bad', variants: [], metadataJson: '' });
+
+    expect(usageEmitter.emitProcessingConsumption).not.toHaveBeenCalled();
   });
 
   it('publishes the active traceparent as the job correlation id', async () => {

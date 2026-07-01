@@ -1,4 +1,4 @@
-.PHONY: install proto proto-check build typecheck test lint gate gate-media test-api test-identity test-photo test-web test-media-worker lint-media-worker dev down reset logs status ps-all logs-svc sh restart-svc up-svc migrate migrate-identity migrate-photo smoke-upload smoke-auth smoke-contract smoke-media smoke-stack smoke-ui
+.PHONY: install proto proto-check build build-libs typecheck test lint gate gate-media gate-usage vet-usage lint-usage test-usage test-api test-identity test-photo test-web test-media-worker lint-media-worker dev down reset logs status ps-all logs-svc sh restart-svc up-svc migrate migrate-identity migrate-photo migrate-usage smoke-upload smoke-auth smoke-contract smoke-media smoke-stack smoke-ui smoke-usage
 
 ifneq (,$(wildcard .env))
 include .env
@@ -17,12 +17,20 @@ proto:
 
 proto-check:
 	pnpm proto
-	git diff --exit-code -- packages/proto-ts apps/media-worker/src/photoops_proto
+	git diff --exit-code -- packages/proto-ts apps/media-worker/src/photoops_proto apps/usage-service/internal/pb
 
 build:
 	pnpm build
 
-typecheck:
+# Workspace libraries (packages/*) must be built before any service typechecks:
+# their package.json points types/main at dist/ (gitignored), so a clean env — CI
+# (typecheck runs before build) or local after a dist wipe — fails TS2307 on
+# @photoops/observability / @photoops/proto-ts. Building the libs first is the fix
+# (photo_ops-qwg); packages are small so the cost is negligible.
+build-libs:
+	pnpm -r --filter './packages/*' --if-present build
+
+typecheck: build-libs
 	pnpm typecheck
 
 test:
@@ -38,12 +46,26 @@ lint:
 # target is the equivalent. Run it before pushing instead of re-typing the
 # sub-targets or remembering to verify the media-worker by hand (s008: media
 # checks were run ad-hoc OUTSIDE the gate — see photo_ops-uil).
-gate: proto-check typecheck lint build test gate-media
-	@echo "gate: all checks passed (TS + media-worker)"
+gate: proto-check typecheck lint build test gate-media gate-usage
+	@echo "gate: all checks passed (TS + media-worker + usage-service)"
 
 # Python half of the gate: lint + tests for the media-worker. Kept as a named
 # target so it composes into `gate` and can also be run on its own.
 gate-media: lint-media-worker test-media-worker
+
+# Go half of the gate: usage-service (first Go service, s012). Mirrors CI's
+# usage-service job. golangci-lint promoted to GREEN (Task 7): bodies are real,
+# generated pb/ excluded via .golangci.yml.
+gate-usage: vet-usage lint-usage test-usage
+
+vet-usage:
+	cd apps/usage-service && go vet ./...
+
+lint-usage:
+	cd apps/usage-service && GOTOOLCHAIN=local golangci-lint run ./...
+
+test-usage:
+	cd apps/usage-service && go test ./...
 
 test-api:
 	pnpm --filter @photoops/api-gateway test
@@ -98,7 +120,7 @@ up-svc:
 	@test -n "$(svc)" || { echo "usage: make up-svc svc=<service ...>"; exit 2; }
 	$(DC) up -d --build $(svc)
 
-migrate: migrate-identity migrate-photo
+migrate: migrate-identity migrate-photo migrate-usage
 
 migrate-identity:
 	$(DC) exec -T postgres psql -U "$${POSTGRES_SUPERUSER}" -d postgres < infra/postgres/init/001-create-databases.sql
@@ -108,6 +130,10 @@ migrate-photo:
 	$(DC) exec -T postgres psql -U "$${POSTGRES_SUPERUSER}" -d postgres < infra/postgres/init/001-create-databases.sql
 	$(DC) exec -T postgres psql "$${PHOTO_DATABASE_URL}" < apps/photo-service/migrations/0001_create_photo_assets.sql
 	$(DC) exec -T postgres psql "$${PHOTO_DATABASE_URL}" < apps/photo-service/migrations/0002_media_processing.sql
+
+migrate-usage:
+	$(DC) exec -T postgres psql -U "$${POSTGRES_SUPERUSER}" -d postgres < infra/postgres/init/001-create-databases.sql
+	$(DC) exec -T postgres psql "$${USAGE_DATABASE_URL}" < apps/usage-service/migrations/0001_create_usage_tables.sql
 
 smoke-upload:
 	scripts/smoke-upload.sh
@@ -133,6 +159,11 @@ smoke-stack:
 
 smoke-ui:
 	scripts/smoke-ui.sh
+
+# Local-only — requires `make dev` + `make migrate` to be running.
+# Do NOT add to `gate` or CI targets.
+smoke-usage:
+	scripts/smoke-usage.sh
 
 # media-worker venv: created/refreshed only when pyproject.toml changes. The
 # stamp is a REAL file target (not .PHONY), so make skips the venv+install on

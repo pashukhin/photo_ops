@@ -348,9 +348,9 @@ Decision:
 
 Owner: `usage-service`
 
-Description: an append-only usage ledger entry recording resource consumption or product actions that may later feed cost estimates and monetization.
+Description: an append-only usage ledger entry recording resource consumption or product actions that feed cost estimates and monetization. Implemented by `usage-service` on the session-012 branch.
 
-Projected fields:
+Implemented fields (physical — `usage-db.billing_events`):
 
 - `id`
 - `user_id`
@@ -358,18 +358,19 @@ Projected fields:
 - `resource_type`
 - `quantity`
 - `unit`
-- `unit_price`
-- `amount`
-- `currency`
+- `provider` — pricing context that produced the event (e.g. `local-demo`); carried from `ConsumptionEvent.provider`
 - `source_entity_type`
 - `source_entity_id`
+- `occurred_at`
 - `created_at`
 
 Rules:
 
-- Billing events are append-only.
+- Billing events are append-only; rows are never updated or deleted.
 - `user_id` references `identity-service` without a cross-service foreign key.
 - Source entity references are typed UUID values and may point to entities owned by other services.
+- Money columns (`unit_price`, `amount`, `currency`) are **not** stored in the ledger — they are resolved at read time by the pricing layer (`internal/usage.Resolver`). See ADR-0004.
+- Charge-once on intake: a companion `processed_events` table deduplicates by `idempotency_key` in the same transaction; redelivery is a no-op.
 
 ### PublicationAttempt
 
@@ -414,5 +415,5 @@ Rules:
 | `Post` | `publication-service` | `publication-db` | No |
 | `PostPhoto` | `publication-service` | `publication-db` | No |
 | `Note` | Deferred | Deferred | No |
-| `BillingEvent` | `usage-service` | `usage-db` | No |
+| `BillingEvent` | `usage-service` | `usage-db` | Yes (session-012 branch) |
 | `PublicationAttempt` | `connector-service` | `connector-db` | No |
