@@ -1,4 +1,4 @@
-.PHONY: install proto proto-check build build-libs typecheck test lint gate gate-media gate-usage vet-usage lint-usage test-usage test-api test-identity test-photo test-web test-media-worker lint-media-worker dev down reset logs status ps-all logs-svc sh restart-svc up-svc migrate migrate-identity migrate-photo migrate-usage smoke-upload smoke-auth smoke-contract smoke-media smoke-stack smoke-ui smoke-usage coverage coverage-go coverage-py coverage-ts coverage-diff coverage-selftest
+.PHONY: install proto proto-check build build-libs typecheck test lint gate gate-media gate-usage vet-usage lint-usage test-usage test-api test-identity test-photo test-web test-media-worker lint-media-worker dev down reset logs status ps-all logs-svc sh restart-svc up-svc migrate migrate-identity migrate-photo migrate-usage smoke-upload smoke-auth smoke-contract smoke-media smoke-stack smoke-ui smoke-usage smoke-coverage coverage coverage-go coverage-py coverage-ts coverage-diff coverage-selftest
 
 ifneq (,$(wildcard .env))
 include .env
@@ -164,6 +164,10 @@ smoke-ui:
 # Do NOT add to `gate` or CI targets.
 smoke-usage:
 	scripts/smoke-usage.sh
+
+# Local-only; regenerates coverage; do NOT add to `gate` or CI.
+smoke-coverage:
+	scripts/smoke-coverage.sh
 
 # media-worker venv: created/refreshed only when pyproject.toml changes. The
 # stamp is a REAL file target (not .PHONY), so make skips the venv+install on
