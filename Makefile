@@ -194,12 +194,13 @@ $(COV_STAMP): $(COV_DIR)/requirements.txt
 	cd $(COV_DIR) && python3 -m venv .venv && .venv/bin/pip install -q -r requirements.txt
 	touch $@
 
-# Skeleton stubs (photo_ops-osq Task 3 fills these GREEN):
-coverage:
-	@echo "coverage: not implemented" >&2; exit 3
+# Aggregate all per-language coverage reports (photo_ops-osq Task 3d-i).
+coverage: coverage-go coverage-py coverage-ts
 
-coverage-diff: $(COV_STAMP)
-	@echo "coverage-diff target: not implemented" >&2; exit 3
+# Score new/changed-code coverage via diff-cover (auto-discovers .coverage/*.cobertura.xml).
+# NOT wired into `gate`. COVERAGE_BASE / COVERAGE_FAIL_UNDER are env-overridable.
+coverage-diff: coverage $(COV_STAMP)
+	scripts/coverage-diff
 
 # Go coverage for usage-service → normalized Cobertura XML (photo_ops-osq Task 3a).
 # gocover-cobertura v1.2.0 is pinned (latest v1.5.0 requires go >=1.25; this

@@ -52,12 +52,20 @@ done
 # Collect coverage reports
 # ---------------------------------------------------------------------------
 if [[ "${SKIP_GENERATE}" -eq 0 ]]; then
-    # TODO(task-3): run per-language coverage generation here and collect
-    # auto-discovered Cobertura XML reports (with normalize.py), then append
-    # them to COVERAGE_FILES. For now, only --coverage-file is supported.
+    # Auto-discover existing Cobertura XML reports written by `make coverage`.
+    # Generation is the Makefile's job — this script never calls `make`.
     if [[ ${#COVERAGE_FILES[@]} -eq 0 ]]; then
-        echo "coverage-diff: no coverage files provided and --skip-generate not set; Task 3 generation not yet implemented" >&2
-        exit 1
+        # Use nullglob so an unmatched glob yields an empty array, not a literal
+        # string. We do this in the current shell (not a subshell) so the
+        # COVERAGE_FILES array is populated for the rest of the script.
+        shopt -s nullglob
+        discovered=(.coverage/*.cobertura.xml)
+        shopt -u nullglob
+        if [[ ${#discovered[@]} -eq 0 ]]; then
+            echo "coverage-diff: no .coverage/*.cobertura.xml found — run \`make coverage\` first" >&2
+            exit 1
+        fi
+        COVERAGE_FILES+=("${discovered[@]}")
     fi
 fi
 

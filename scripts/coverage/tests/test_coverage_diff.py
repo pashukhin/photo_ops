@@ -72,3 +72,24 @@ def test_passes_at_zero_threshold(tmp_path):
     repo = _make_repo(tmp_path)
     r = _run(repo, "--fail-under", "0")
     assert r.returncode == 0
+
+
+def test_auto_discovery_finds_cobertura_in_coverage_dir(tmp_path):
+    # why: when --skip-generate is NOT set and no --coverage-file is given, the
+    # script must glob .coverage/*.cobertura.xml and use whatever it finds.
+    # This locks the auto-discovery path added in Task 3d-i.
+    repo = _make_repo(tmp_path)
+    cov_dir = repo / ".coverage"
+    cov_dir.mkdir(parents=True, exist_ok=True)
+    probe = cov_dir / "probe.cobertura.xml"
+    probe.write_text(COBERTURA)
+
+    # Run WITHOUT --skip-generate and WITHOUT --coverage-file so auto-discovery runs.
+    r = subprocess.run(
+        [str(SCRIPT), "--base", "main", "--fail-under", "0",
+         "--report", ".coverage/diff.md"],
+        cwd=repo, capture_output=True, text=True,
+    )
+    report = repo / ".coverage" / "diff.md"
+    assert r.returncode == 0, f"exit {r.returncode}\nstdout={r.stdout}\nstderr={r.stderr}"
+    assert report.exists(), "diff.md not written"
