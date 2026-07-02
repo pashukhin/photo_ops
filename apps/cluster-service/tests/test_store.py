@@ -55,6 +55,20 @@ def test_failed_run_never_becomes_ready() -> None:
     assert s.get(result_id="r1", user_id="u1").status == "failed"
 
 
+def test_finalized_result_is_immutable() -> None:
+    s = InMemoryStore()
+    _pending(s)
+    s.save_tree(result_id="r1", tree=_tree(), consumption_json="{}")
+    s.mark_ready(result_id="r1")
+    # once ready, save_tree and mark_failed are no-ops (immutable snapshot)
+    s.save_tree(result_id="r1", tree=_tree(), consumption_json="ignored")
+    s.mark_failed(result_id="r1", error_message="ignored")
+    r = s.get(result_id="r1", user_id="u1")
+    assert r.status == "ready"
+    assert r.consumption_json == "{}"
+    assert r.error_message == ""
+
+
 def test_mark_failed() -> None:
     s = InMemoryStore()
     _pending(s)

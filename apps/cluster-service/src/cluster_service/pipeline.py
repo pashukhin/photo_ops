@@ -7,8 +7,12 @@ not_clusterable concern; it is driven here by `descriptor.required_photo_fields`
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+from datetime import datetime
 
-from .model import ClusterTree, PhotoPoint
+from .fingerprint import input_fingerprint
+from .methods.base import get
+from .model import ClusterTree, NodeKind, PhotoPoint, TreeNode
+from .tree import pick_cover, time_span
 
 # proto field name -> PhotoPoint attribute that must be non-None for a photo to
 # be clusterable under a method requiring that field.
@@ -41,15 +45,45 @@ def run_clustering(
 ) -> ClusterTree:
     """Run one clustering method over `points` and return the full immutable tree.
 
-    Contract (GREEN — photo_ops-9dk):
-    - Resolve the method from the registry (unknown id → UnknownMethodError).
-    - Merge `params` over the method's defaults.
-    - partition() out not-clusterable photos by the method's required fields.
-    - Sort the clusterable photos deterministically by (taken_at, photo_id).
-    - method.cluster(...) yields the top-level clustered nodes.
-    - Assemble a ROOT node over those nodes plus, if any, one NOT_CLUSTERABLE
-      node holding the excluded photos as items; fill root aggregates.
-    - fingerprint over ALL input points (incl. not_clusterable).
-    - photo_count == len(points).
+    Generic assembly (the algorithm lives in method.cluster): resolve the method,
+    partition out not-clusterable photos, deterministically order the rest, let the
+    method build the top-level nodes, then wrap them (plus a NOT_CLUSTERABLE bucket)
+    under a ROOT with subtree aggregates and an input fingerprint.
     """
-    raise NotImplementedError("run_clustering — GREEN pending (photo_ops-9dk)")
+    method = get(method_id)  # unknown id → UnknownMethodError
+    merged = {**method.descriptor.default_params, **params}
+    clusterable, unclusterable = partition(points, method.descriptor.required_photo_fields)
+    ordered = sorted(
+        clusterable,
+        key=lambda p: (p.taken_at is None, p.taken_at or datetime.min, p.photo_id),
+    )
+
+    children: list[TreeNode] = list(method.cluster(ordered, merged, id_factory))
+
+    if unclusterable:
+        excluded = sorted(unclusterable, key=lambda p: p.photo_id)
+        children.append(
+            TreeNode(
+                id=id_factory(),
+                kind=NodeKind.NOT_CLUSTERABLE,
+                photo_count=len(excluded),
+                cover_photo_id=pick_cover(excluded),
+                items=[p.photo_id for p in excluded],
+            )
+        )
+
+    date_from, date_to = time_span(points)
+    root = TreeNode(
+        id=id_factory(),
+        kind=NodeKind.ROOT,
+        photo_count=len(points),
+        date_from=date_from,
+        date_to=date_to,
+        cover_photo_id=pick_cover(clusterable) or pick_cover(points),
+        children=children,
+    )
+    return ClusterTree(
+        root=root,
+        input_fingerprint=input_fingerprint(method_id, merged, points),
+        photo_count=len(points),
+    )

@@ -37,6 +37,8 @@ def test_time_span() -> None:
 
     assert lo == BASE
     assert hi == BASE + timedelta(minutes=30)
+    # no point has a time → (None, None)
+    assert time_span([make_point("x", minutes=None)]) == (None, None)
 
 
 def test_build_segment_tree_single_leaf(id_factory) -> None:

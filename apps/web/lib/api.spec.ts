@@ -150,6 +150,14 @@ describe('web API helper', () => {
     expect(fetchMock).toHaveBeenCalledWith('http://localhost:3001/v1/clustering-results/r1', expect.objectContaining({ credentials: 'include' }));
   });
 
+  it('clustering client throws on non-ok responses (session 013)', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(() => Promise.resolve(new Response('nope', { status: 500 })));
+    await expect(generateClusters({ method: 'time_only' })).rejects.toThrow(/GenerateClusters failed/);
+    await expect(getClusteringResult('r1')).rejects.toThrow(/GetClusteringResult failed/);
+    await expect(listClusteringResults()).rejects.toThrow(/ListClusteringResults failed/);
+    await expect(listClusteringMethods()).rejects.toThrow(/ListClusteringMethods failed/);
+  });
+
   it('uses backend error messages for signup failures', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ code: 'conflict', message: 'email already exists' }), {

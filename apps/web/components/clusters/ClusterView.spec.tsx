@@ -104,4 +104,57 @@ describe('ClusterView', () => {
     );
     await screen.findByText('Canon EOS R5');
   });
+
+  it('shows an empty state when there are no results', async () => {
+    vi.mocked(api.listClusteringResults).mockResolvedValue({ results: [] });
+    render(<ClusterView />);
+    await screen.findByText('No clustering results yet.');
+  });
+
+  it('surfaces a generate error', async () => {
+    vi.mocked(api.generateClusters).mockRejectedValue(new Error('boom'));
+    render(<ClusterView />);
+    fireEvent.click(await screen.findByText('Generate clusters'));
+    await screen.findByText(/boom/);
+  });
+
+  it('renders a failed result with its error message', async () => {
+    vi.mocked(api.getClusteringResult).mockResolvedValue({
+      ...TREE,
+      status: 'failed',
+      errorMessage: 'kaput',
+      root: null
+    });
+    render(<ClusterView />);
+    fireEvent.click(await screen.findByTestId('result-row'));
+    await screen.findByText('kaput');
+  });
+
+  it('renders a node without a date span', async () => {
+    vi.mocked(api.getClusteringResult).mockResolvedValue({
+      ...TREE,
+      root: { ...TREE.root, dateFrom: '', dateTo: '', children: [], items: ['solo'] }
+    });
+    render(<ClusterView />);
+    fireEvent.click(await screen.findByTestId('result-row'));
+    await screen.findByText(/solo/); // dateless node renders (no-date-span branch)
+  });
+
+  it('shows "not ready" when a result has no root yet', async () => {
+    vi.mocked(api.getClusteringResult).mockResolvedValue({ ...TREE, root: null });
+    render(<ClusterView />);
+    fireEvent.click(await screen.findByTestId('result-row'));
+    await screen.findByText('Not ready.');
+  });
+
+  it('polls a pending result until it is ready', async () => {
+    // first poll returns pending; after CLUSTER_POLL_MS the second returns ready
+    vi.mocked(api.getClusteringResult)
+      .mockResolvedValueOnce({ ...TREE, status: 'pending', root: null })
+      .mockResolvedValue(TREE);
+    render(<ClusterView />);
+    fireEvent.click(await screen.findByText('Generate clusters'));
+    await screen.findByText('Canon EOS R5', undefined, { timeout: 5000 });
+    expect(vi.mocked(api.getClusteringResult).mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
 });

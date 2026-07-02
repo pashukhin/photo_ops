@@ -38,27 +38,28 @@ def test_input_fingerprint_order_independent_and_sensitive() -> None:
     assert input_fingerprint("time_only", {}, [a]) != fp1
 
 
-def test_run_clustering_not_clusterable_bucket(id_factory) -> None:
+def test_run_clustering_not_clusterable_bucket(fake_method, id_factory) -> None:
+    # generic assembly (fake method): a no-time photo goes to a NOT_CLUSTERABLE
+    # bucket, the rest are clustered, and the run does not abort.
     pts = [
         make_point("a", minutes=0),
         make_point("b", minutes=2),
         make_point("u", minutes=None),  # no time → not clusterable
     ]
-    tree = run_clustering(pts, "time_only", {}, id_factory)
+    tree = run_clustering(pts, "fake", {}, id_factory)
     assert tree.root.kind == NodeKind.ROOT
     assert tree.photo_count == 3
     nc = [c for c in tree.root.children if c.kind == NodeKind.NOT_CLUSTERABLE]
     assert len(nc) == 1
     assert nc[0].items == ["u"]
-    # the clusterable photos are under non-not_clusterable children
     clustered = [c for c in tree.root.children if c.kind != NodeKind.NOT_CLUSTERABLE]
     assert sorted(pid for c in clustered for pid in collect_items(c)) == ["a", "b"]
 
 
-def test_run_clustering_is_deterministic(id_factory) -> None:
+def test_run_clustering_is_deterministic(fake_method, id_factory) -> None:
     pts = [make_point("a", minutes=0), make_point("b", minutes=1), make_point("c", minutes=300)]
-    t1 = run_clustering(pts, "time_only", {}, id_factory)
-    t2 = run_clustering(list(reversed(pts)), "time_only", {}, id_factory)
+    t1 = run_clustering(pts, "fake", {}, id_factory)
+    t2 = run_clustering(list(reversed(pts)), "fake", {}, id_factory)
     assert shape(t1.root) == shape(t2.root)
     assert t1.input_fingerprint == t2.input_fingerprint
 

@@ -27,6 +27,18 @@ testpaths = ["tests"]
 # Service code is imported as `cluster_service.*` (src on path).
 pythonpath = ["src", "src/photoops_proto"]
 
+[tool.coverage.run]
+# Thin IO adapters + process entrypoints are `# pragma: no cover` and exercised by
+# the live smoke (make smoke-cluster), not unit tests — omit them from the report
+# so the coverage gate scores only unit-testable logic.
+omit = [
+  "*/server_main.py",
+  "*/worker_main.py",
+  "*/photo_client.py",
+  "*/store_postgres.py",
+  "*/messaging/rabbitmq.py",
+]
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"

@@ -9,7 +9,11 @@ from cluster_service.codec import decode_result, encode_job
 from cluster_service.messaging.in_memory import BusMessage, InMemoryBus
 from cluster_service.model import PhotoPoint
 from cluster_service.store import InMemoryStore
-from cluster_service.worker import ClusterWorker
+from cluster_service.worker import ClusterWorker, _utc_now_iso
+
+
+def test_utc_now_iso_is_iso_instant() -> None:
+    assert "T" in _utc_now_iso()
 
 
 class FakeReader:
@@ -25,21 +29,22 @@ class FailingReader:
         raise RuntimeError("photo-service unavailable")
 
 
-def _pending(store: InMemoryStore) -> None:
+def _pending(store: InMemoryStore, method: str = "fake") -> None:
     store.create_pending(
-        result_id="r1", user_id="u1", method="time_only", params_json="{}", scope="all"
+        result_id="r1", user_id="u1", method=method, params_json="{}", scope="all"
     )
 
 
-def _job() -> BusMessage:
+def _job(method: str = "fake") -> BusMessage:
     return BusMessage(
-        body=encode_job(result_id="r1", user_id="u1", method="time_only", params_json="{}"),
+        body=encode_job(result_id="r1", user_id="u1", method=method, params_json="{}"),
         correlation_id="c1",
     )
 
 
-def test_worker_success_persists_and_publishes(id_factory) -> None:
-    # RED until compute GREEN (photo_ops-9dk): pins the SUCCESS path.
+def test_worker_success_persists_and_publishes(fake_method, id_factory) -> None:
+    # Success path over the generic pipeline (fake method): persist the tree,
+    # publish a SUCCEEDED result, and emit one consumption event.
     store = InMemoryStore()
     _pending(store)
     bus = InMemoryBus()

@@ -74,6 +74,13 @@ def test_get_result_is_owner_scoped() -> None:
     assert ctx.code == grpc.StatusCode.NOT_FOUND
 
 
+def test_health() -> None:
+    svc, _, _ = _servicer()
+    resp = svc.Health(None, FakeContext())
+    assert resp.status == "ok"
+    assert resp.service == "cluster-service"
+
+
 def test_list_methods_lists_time_only() -> None:
     svc, _, _ = _servicer()
     resp = svc.ListClusteringMethods(pb.ListClusteringMethodsRequest(), FakeContext())
