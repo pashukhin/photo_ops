@@ -219,48 +219,90 @@ Rules:
 - Location starts as a photo-domain reverse-geocoding cache/reference.
 - Do not extract a separate location service until another domain needs independent location ownership.
 
-### PhotoCluster
+The clustering result is a **tree**, not a flat grouping: a `ClusteringResult`
+run owns a tree of `ClusterNode`s, and a photo's membership is a leaf-level
+`ClusterItem`. Session 013 ships this model (Python `cluster-service`); the why
+is ADR-0005.
+
+### ClusteringResult
 
 Owner: `cluster-service`
 
-Description: a deterministic grouping of photos by time and place. It helps turn a large photo bank into reviewable trip or event segments.
+Description: one immutable clustering run over a user's photos — the root of a
+deterministic cluster tree (time-only in the first slice; space-time is a seam).
+Re-clustering produces a new co-existing result; results are never mutated.
+
+Physical storage: `cluster-db.clustering_results`
 
 Projected fields:
 
-- `id`
+- `id` (== the async job id)
 - `user_id`
-- `title`
-- `location_label`
-- `date_from`
-- `date_to`
+- `method` (registry id, e.g. `time_only`)
+- `params_json`
+- `scope`
+- `input_fingerprint`
+- `status` (`pending` | `ready` | `failed`)
+- `error_message`
 - `photo_count`
-- `cover_photo_id`
-- `algorithm_version`
-- `parameters_json`
+- `consumption_json` (seam — raw self-metering snapshot)
+- `deleted_at` (seam — restore-able soft-delete; ops deferred)
 - `created_at`
 
 Rules:
 
 - `user_id` references `identity-service` without a cross-service foreign key.
-- `cover_photo_id` references a `photo-service` photo without a cross-service foreign key.
-- Clusters are read-only generated results in the MVP.
+- A result is immutable once `ready`; re-clustering creates a new result.
+- Deterministic in (input photos + method + params); clustering is on-demand and
+  never recomputes prior results when photos are added.
 
-### PhotoClusterItem
+### ClusterNode
 
 Owner: `cluster-service`
 
-Description: the membership and ordering of one photo inside a generated cluster.
+Description: one node of a result's immutable tree. Internal / segment / root
+nodes carry children; leaves carry the photo memberships. Node ids are per-run
+UUID v7 (stable so a future `notes-service` can reference nodes/edges).
+
+Physical storage: `cluster-db.cluster_nodes`
 
 Projected fields:
 
-- `cluster_id`
-- `photo_id`
-- `order`
+- `id`, `result_id`, `parent_id` (NULL = root)
+- `kind` (`root` | `internal` | `leaf` | `not_clusterable` | `segment`)
+- `merge_distance` (dendrogram merge height)
+- `date_from`, `date_to`
+- `photo_count` (subtree aggregate)
+- `cover_photo_id`
+- `segment_label` (device label for a `segment` node)
+- `anomaly` (seam — `spacelike` overlay for the future space-time method)
+- `ordinal`, `created_at`
 
 Rules:
 
-- `photo_id` references `photo-service` without a cross-service foreign key.
-- Cluster membership is changed by reclustering, not manual user edits in the MVP.
+- `cover_photo_id` references a `photo-service` photo without a cross-service foreign key.
+- Photos missing a method's required fields (e.g. no capture time) go into a
+  top-level `not_clusterable` node; the run is not aborted.
+
+### ClusterItem
+
+Owner: `cluster-service`
+
+Description: the membership ("link") of one photo at its entry (leaf) node.
+
+Physical storage: `cluster-db.cluster_items`
+
+Projected fields:
+
+- `node_id`
+- `photo_id`
+- `ordinal`
+
+Rules:
+
+- `photo_id` references `photo-service` without a cross-service foreign key;
+  deleting the original just dangles the link (the cluster is unaffected).
+- Membership changes only by reclustering (a new result), never in place.
 
 ### Post
 
@@ -410,8 +452,9 @@ Rules:
 | `PhotoAsset` | `photo-service` | `photo-db` | Yes, with `user_id` ownership |
 | `PhotoVariant` | `photo-service` | `photo-db` | No |
 | `Location` | `photo-service` | `photo-db` | No |
-| `PhotoCluster` | `cluster-service` | `cluster-db` | No |
-| `PhotoClusterItem` | `cluster-service` | `cluster-db` | No |
+| `ClusteringResult` | `cluster-service` | `cluster-db` | Yes (session-013 branch) |
+| `ClusterNode` | `cluster-service` | `cluster-db` | Yes (session-013 branch) |
+| `ClusterItem` | `cluster-service` | `cluster-db` | Yes (session-013 branch) |
 | `Post` | `publication-service` | `publication-db` | No |
 | `PostPhoto` | `publication-service` | `publication-db` | No |
 | `Note` | Deferred | Deferred | No |
