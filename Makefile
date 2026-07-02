@@ -1,4 +1,4 @@
-.PHONY: install proto proto-check build build-libs typecheck test lint gate gate-media gate-usage vet-usage lint-usage test-usage test-api test-identity test-photo test-web test-media-worker lint-media-worker dev down reset logs status ps-all logs-svc sh restart-svc up-svc migrate migrate-identity migrate-photo migrate-usage smoke-upload smoke-auth smoke-contract smoke-media smoke-stack smoke-ui smoke-usage smoke-coverage coverage coverage-go coverage-py coverage-ts coverage-diff coverage-selftest
+.PHONY: install proto proto-check build build-libs typecheck test lint gate gate-media gate-usage vet-usage lint-usage test-usage test-api test-identity test-photo test-web test-media-worker lint-media-worker dev down reset logs status ps-all logs-svc sh restart-svc up-svc migrate migrate-identity migrate-photo migrate-usage smoke-upload smoke-auth smoke-contract smoke-media smoke-stack smoke-ui smoke-usage smoke-coverage coverage coverage-go coverage-py coverage-ts coverage-diff coverage-selftest skeleton-gate coverage-gate smoke-skeleton-gate smoke-coverage-gate
 
 ifneq (,$(wildcard .env))
 include .env
@@ -279,3 +279,19 @@ coverage-ts: $(COV_STAMP)
 # Self-test of the coverage tooling itself (Tasks 1-2 RED tests):
 coverage-selftest: $(COV_STAMP)
 	$(COV_DIR)/.venv/bin/python -m pytest $(COV_DIR)/tests -q
+
+# --- coverage GATES (photo_ops-q2n) — skeleton stubs, filled GREEN per plan ----
+# RED gate: skeleton review-readiness. Local-only; NOT in `gate`/CI.
+skeleton-gate:
+	@echo "skeleton-gate: not implemented" >&2; exit 3
+
+# GREEN gate: new-code coverage at branch completion; also a CI PR job.
+coverage-gate:
+	@echo "coverage-gate: not implemented" >&2; exit 3
+
+# Behaviour smokes for the gates (local-only; do NOT add to gate/CI):
+smoke-skeleton-gate:
+	scripts/smoke-skeleton-gate.sh
+
+smoke-coverage-gate:
+	scripts/smoke-coverage-gate.sh
