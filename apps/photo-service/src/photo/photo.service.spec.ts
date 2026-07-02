@@ -174,6 +174,19 @@ describe('PhotoDomainService', () => {
     expect(repository.list).toHaveBeenCalledWith(params);
   });
 
+  it('listSpacetime returns the ready photos for the user (session 013)', async () => {
+    // why: the internal ListPhotoSpacetime read-RPC feeds clustering; it forwards
+    // the caller's ready photos from the repository, owner-scoped.
+    const { service, repository } = createService();
+    const rows = [{ id: 'p1' }] as never; // service forwards verbatim; shape is the repo's concern
+    repository.listReadyForUser.mockResolvedValue(rows);
+
+    const result = await service.listSpacetime('user-1');
+
+    expect(repository.listReadyForUser).toHaveBeenCalledWith('user-1');
+    expect(result).toBe(rows);
+  });
+
   it('listPhotos returns the real totalCount even when the page is empty (session 011)', async () => {
     // why: a page past the end has zero rows but the UI still needs the total to
     // render "page N of M"; an empty page must not collapse totalCount to 0.

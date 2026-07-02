@@ -37,10 +37,15 @@ export default tseslint.config(
     languageOptions: {
       parserOptions: {
         projectService: {
-          // vitest.config.ts files live outside src/ and are not included in
-          // any tsconfig; type-check them against a default project so the
-          // type-aware rules still run on them.
-          allowDefaultProject: ["packages/*/vitest.config.ts", "apps/*/vitest.config.ts"],
+          // vitest.config.ts files that live outside their service's src-only
+          // tsconfig; type-check them against a default project so the type-aware
+          // rules still run. (apps/web's is already in its `**/*.ts` tsconfig, so
+          // it must NOT be listed here — that would be a double-inclusion error.)
+          allowDefaultProject: [
+            "packages/*/vitest.config.ts",
+            "apps/api-gateway/vitest.config.ts",
+            "apps/photo-service/vitest.config.ts",
+          ],
         },
         tsconfigRootDir: import.meta.dirname,
       },
