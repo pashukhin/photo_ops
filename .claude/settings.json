@@ -66,6 +66,17 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "scripts/lint-changed"
+          }
+        ]
+      }
     ]
   }
 }

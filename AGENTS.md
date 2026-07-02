@@ -63,6 +63,7 @@ Before implementing, read:
 - Session briefs are numbered sequentially under `sessions/`; name each brief so its purpose is clear (see `sessions/README.md`).
 - **Coverage gates (q2n):** run `make skeleton-gate` before handing a skeleton to human review; if it fails, the skeleton is NOT review-ready — return to author to add the missing RED test (spec-change protocol applies). Run `make coverage-gate` before final branch review / merge (also enforced by the CI `coverage-gate` job on PRs). Both gates require 100% new/changed-code coverage; override with `COVERAGE_FAIL_UNDER=<n>`. Design: `docs/superpowers/specs/2026-07-02-coverage-gate-design.md`.
 - **Test-integrity guard (mp0):** removing or renaming-away a test declaration, or deleting a test file, requires an `Allow-test-removal: <reason>` trailer on the commit that does it. `make test-guard` enforces this (also a CI PR job). Design: `docs/superpowers/specs/2026-07-02-test-integrity-guard-design.md`.
+- **Edit-time lint hook (8d5):** a `PostToolUse` (Write|Edit) hook `scripts/lint-changed` lints the just-edited file (eslint / ruff-in-media-worker / gofmt) and feeds issues back for a quick fix; it is advisory (`make gate` is authoritative). Disable a session with `LINT_HOOK=0`. Loads at session start. Design: `docs/superpowers/specs/2026-07-02-lint-hook-design.md`.
 
 ## Agent Ergonomics
 
