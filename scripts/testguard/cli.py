@@ -52,6 +52,14 @@ def main() -> int:
         return 1
 
     try:
+        # Normalize base to the true fork point (merge-base with HEAD).
+        # In CI, GUARD_BASE is the base-branch TIP sha which is NOT an ancestor
+        # of HEAD once main advances after the branch point.  Two-dot diff would
+        # then include files changed on main (not by the PR) and report their
+        # declarations as "removed by this PR" — a false positive.
+        # merge-base is idempotent when base is already the fork point (local path).
+        base = _git("merge-base", base, "HEAD").strip()
+
         # Changed files between base and HEAD
         diff_out = _git("diff", "--name-only", f"{base}..HEAD")
         changed_files = [f for f in diff_out.splitlines() if f.strip()]
