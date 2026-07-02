@@ -212,11 +212,19 @@ coverage-diff: coverage $(COV_STAMP)
 # gocover-cobertura v1.2.0 emits workspace-relative filenames with the
 # absolute workspace dir as <source>; remap_cobertura_paths converts to
 # repo-root-relative paths (apps/usage-service/internal/…) for diff-cover.
+# COVERAGE_ALLOW_FAIL=1: tolerate non-zero test exit (skeleton gate needs coverage
+# even when tests are RED); go test still writes the coverprofile on failure.
 coverage-go: $(COV_STAMP)
 	@mkdir -p .coverage
 	bash -euo pipefail -c 'cd apps/usage-service && \
+	  set +e; \
 	  GOTOOLCHAIN=local go test -covermode=atomic -coverprofile=../../.coverage/go.out \
-	    $$(go list ./... | grep -v '"'"'/internal/pb'"'"') && \
+	    $$(go list ./... | grep -v '"'"'/internal/pb'"'"'); \
+	  TEST_EXIT=$$?; \
+	  set -e; \
+	  if [ "$$TEST_EXIT" -ne 0 ] && [ "$${COVERAGE_ALLOW_FAIL:-0}" != "1" ]; then \
+	    exit $$TEST_EXIT; \
+	  fi; \
 	  GOTOOLCHAIN=local go run github.com/boumenot/gocover-cobertura@v1.2.0 \
 	    < ../../.coverage/go.out \
 	  | ../../$(COV_DIR)/.venv/bin/python ../../scripts/coverage/normalize.py \
@@ -229,11 +237,19 @@ coverage-go: $(COV_STAMP)
 # pytest-cov emits bare filenames relative to src/media_worker (e.g. app.py);
 # normalize_cobertura prefixes apps/media-worker/src/media_worker to produce
 # repo-root-relative paths (apps/media-worker/src/media_worker/app.py).
+# COVERAGE_ALLOW_FAIL=1: tolerate non-zero test exit; pytest-cov writes the XML
+# even when tests fail.
 coverage-py: $(MW_STAMP)
 	@mkdir -p .coverage
 	bash -euo pipefail -c 'cd $(MW_DIR) && \
+	  set +e; \
 	  .venv/bin/python -m pytest --cov=src/media_worker \
-	    --cov-report=xml:../../.coverage/py.cobertura.xml.raw -q && \
+	    --cov-report=xml:../../.coverage/py.cobertura.xml.raw -q; \
+	  TEST_EXIT=$$?; \
+	  set -e; \
+	  if [ "$$TEST_EXIT" -ne 0 ] && [ "$${COVERAGE_ALLOW_FAIL:-0}" != "1" ]; then \
+	    exit $$TEST_EXIT; \
+	  fi; \
 	  python3 ../../scripts/coverage/normalize.py \
 	    apps/media-worker/src/media_worker \
 	    < ../../.coverage/py.cobertura.xml.raw \
@@ -249,41 +265,58 @@ coverage-py: $(MW_STAMP)
 # and Next.js config files to the default exclude list.
 # apps/publication-service and apps/connector-service are skipped (no-op tests).
 # packages/proto-ts is skipped (generated code, no tests).
+# COVERAGE_ALLOW_FAIL=1: tolerate non-zero vitest exit and still normalize the
+# cobertura output (vitest writes the report even when tests fail).
 coverage-ts: $(COV_STAMP)
 	@mkdir -p .coverage
 	bash -euo pipefail -c '\
 	  FAIL=0; \
+	  ALLOW_FAIL="$${COVERAGE_ALLOW_FAIL:-0}"; \
 	  for WS_DIR in apps/api-gateway apps/photo-service apps/identity-service apps/web packages/observability; do \
 	    WS_SLUG=$$(basename $$WS_DIR); \
 	    TMP_DIR=.coverage/tmp-ts-$$WS_SLUG; \
 	    OUT_FILE=.coverage/ts-$$WS_SLUG.cobertura.xml; \
 	    echo "coverage-ts: running $$WS_DIR ..."; \
-	    if pnpm --filter @photoops/$$WS_SLUG exec vitest run \
+	    set +e; \
+	    pnpm --filter @photoops/$$WS_SLUG exec vitest run \
 	        --coverage \
 	        --coverage.provider=v8 \
 	        --coverage.reporter=cobertura \
 	        "--coverage.reportsDirectory=../../$$TMP_DIR" \
-	        2>&1; then \
-	      python3 scripts/coverage/normalize.py $$WS_DIR \
-	        < $$TMP_DIR/cobertura-coverage.xml \
-	        > $$OUT_FILE && \
-	      rm -rf $$TMP_DIR && \
-	      echo "coverage-ts: $$WS_DIR -> $$OUT_FILE OK"; \
+	        2>&1; \
+	    WS_EXIT=$$?; \
+	    set -e; \
+	    if [ "$$WS_EXIT" -eq 0 ] || [ "$$ALLOW_FAIL" = "1" ]; then \
+	      if [ -f "$$TMP_DIR/cobertura-coverage.xml" ]; then \
+	        python3 scripts/coverage/normalize.py $$WS_DIR \
+	          < $$TMP_DIR/cobertura-coverage.xml \
+	          > $$OUT_FILE && \
+	        rm -rf $$TMP_DIR && \
+	        echo "coverage-ts: $$WS_DIR -> $$OUT_FILE OK"; \
+	      else \
+	        echo "coverage-ts: WARN $$WS_DIR no coverage XML produced" >&2; \
+	        FAIL=$$((FAIL + 1)); \
+	      fi; \
 	    else \
-	      echo "coverage-ts: WARN $$WS_DIR coverage failed (exit $$?), skipping" >&2; \
+	      echo "coverage-ts: WARN $$WS_DIR coverage failed (exit $$WS_EXIT), skipping" >&2; \
 	      FAIL=$$((FAIL + 1)); \
 	    fi; \
 	  done; \
-	  if [ $$FAIL -gt 0 ]; then echo "coverage-ts: $$FAIL workspace(s) failed" >&2; exit 1; fi'
+	  if [ $$FAIL -gt 0 ] && [ "$$ALLOW_FAIL" != "1" ]; then echo "coverage-ts: $$FAIL workspace(s) failed" >&2; exit 1; fi'
 
 # Self-test of the coverage tooling itself (Tasks 1-2 RED tests):
 coverage-selftest: $(COV_STAMP)
 	$(COV_DIR)/.venv/bin/python -m pytest $(COV_DIR)/tests -q
 
 # --- coverage GATES (photo_ops-q2n) — skeleton stubs, filled GREEN per plan ----
-# RED gate: skeleton review-readiness. Local-only; NOT in `gate`/CI.
+# RED gate: skeleton review-readiness (photo_ops-q2n Task 1). Local-only; NOT in
+# `gate`/CI. Runs coverage tolerating RED tests (COVERAGE_ALLOW_FAIL=1) then
+# asserts 100% new-code coverage using the branch merge-base as the diff base.
+# COVERAGE_BASE overrides the default merge-base (useful for CI or testing).
 skeleton-gate:
-	@echo "skeleton-gate: not implemented" >&2; exit 3
+	BASE="$${COVERAGE_BASE:-$$(git merge-base HEAD main)}"; \
+	COVERAGE_ALLOW_FAIL=1 $(MAKE) coverage; \
+	scripts/coverage-diff --base "$$BASE" --fail-under "$${COVERAGE_FAIL_UNDER:-100}" --report .coverage/skeleton-gate.md
 
 # GREEN gate: new-code coverage at branch completion; also a CI PR job.
 coverage-gate:
