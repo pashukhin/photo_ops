@@ -92,6 +92,14 @@ export class PhotoRepository implements PhotoRepositoryPort {
     return { rows: rows.map((r) => this.toRecord(r)), totalCount };
   }
 
+  async listReadyForUser(userId: string): Promise<PhotoAssetRecord[]> {
+    const rows = await this.db
+      .select()
+      .from(photoAssets)
+      .where(and(eq(photoAssets.userId, userId), eq(photoAssets.status, 'ready')));
+    return rows.map((r) => this.toRecord(r));
+  }
+
   async createProcessingJob(input: { photoId: string; userId: string; type: 'initial' | 'reprocess'; correlationId: string }): Promise<ProcessingJobRecord> {
     const [created] = await this.db
       .insert(processingJobs)

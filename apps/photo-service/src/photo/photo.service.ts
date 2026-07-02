@@ -30,6 +30,8 @@ export interface PhotoRepositoryPort {
   // Returns the page of rows matching the filter/sort plus the total matching
   // count (ignoring pagination) for "page N of M". (session 011)
   list(params: ListPhotosParams): Promise<{ rows: PhotoAssetRecord[]; totalCount: number }>;
+  // Ready photos for a user, for the internal ListPhotoSpacetime read-RPC (clustering).
+  listReadyForUser(userId: string): Promise<PhotoAssetRecord[]>;
   createProcessingJob(input: { photoId: string; userId: string; type: 'initial' | 'reprocess'; correlationId: string }): Promise<ProcessingJobRecord>;
   markProcessingForUser(userId: string, photoId: string): Promise<boolean>;
   finalizeJob(jobId: string, outcome: 'succeeded' | 'failed', errorMessage?: string): Promise<boolean>;
@@ -159,6 +161,12 @@ export class PhotoDomainService {
     );
 
     return { photos, totalCount };
+  }
+
+  // Lean space-time + device attributes of the caller's `ready` photos, for the
+  // internal ListPhotoSpacetime read-RPC consumed by cluster-worker.
+  async listSpacetime(userId: string): Promise<PhotoAssetRecord[]> {
+    return this.repository.listReadyForUser(userId);
   }
 
   private async toVariantView(v: PhotoVariantRecord): Promise<PhotoVariantView> {

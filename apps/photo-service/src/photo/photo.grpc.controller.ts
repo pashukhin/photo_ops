@@ -108,6 +108,22 @@ export class PhotoGrpcController {
     }
   }
 
+  @GrpcMethod('PhotoService', 'ListPhotoSpacetime')
+  async listPhotoSpacetime(request: { userId: string }): Promise<{ photos: unknown[] }> {
+    const photos = await this.photoService.listSpacetime(request.userId);
+    return {
+      photos: photos.map((p) => ({
+        photoId: p.id,
+        takenAtUtc: p.takenAtUtc ? p.takenAtUtc.toISOString() : '',
+        takenAtLocal: p.takenAtLocal ?? '',
+        cameraMake: p.cameraMake ?? '',
+        cameraModel: p.cameraModel ?? '',
+        ...(p.lat !== null && { lat: p.lat }),
+        ...(p.lon !== null && { lon: p.lon })
+      }))
+    };
+  }
+
   private toProtoPhoto(pwv: PhotoWithVariants) {
     const statusMap = {
       uploading: 1,

@@ -43,7 +43,8 @@ function createController() {
     createUploadIntent: vi.fn(),
     completeUpload: vi.fn(),
     listPhotos: vi.fn(),
-    getPhoto: vi.fn()
+    getPhoto: vi.fn(),
+    listSpacetime: vi.fn()
   };
   return { controller: new PhotoGrpcController(photoService as never), photoService };
 }
@@ -165,6 +166,34 @@ describe('PhotoGrpcController', () => {
       await controller.listPhotos({ userId: 'user-1', pageSize: 5000 });
 
       expect(photoService.listPhotos).toHaveBeenCalledWith(expect.objectContaining({ pageSize: 100 }));
+    });
+  });
+
+  describe('ListPhotoSpacetime (session 013 internal read-RPC)', () => {
+    it('maps ready photos to the lean space-time + device shape', async () => {
+      const { controller, photoService } = createController();
+      photoService.listSpacetime.mockResolvedValue([
+        makePhotoWithVariants().photo,
+        { ...makePhotoWithVariants().photo, id: 'photo-2', takenAtUtc: null, lat: null, lon: null }
+      ]);
+
+      const reply = await controller.listPhotoSpacetime({ userId: 'user-1' });
+
+      expect(photoService.listSpacetime).toHaveBeenCalledWith('user-1');
+      expect(reply.photos[0]).toEqual({
+        photoId: 'photo-1',
+        takenAtUtc: '2024-01-15T09:30:00.000Z',
+        takenAtLocal: '2024-01-15T10:30:00',
+        cameraMake: 'Canon',
+        cameraModel: 'EOS R5',
+        lat: 51.5074,
+        lon: -0.1278
+      });
+      // absent utc/coords collapse to empty string / omitted optional fields
+      const second = reply.photos[1] as Record<string, unknown>;
+      expect(second.takenAtUtc).toBe('');
+      expect('lat' in second).toBe(false);
+      expect('lon' in second).toBe(false);
     });
   });
 });

@@ -69,6 +69,7 @@ function createService() {
     markUploadedForUser: vi.fn(),
     findByIdForUser: vi.fn(),
     list: vi.fn(),
+    listReadyForUser: vi.fn(),
     createProcessingJob: vi.fn(),
     markProcessingForUser: vi.fn(),
     finalizeJob: vi.fn(),
