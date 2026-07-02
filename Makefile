@@ -322,8 +322,14 @@ skeleton-gate:
 	scripts/coverage-diff --base "$$BASE" --fail-under "$${COVERAGE_FAIL_UNDER:-100}" --report .coverage/skeleton-gate.md
 
 # GREEN gate: new-code coverage at branch completion; also a CI PR job.
+# Runs `make coverage` (tests must PASS — no COVERAGE_ALLOW_FAIL) then asserts
+# 100% new-code coverage using the branch merge-base as the diff base.
+# COVERAGE_BASE overrides the default merge-base (useful for CI or testing).
 coverage-gate:
-	@echo "coverage-gate: not implemented" >&2; exit 3
+	BASE="$${COVERAGE_BASE:-$$(git merge-base HEAD main 2>/dev/null)}"; \
+	[ -n "$$BASE" ] || { echo "coverage-gate: could not compute merge-base; set COVERAGE_BASE" >&2; exit 1; }; \
+	$(MAKE) coverage && \
+	scripts/coverage-diff --base "$$BASE" --fail-under "$${COVERAGE_FAIL_UNDER:-100}" --report .coverage/coverage-gate.md
 
 # Behaviour smokes for the gates (local-only; do NOT add to gate/CI):
 smoke-skeleton-gate:
