@@ -1,4 +1,4 @@
-.PHONY: install proto proto-check build build-libs typecheck test lint gate gate-media gate-usage vet-usage lint-usage test-usage test-api test-identity test-photo test-web test-media-worker lint-media-worker dev down reset logs status ps-all logs-svc sh restart-svc up-svc migrate migrate-identity migrate-photo migrate-usage smoke-upload smoke-auth smoke-contract smoke-media smoke-stack smoke-ui smoke-usage smoke-coverage coverage coverage-go coverage-py coverage-ts coverage-diff coverage-selftest skeleton-gate coverage-gate smoke-skeleton-gate smoke-coverage-gate test-guard smoke-test-guard test-guard-selftest
+.PHONY: install proto proto-check build build-libs typecheck test lint gate gate-media gate-usage vet-usage lint-usage test-usage test-api test-identity test-photo test-web test-media-worker lint-media-worker dev down reset logs status ps-all logs-svc sh restart-svc up-svc migrate migrate-identity migrate-photo migrate-usage smoke-upload smoke-auth smoke-contract smoke-media smoke-stack smoke-ui smoke-usage smoke-coverage coverage coverage-go coverage-py coverage-ts coverage-diff coverage-selftest skeleton-gate coverage-gate smoke-skeleton-gate smoke-coverage-gate test-guard smoke-test-guard test-guard-selftest lint-hook-selftest
 
 ifneq (,$(wildcard .env))
 include .env
@@ -352,3 +352,9 @@ test-guard-selftest: $(COV_STAMP)
 # End-to-end behaviour smoke (local-only; uses throwaway commits + hard-reset trap):
 smoke-test-guard:
 	scripts/smoke-test-guard.sh
+
+# --- edit-time lint hook (photo_ops-8d5) ---------------------------------------
+# Unit + integration tests for the PostToolUse lint hook (scripts/lint-changed).
+# The hook itself is wired in .claude/settings.json and fires on Write|Edit.
+lint-hook-selftest: $(COV_STAMP)
+	$(COV_DIR)/.venv/bin/python -m pytest scripts/linthook/tests -q
