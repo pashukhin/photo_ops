@@ -267,7 +267,12 @@ coverage-py: $(MW_STAMP)
 # packages/proto-ts is skipped (generated code, no tests).
 # COVERAGE_ALLOW_FAIL=1: tolerate non-zero vitest exit and still normalize the
 # cobertura output (vitest writes the report even when tests fail).
-coverage-ts: $(COV_STAMP)
+# Depends on build-libs: service vitest suites import @photoops/observability etc.,
+# whose package.json main/exports point at dist/ (gitignored). Without a prior
+# lib build (clean checkout / the coverage-gate CI job), vitest fails with
+# "Failed to resolve entry for package @photoops/observability" (same reason
+# typecheck depends on build-libs — photo_ops-qwg).
+coverage-ts: build-libs $(COV_STAMP)
 	@mkdir -p .coverage
 	bash -euo pipefail -c '\
 	  FAIL=0; \
