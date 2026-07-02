@@ -21,4 +21,5 @@ if [[ ! -x "${PYTHON}" ]]; then
     exit 1
 fi
 
+cd "${REPO_ROOT}"
 exec "${PYTHON}" -m scripts.testguard.cli "${BASE}"
