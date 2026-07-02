@@ -179,6 +179,9 @@ The skeleton's RED tests are the spec. The implementer may add narrower tests
 but may not weaken, delete, rename-away, or change the expected behavior of a
 skeleton test (its prompt enforces this). Two things follow for you:
 
+- Before handing the skeleton to human review, run the project's new-code
+  coverage gate if it has one. On fail the skeleton is not review-ready —
+  return to add the missing RED test (spec-change protocol applies).
 - If an implementer reports a skeleton test looks wrong (it escalates instead
   of editing it), run the **spec-change protocol**: get the spec-change note
   (which executable artifact must change and why) → your human partner /

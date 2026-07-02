@@ -220,6 +220,9 @@ If you find issues, fix them inline. No need to re-review — just fix and move 
 - **The skeleton commit is the approval checkpoint.** The human/strong-model
   checkpoint relocates from "approve the prose" to "approve the skeleton" —
   authoring the skeleton is the main design act, so it needs that gate.
+- **New-code coverage gate.** Before handing the skeleton to review, run the
+  project's new-code coverage gate if it has one. On fail the skeleton is not
+  review-ready — return to add the missing RED test (spec-change protocol).
 
 ## Execution Handoff
 
