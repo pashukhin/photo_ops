@@ -223,6 +223,13 @@ If you find issues, fix them inline. No need to re-review — just fix and move 
 - **New-code coverage gate.** Before handing the skeleton to review, run the
   project's new-code coverage gate if it has one. On fail the skeleton is not
   review-ready — return to add the missing RED test (spec-change protocol).
+- **Executable e2e/smoke where applicable.** If the change is user-facing or
+  crosses an integration boundary (UI render, RPC, message broker, storage, or a
+  cross-service flow), the skeleton MUST include an executable e2e/smoke scenario
+  on a live stack — not just unit/mock tests, which share the code's assumptions
+  and miss render/integration bugs — and it must be run green before the final
+  review. Pure-internal / library / refactor changes with no boundary crossing
+  are exempt (unit tests suffice).
 
 ## Execution Handoff
 
