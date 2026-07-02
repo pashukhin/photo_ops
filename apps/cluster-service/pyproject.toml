@@ -1,0 +1,49 @@
+[project]
+name = "photoops-cluster-service"
+version = "0.0.0"
+requires-python = ">=3.12"
+dependencies = [
+  "grpcio>=1.68.0",
+  "protobuf>=5.27.0",
+  "googleapis-common-protos>=1.65.0",
+  "pika>=1.3.2",
+  "psycopg[binary]>=3.2.0",
+  "scipy>=1.14.0",
+  "numpy>=2.0.0",
+  "psutil>=6.0.0",
+  "uuid6>=2024.7.10",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3.0", "pytest-cov>=5", "ruff>=0.6.0", "mypy>=1.14.0", "grpcio-tools>=1.68.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# cluster-service is the first Python gRPC service. Its generated grpc stubs use
+# imports rooted at the proto ROOT ("from cluster.v1 import ..."), so the proto
+# root is on the path and proto is imported as `cluster.v1.*` — NOT media-worker's
+# `src.photoops_proto.*` style (which only works for cross-import-free files).
+# Service code is imported as `cluster_service.*` (src on path).
+pythonpath = ["src", "src/photoops_proto"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["src/photoops_proto"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_unused_configs = true
+exclude = ["src/photoops_proto"]
+# Runtime deps (grpcio, pika, scipy, psycopg, ...) and the excluded generated
+# proto stubs ship partial/no type info; a blanket ignore is the pragmatic guard
+# (mirrors media-worker).
+ignore_missing_imports = true
+# Tests import via `cluster_service.*` (pythonpath includes "src") while the
+# package is also installable; explicit_package_bases roots module names at the
+# path entries, resolving duplicate-module errors.
+explicit_package_bases = true
+mypy_path = "src"
