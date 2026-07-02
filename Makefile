@@ -271,6 +271,7 @@ coverage-ts: $(COV_STAMP)
 	@mkdir -p .coverage
 	bash -euo pipefail -c '\
 	  FAIL=0; \
+	  NO_XML_FAIL=0; \
 	  ALLOW_FAIL="$${COVERAGE_ALLOW_FAIL:-0}"; \
 	  for WS_DIR in apps/api-gateway apps/photo-service apps/identity-service apps/web packages/observability; do \
 	    WS_SLUG=$$(basename $$WS_DIR); \
@@ -294,14 +295,15 @@ coverage-ts: $(COV_STAMP)
 	        rm -rf $$TMP_DIR && \
 	        echo "coverage-ts: $$WS_DIR -> $$OUT_FILE OK"; \
 	      else \
-	        echo "coverage-ts: WARN $$WS_DIR no coverage XML produced" >&2; \
-	        FAIL=$$((FAIL + 1)); \
+	        echo "coverage-ts: ERROR $$WS_DIR no coverage XML produced (hard failure)" >&2; \
+	        NO_XML_FAIL=$$((NO_XML_FAIL + 1)); \
 	      fi; \
 	    else \
 	      echo "coverage-ts: WARN $$WS_DIR coverage failed (exit $$WS_EXIT), skipping" >&2; \
 	      FAIL=$$((FAIL + 1)); \
 	    fi; \
 	  done; \
+	  if [ $$NO_XML_FAIL -gt 0 ]; then echo "coverage-ts: $$NO_XML_FAIL workspace(s) produced no XML (hard failure)" >&2; exit 1; fi; \
 	  if [ $$FAIL -gt 0 ] && [ "$$ALLOW_FAIL" != "1" ]; then echo "coverage-ts: $$FAIL workspace(s) failed" >&2; exit 1; fi'
 
 # Self-test of the coverage tooling itself (Tasks 1-2 RED tests):
@@ -314,8 +316,9 @@ coverage-selftest: $(COV_STAMP)
 # asserts 100% new-code coverage using the branch merge-base as the diff base.
 # COVERAGE_BASE overrides the default merge-base (useful for CI or testing).
 skeleton-gate:
-	BASE="$${COVERAGE_BASE:-$$(git merge-base HEAD main)}"; \
-	COVERAGE_ALLOW_FAIL=1 $(MAKE) coverage; \
+	BASE="$${COVERAGE_BASE:-$$(git merge-base HEAD main 2>/dev/null)}"; \
+	[ -n "$$BASE" ] || { echo "skeleton-gate: could not compute merge-base; set COVERAGE_BASE" >&2; exit 1; }; \
+	COVERAGE_ALLOW_FAIL=1 $(MAKE) coverage && \
 	scripts/coverage-diff --base "$$BASE" --fail-under "$${COVERAGE_FAIL_UNDER:-100}" --report .coverage/skeleton-gate.md
 
 # GREEN gate: new-code coverage at branch completion; also a CI PR job.
