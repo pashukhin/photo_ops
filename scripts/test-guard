@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# test-guard — fail a change that removes/renames-away a test declaration or
+# deletes a test file, unless a commit in the range carries an
+# `Allow-test-removal: <reason>` trailer (photo_ops-mp0). Contract:
+# docs/superpowers/specs/2026-07-02-test-integrity-guard-design.md
+set -euo pipefail
+echo "test-guard: not implemented" >&2
+exit 3
