@@ -2,7 +2,7 @@
 
 ## Local context
 
-- `docker-compose.yml` runs the local stack: infrastructure services (`postgres`, `minio`, `minio-init`, `rabbitmq`), app services (`identity-service`, `photo-service`, `api-gateway`, `web`, `media-worker`, `cluster-service`, `publication-service`, `usage-service`, `connector-service`).
+- `docker-compose.yml` runs the local stack: infrastructure services (`postgres`, `minio`, `minio-init`, `rabbitmq`), app services (`identity-service`, `photo-service`, `api-gateway`, `web`, `media-worker`, `cluster-service` + `cluster-worker` (two roles of one Python image), `publication-service`, `usage-service`, `connector-service`).
 - Driven via Makefile: `make dev` / `make down` / `make reset` / `make logs` / `make status`.
 - Env defaults come from `.env` (template `.env.example`).
 

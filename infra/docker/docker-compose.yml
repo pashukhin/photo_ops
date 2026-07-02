@@ -111,10 +111,12 @@ services:
       WEB_ORIGIN: ${WEB_ORIGIN}
       PHOTO_SERVICE_GRPC_URL: photo-service:${PHOTO_SERVICE_GRPC_PORT}
       USAGE_SERVICE_GRPC_URL: usage-service:${USAGE_SERVICE_GRPC_PORT}
+      CLUSTER_SERVICE_GRPC_URL: cluster-service:${CLUSTER_SERVICE_GRPC_PORT}
     depends_on:
       - identity-service
       - photo-service
       - usage-service
+      - cluster-service
     ports:
       - "3001:3001"
 
@@ -152,8 +154,39 @@ services:
     build:
       context: ../..
       dockerfile: apps/cluster-service/Dockerfile
+    command: ["python", "-m", "cluster_service.server_main"]
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      CLUSTER_DATABASE_URL: ${CLUSTER_DATABASE_URL}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+      CLUSTER_SERVICE_GRPC_PORT: ${CLUSTER_SERVICE_GRPC_PORT}
+      USAGE_PROVIDER: ${USAGE_PROVIDER:-local-demo}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     ports:
-      - "3011:3011"
+      - "${CLUSTER_SERVICE_GRPC_PORT}:${CLUSTER_SERVICE_GRPC_PORT}"
+
+  cluster-worker:
+    build:
+      context: ../..
+      dockerfile: apps/cluster-service/Dockerfile
+    command: ["python", "-m", "cluster_service.worker_main"]
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      CLUSTER_DATABASE_URL: ${CLUSTER_DATABASE_URL}
+      RABBITMQ_URL: ${RABBITMQ_URL}
+      PHOTO_SERVICE_GRPC_URL: photo-service:${PHOTO_SERVICE_GRPC_PORT}
+      USAGE_PROVIDER: ${USAGE_PROVIDER:-local-demo}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      photo-service:
+        condition: service_started
 
   publication-service:
     build:

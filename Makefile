@@ -1,4 +1,4 @@
-.PHONY: install proto proto-check build build-libs typecheck test lint gate gate-media gate-usage vet-usage lint-usage test-usage test-api test-identity test-photo test-web test-media-worker lint-media-worker dev down reset logs status ps-all logs-svc sh restart-svc up-svc migrate migrate-identity migrate-photo migrate-usage migrate-cluster smoke-upload smoke-auth smoke-contract smoke-media smoke-stack smoke-ui smoke-usage smoke-coverage coverage coverage-go coverage-py coverage-ts coverage-diff coverage-selftest skeleton-gate coverage-gate smoke-skeleton-gate smoke-coverage-gate test-guard smoke-test-guard test-guard-selftest lint-hook-selftest
+.PHONY: install proto proto-check build build-libs typecheck test lint gate gate-media gate-usage gate-cluster vet-usage lint-usage test-usage lint-cluster test-cluster test-api test-identity test-photo test-web test-media-worker lint-media-worker dev down reset logs status ps-all logs-svc sh restart-svc up-svc migrate migrate-identity migrate-photo migrate-usage migrate-cluster smoke-upload smoke-auth smoke-contract smoke-media smoke-stack smoke-ui smoke-usage smoke-cluster smoke-coverage coverage coverage-go coverage-py coverage-cluster coverage-ts coverage-diff coverage-selftest skeleton-gate coverage-gate smoke-skeleton-gate smoke-coverage-gate test-guard smoke-test-guard test-guard-selftest lint-hook-selftest
 
 ifneq (,$(wildcard .env))
 include .env
@@ -46,12 +46,15 @@ lint:
 # target is the equivalent. Run it before pushing instead of re-typing the
 # sub-targets or remembering to verify the media-worker by hand (s008: media
 # checks were run ad-hoc OUTSIDE the gate — see photo_ops-uil).
-gate: proto-check typecheck lint build test gate-media gate-usage
-	@echo "gate: all checks passed (TS + media-worker + usage-service)"
+gate: proto-check typecheck lint build test gate-media gate-usage gate-cluster
+	@echo "gate: all checks passed (TS + media-worker + usage-service + cluster-service)"
 
 # Python half of the gate: lint + tests for the media-worker. Kept as a named
 # target so it composes into `gate` and can also be run on its own.
 gate-media: lint-media-worker test-media-worker
+
+# Python half of the gate: cluster-service (s013). Mirrors gate-media.
+gate-cluster: lint-cluster test-cluster
 
 # Go half of the gate: usage-service (first Go service, s012). Mirrors CI's
 # usage-service job. golangci-lint promoted to GREEN (Task 7): bodies are real,
@@ -169,6 +172,11 @@ smoke-ui:
 smoke-usage:
 	scripts/smoke-usage.sh
 
+# Local-only — requires `make dev` + `make migrate` to be running.
+# Do NOT add to `gate` or CI targets.
+smoke-cluster:
+	scripts/smoke-cluster.sh
+
 # Local-only; regenerates coverage; do NOT add to `gate` or CI.
 smoke-coverage:
 	scripts/smoke-coverage.sh
@@ -191,6 +199,20 @@ test-media-worker: $(MW_STAMP)
 lint-media-worker: $(MW_STAMP)
 	cd $(MW_DIR) && .venv/bin/ruff check src tests && .venv/bin/mypy src
 
+# cluster-service venv (s013), mirroring the media-worker stamp pattern.
+CL_DIR := apps/cluster-service
+CL_STAMP := $(CL_DIR)/.venv/.install-stamp
+
+$(CL_STAMP): $(CL_DIR)/pyproject.toml
+	cd $(CL_DIR) && python3 -m venv .venv && .venv/bin/pip install -q -e ".[dev]"
+	touch $@
+
+test-cluster: $(CL_STAMP)
+	cd $(CL_DIR) && .venv/bin/python -m pytest -q
+
+lint-cluster: $(CL_STAMP)
+	cd $(CL_DIR) && .venv/bin/ruff check src tests && .venv/bin/mypy src
+
 # Diff-based coverage tooling (photo_ops-osq). Self-contained venv + stamp,
 # mirroring the media-worker pattern above. NOT wired into `gate` (the gate /
 # threshold policy is photo_ops-q2n). See
@@ -203,7 +225,7 @@ $(COV_STAMP): $(COV_DIR)/requirements.txt
 	touch $@
 
 # Aggregate all per-language coverage reports (photo_ops-osq Task 3d-i).
-coverage: coverage-go coverage-py coverage-ts
+coverage: coverage-go coverage-py coverage-cluster coverage-ts
 
 # Score new/changed-code coverage via diff-cover (auto-discovers .coverage/*.cobertura.xml).
 # NOT wired into `gate`. COVERAGE_BASE / COVERAGE_FAIL_UNDER are env-overridable.
@@ -259,6 +281,27 @@ coverage-py: $(MW_STAMP)
 	    < ../../.coverage/py.cobertura.xml.raw \
 	    > ../../.coverage/py.cobertura.xml && \
 	  rm ../../.coverage/py.cobertura.xml.raw'
+
+# Python coverage for cluster-service (s013) → normalized Cobertura XML.
+# Mirrors coverage-py; --cov=src/cluster_service scopes to the REAL package
+# (generated photoops_proto is outside scope). COVERAGE_ALLOW_FAIL=1 tolerates
+# RED tests (skeleton gate needs coverage even when the compute core is RED).
+coverage-cluster: $(CL_STAMP)
+	@mkdir -p .coverage
+	bash -euo pipefail -c 'cd $(CL_DIR) && \
+	  set +e; \
+	  .venv/bin/python -m pytest --cov=src/cluster_service \
+	    --cov-report=xml:../../.coverage/py-cluster.cobertura.xml.raw -q; \
+	  TEST_EXIT=$$?; \
+	  set -e; \
+	  if [ "$$TEST_EXIT" -ne 0 ] && [ "$${COVERAGE_ALLOW_FAIL:-0}" != "1" ]; then \
+	    exit $$TEST_EXIT; \
+	  fi; \
+	  python3 ../../scripts/coverage/normalize.py \
+	    apps/cluster-service/src/cluster_service \
+	    < ../../.coverage/py-cluster.cobertura.xml.raw \
+	    > ../../.coverage/py-cluster.cobertura.xml && \
+	  rm ../../.coverage/py-cluster.cobertura.xml.raw'
 
 # TypeScript (vitest) coverage for the five TS workspaces → normalized Cobertura
 # XML (photo_ops-osq Task 3c). vitest v2.1.9 with @vitest/coverage-v8 emits
