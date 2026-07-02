@@ -4,5 +4,21 @@
 # `Allow-test-removal: <reason>` trailer (photo_ops-mp0). Contract:
 # docs/superpowers/specs/2026-07-02-test-integrity-guard-design.md
 set -euo pipefail
-echo "test-guard: not implemented" >&2
-exit 3
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+BASE="${GUARD_BASE:-$(git -C "${REPO_ROOT}" merge-base HEAD main 2>/dev/null || true)}"
+
+if [[ -z "${BASE}" ]]; then
+    echo "test-guard: cannot determine BASE — set GUARD_BASE or ensure 'main' branch exists" >&2
+    exit 1
+fi
+
+PYTHON="${REPO_ROOT}/scripts/coverage/.venv/bin/python"
+
+if [[ ! -x "${PYTHON}" ]]; then
+    echo "test-guard: coverage venv not found at ${PYTHON}; run 'make coverage-selftest' to bootstrap" >&2
+    exit 1
+fi
+
+exec "${PYTHON}" -m scripts.testguard.cli "${BASE}"
