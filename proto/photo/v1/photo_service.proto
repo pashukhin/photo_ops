@@ -31,6 +31,32 @@ service PhotoService {
   rpc GetPhoto(GetPhotoRequest) returns (PhotoAsset) {
     option (google.api.http) = {get: "/v1/photos/{photo_id}"};
   }
+
+  // Internal service-to-service read-RPC: the space-time + device attributes of
+  // the caller's `ready` photos, for clustering. Deliberately NOT gateway-exposed
+  // (no http annotation) and lean — it must not carry the gallery ListPhotos
+  // payload (variants, presigned urls). Consumed by cluster-worker.
+  rpc ListPhotoSpacetime(ListPhotoSpacetimeRequest) returns (ListPhotoSpacetimeResponse);
+}
+
+message ListPhotoSpacetimeRequest {
+  string user_id = 1;  // owner scope; returns only this user's `ready` photos
+}
+
+message ListPhotoSpacetimeResponse {
+  repeated PhotoSpacetime photos = 1;
+}
+
+// Lean per-photo attributes for clustering. `taken_at_*` and `lat`/`lon` follow
+// the same semantics as PhotoAsset; camera fields drive device segmentation.
+message PhotoSpacetime {
+  string photo_id = 1;
+  string taken_at_utc = 2;    // explicit-UTC ISO instant; "" if unresolved
+  string taken_at_local = 3;  // tz-less wall-clock; "" if absent
+  optional double lat = 4;
+  optional double lon = 5;
+  string camera_make = 6;
+  string camera_model = 7;
 }
 
 message CreateUploadIntentRequest {

@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package photoops.cluster.v1;
+
+// Async clustering message contracts. These messages are the payload schema for
+// the RabbitMQ job/result flows (serialized into the AMQP body); they are not
+// gRPC service methods. Transport is owned by a broker-agnostic port. Mirrors
+// photo/v1/processing.proto (photo.process/photo.result).
+
+// Job published by cluster-service (API role) when a run is accepted; consumed
+// by cluster-worker. The tree is computed + persisted by the worker; only the
+// terminal status flip travels back on the result (the tree stays in cluster-db).
+message ClusterProcessJob {
+  string result_id = 1;       // UUID v7, == ClusteringResult.id (idempotency key)
+  string user_id = 2;
+  string method = 3;          // method id from the registry
+  string params_json = 4;     // resolved params JSON ("" -> method defaults)
+  string correlation_id = 5;  // threaded through logs/trace; not an idempotency key
+}
+
+// Terminal outcome of a clustering run.
+enum ClusterOutcome {
+  CLUSTER_OUTCOME_UNSPECIFIED = 0;
+  CLUSTER_OUTCOME_SUCCEEDED = 1;
+  CLUSTER_OUTCOME_FAILED = 2;
+}
+
+// Result published by cluster-worker; consumed by cluster-service to flip the
+// persisted result row to READY / FAILED.
+message ClusterProcessResult {
+  string result_id = 1;
+  string user_id = 2;
+  string correlation_id = 3;
+  ClusterOutcome outcome = 4;
+  string error_message = 5;  // when FAILED
+}

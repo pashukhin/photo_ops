@@ -17,7 +17,7 @@ proto:
 
 proto-check:
 	pnpm proto
-	git diff --exit-code -- packages/proto-ts apps/media-worker/src/photoops_proto apps/usage-service/internal/pb
+	git diff --exit-code -- packages/proto-ts apps/media-worker/src/photoops_proto apps/cluster-service/src/photoops_proto apps/usage-service/internal/pb
 
 build:
 	pnpm build

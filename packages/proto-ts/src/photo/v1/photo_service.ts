@@ -41,6 +41,31 @@ export enum SortDirection {
   UNRECOGNIZED = -1,
 }
 
+export interface ListPhotoSpacetimeRequest {
+  /** owner scope; returns only this user's `ready` photos */
+  userId: string;
+}
+
+export interface ListPhotoSpacetimeResponse {
+  photos: PhotoSpacetime[];
+}
+
+/**
+ * Lean per-photo attributes for clustering. `taken_at_*` and `lat`/`lon` follow
+ * the same semantics as PhotoAsset; camera fields drive device segmentation.
+ */
+export interface PhotoSpacetime {
+  photoId: string;
+  /** explicit-UTC ISO instant; "" if unresolved */
+  takenAtUtc: string;
+  /** tz-less wall-clock; "" if absent */
+  takenAtLocal: string;
+  lat?: number | undefined;
+  lon?: number | undefined;
+  cameraMake: string;
+  cameraModel: string;
+}
+
 export interface CreateUploadIntentRequest {
   filename: string;
   contentType: string;
@@ -128,6 +153,183 @@ export interface PhotoAsset {
 }
 
 export const PHOTOOPS_PHOTO_V1_PACKAGE_NAME = "photoops.photo.v1";
+
+function createBaseListPhotoSpacetimeRequest(): ListPhotoSpacetimeRequest {
+  return { userId: "" };
+}
+
+export const ListPhotoSpacetimeRequest: MessageFns<ListPhotoSpacetimeRequest> = {
+  encode(message: ListPhotoSpacetimeRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.userId !== "") {
+      writer.uint32(10).string(message.userId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListPhotoSpacetimeRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListPhotoSpacetimeRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.userId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBaseListPhotoSpacetimeResponse(): ListPhotoSpacetimeResponse {
+  return { photos: [] };
+}
+
+export const ListPhotoSpacetimeResponse: MessageFns<ListPhotoSpacetimeResponse> = {
+  encode(message: ListPhotoSpacetimeResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.photos) {
+      PhotoSpacetime.encode(v!, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListPhotoSpacetimeResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListPhotoSpacetimeResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.photos.push(PhotoSpacetime.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBasePhotoSpacetime(): PhotoSpacetime {
+  return { photoId: "", takenAtUtc: "", takenAtLocal: "", cameraMake: "", cameraModel: "" };
+}
+
+export const PhotoSpacetime: MessageFns<PhotoSpacetime> = {
+  encode(message: PhotoSpacetime, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.photoId !== "") {
+      writer.uint32(10).string(message.photoId);
+    }
+    if (message.takenAtUtc !== "") {
+      writer.uint32(18).string(message.takenAtUtc);
+    }
+    if (message.takenAtLocal !== "") {
+      writer.uint32(26).string(message.takenAtLocal);
+    }
+    if (message.lat !== undefined) {
+      writer.uint32(33).double(message.lat);
+    }
+    if (message.lon !== undefined) {
+      writer.uint32(41).double(message.lon);
+    }
+    if (message.cameraMake !== "") {
+      writer.uint32(50).string(message.cameraMake);
+    }
+    if (message.cameraModel !== "") {
+      writer.uint32(58).string(message.cameraModel);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PhotoSpacetime {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBasePhotoSpacetime();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.photoId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.takenAtUtc = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.takenAtLocal = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 33) {
+            break;
+          }
+
+          message.lat = reader.double();
+          continue;
+        }
+        case 5: {
+          if (tag !== 41) {
+            break;
+          }
+
+          message.lon = reader.double();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.cameraMake = reader.string();
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.cameraModel = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
 
 function createBaseCreateUploadIntentRequest(): CreateUploadIntentRequest {
   return { filename: "", contentType: "", sizeBytes: "", userId: "" };
@@ -873,6 +1075,15 @@ export interface PhotoServiceClient {
   listPhotos(request: ListPhotosRequest): Observable<ListPhotosResponse>;
 
   getPhoto(request: GetPhotoRequest): Observable<PhotoAsset>;
+
+  /**
+   * Internal service-to-service read-RPC: the space-time + device attributes of
+   * the caller's `ready` photos, for clustering. Deliberately NOT gateway-exposed
+   * (no http annotation) and lean — it must not carry the gallery ListPhotos
+   * payload (variants, presigned urls). Consumed by cluster-worker.
+   */
+
+  listPhotoSpacetime(request: ListPhotoSpacetimeRequest): Observable<ListPhotoSpacetimeResponse>;
 }
 
 export interface PhotoServiceController {
@@ -891,11 +1102,29 @@ export interface PhotoServiceController {
   ): Promise<ListPhotosResponse> | Observable<ListPhotosResponse> | ListPhotosResponse;
 
   getPhoto(request: GetPhotoRequest): Promise<PhotoAsset> | Observable<PhotoAsset> | PhotoAsset;
+
+  /**
+   * Internal service-to-service read-RPC: the space-time + device attributes of
+   * the caller's `ready` photos, for clustering. Deliberately NOT gateway-exposed
+   * (no http annotation) and lean — it must not carry the gallery ListPhotos
+   * payload (variants, presigned urls). Consumed by cluster-worker.
+   */
+
+  listPhotoSpacetime(
+    request: ListPhotoSpacetimeRequest,
+  ): Promise<ListPhotoSpacetimeResponse> | Observable<ListPhotoSpacetimeResponse> | ListPhotoSpacetimeResponse;
 }
 
 export function PhotoServiceControllerMethods() {
   return function (constructor: Function) {
-    const grpcMethods: string[] = ["health", "createUploadIntent", "completeUpload", "listPhotos", "getPhoto"];
+    const grpcMethods: string[] = [
+      "health",
+      "createUploadIntent",
+      "completeUpload",
+      "listPhotos",
+      "getPhoto",
+      "listPhotoSpacetime",
+    ];
     for (const method of grpcMethods) {
       const descriptor: any = Reflect.getOwnPropertyDescriptor(constructor.prototype, method);
       GrpcMethod("PhotoService", method)(constructor.prototype[method], method, descriptor);
@@ -960,6 +1189,23 @@ export const PhotoServiceService = {
     responseSerialize: (value: PhotoAsset): Buffer => Buffer.from(PhotoAsset.encode(value).finish()),
     responseDeserialize: (value: Buffer): PhotoAsset => PhotoAsset.decode(value),
   },
+  /**
+   * Internal service-to-service read-RPC: the space-time + device attributes of
+   * the caller's `ready` photos, for clustering. Deliberately NOT gateway-exposed
+   * (no http annotation) and lean — it must not carry the gallery ListPhotos
+   * payload (variants, presigned urls). Consumed by cluster-worker.
+   */
+  listPhotoSpacetime: {
+    path: "/photoops.photo.v1.PhotoService/ListPhotoSpacetime" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: ListPhotoSpacetimeRequest): Buffer =>
+      Buffer.from(ListPhotoSpacetimeRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ListPhotoSpacetimeRequest => ListPhotoSpacetimeRequest.decode(value),
+    responseSerialize: (value: ListPhotoSpacetimeResponse): Buffer =>
+      Buffer.from(ListPhotoSpacetimeResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ListPhotoSpacetimeResponse => ListPhotoSpacetimeResponse.decode(value),
+  },
 } as const;
 
 export interface PhotoServiceServer extends UntypedServiceImplementation {
@@ -968,6 +1214,13 @@ export interface PhotoServiceServer extends UntypedServiceImplementation {
   completeUpload: handleUnaryCall<CompleteUploadRequest, PhotoAsset>;
   listPhotos: handleUnaryCall<ListPhotosRequest, ListPhotosResponse>;
   getPhoto: handleUnaryCall<GetPhotoRequest, PhotoAsset>;
+  /**
+   * Internal service-to-service read-RPC: the space-time + device attributes of
+   * the caller's `ready` photos, for clustering. Deliberately NOT gateway-exposed
+   * (no http annotation) and lean — it must not carry the gallery ListPhotos
+   * payload (variants, presigned urls). Consumed by cluster-worker.
+   */
+  listPhotoSpacetime: handleUnaryCall<ListPhotoSpacetimeRequest, ListPhotoSpacetimeResponse>;
 }
 
 export interface MessageFns<T> {

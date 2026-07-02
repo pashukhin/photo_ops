@@ -5,23 +5,142 @@ package photoops.cluster.v1;
 import "common/v1/common.proto";
 import "google/api/annotations.proto";
 
+// Deterministic hierarchical clustering of a user's photos into an immutable
+// tree. Clustering methods are pluggable behind a registry (SOLID): this slice
+// ships `time_only`; space-time is a registered-later seam. Runs are async
+// (result_id == async job id); see process.proto for the RabbitMQ contract.
 service ClusterService {
   rpc Health(photoops.common.v1.HealthCheckRequest) returns (photoops.common.v1.HealthCheckResponse) {
     option (google.api.http) = {get: "/v1/cluster/health"};
   }
 
+  // The clustering methods this service can run (the registry surface).
+  rpc ListClusteringMethods(ListClusteringMethodsRequest) returns (ListClusteringMethodsResponse) {
+    option (google.api.http) = {get: "/v1/clustering-methods"};
+  }
+
+  // Start an async clustering run over the caller's photos. Returns immediately
+  // with a PENDING result whose id equals the async job id.
   rpc GenerateClusters(GenerateClustersRequest) returns (GenerateClustersResponse) {
     option (google.api.http) = {
       post: "/v1/clusters/generate"
       body: "*"
     };
   }
+
+  // One clustering result as the full immutable tree, owner-scoped.
+  rpc GetClusteringResult(GetClusteringResultRequest) returns (ClusteringResult) {
+    option (google.api.http) = {get: "/v1/clustering-results/{result_id}"};
+  }
+
+  // The caller's clustering results (metadata only, no tree).
+  rpc ListClusteringResults(ListClusteringResultsRequest) returns (ListClusteringResultsResponse) {
+    option (google.api.http) = {get: "/v1/clustering-results"};
+  }
 }
 
+// ---- method registry --------------------------------------------------------
+
+message ListClusteringMethodsRequest {}
+
+message ListClusteringMethodsResponse {
+  repeated ClusteringMethodDescriptor methods = 1;
+}
+
+// A method the registry can run. `required_photo_fields` drives the
+// not_clusterable partition (a photo missing any required field is excluded).
+message ClusteringMethodDescriptor {
+  string id = 1;                              // stable id, e.g. "time_only"
+  string display_name = 2;                    // human label
+  string description = 3;
+  repeated string required_photo_fields = 4;  // e.g. ["taken_at"]
+  string default_params_json = 5;             // JSON object of default params
+}
+
+// ---- generate ---------------------------------------------------------------
+
 message GenerateClustersRequest {
-  string scope = 1;
+  string user_id = 1;      // caller-supplied from the validated session in api-gateway
+  string scope = 2;        // "all" (only value in this slice)
+  string method = 3;       // method id from the registry (required)
+  string params_json = 4;  // JSON overriding method defaults; "" -> defaults
 }
 
 message GenerateClustersResponse {
-  string job_id = 1;
+  string result_id = 1;         // == job_id, UUID v7
+  ClusteringStatus status = 2;  // PENDING on accept
+}
+
+// ---- results ----------------------------------------------------------------
+
+message GetClusteringResultRequest {
+  string result_id = 1;
+  string user_id = 2;  // owner scope
+}
+
+message ListClusteringResultsRequest {
+  string user_id = 1;  // owner scope
+}
+
+message ListClusteringResultsResponse {
+  repeated ClusteringResultSummary results = 1;
+}
+
+message ClusteringResultSummary {
+  string id = 1;
+  string method = 2;
+  ClusteringStatus status = 3;
+  int32 photo_count = 4;  // total photos in the run (incl. not_clusterable)
+  string date_from = 5;   // root span; "" if empty / not ready
+  string date_to = 6;
+  string created_at = 7;
+}
+
+// The full immutable result tree.
+message ClusteringResult {
+  string id = 1;
+  string user_id = 2;
+  string method = 3;
+  string params_json = 4;
+  string input_fingerprint = 5;  // determinism + future carry-over anchor
+  ClusteringStatus status = 6;
+  string error_message = 7;      // when FAILED
+  string created_at = 8;
+  ClusterNode root = 9;          // absent until READY
+}
+
+// One node in the cluster tree. Internal nodes carry children; a photo's
+// membership ("link") lives as a ClusterItem on the node it enters at.
+message ClusterNode {
+  string id = 1;                   // per-run UUID v7 (stable id for a future notes-service)
+  ClusterNodeKind kind = 2;
+  double merge_distance = 3;       // dendrogram merge height; 0 for leaves
+  string date_from = 4;
+  string date_to = 5;
+  int32 photo_count = 6;           // aggregate over subtree
+  string cover_photo_id = 7;
+  string segment_label = 8;        // device label for a SEGMENT node; "" otherwise
+  repeated ClusterNode children = 9;
+  repeated ClusterItem items = 10; // photos entering at THIS node
+}
+
+// Membership of one photo at its entry node (a "link" to a photo).
+message ClusterItem {
+  string photo_id = 1;
+}
+
+enum ClusteringStatus {
+  CLUSTERING_STATUS_UNSPECIFIED = 0;
+  CLUSTERING_STATUS_PENDING = 1;
+  CLUSTERING_STATUS_READY = 2;
+  CLUSTERING_STATUS_FAILED = 3;
+}
+
+enum ClusterNodeKind {
+  CLUSTER_NODE_KIND_UNSPECIFIED = 0;
+  CLUSTER_NODE_KIND_ROOT = 1;
+  CLUSTER_NODE_KIND_INTERNAL = 2;
+  CLUSTER_NODE_KIND_LEAF = 3;
+  CLUSTER_NODE_KIND_NOT_CLUSTERABLE = 4;  // top-level bucket for excluded photos
+  CLUSTER_NODE_KIND_SEGMENT = 5;          // device segment (time_only anti-injection guard)
 }

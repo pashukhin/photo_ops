@@ -13,24 +13,300 @@ import { HealthCheckRequest, HealthCheckResponse } from "../../common/v1/common"
 
 export const protobufPackage = "photoops.cluster.v1";
 
+export enum ClusteringStatus {
+  CLUSTERING_STATUS_UNSPECIFIED = 0,
+  CLUSTERING_STATUS_PENDING = 1,
+  CLUSTERING_STATUS_READY = 2,
+  CLUSTERING_STATUS_FAILED = 3,
+  UNRECOGNIZED = -1,
+}
+
+export enum ClusterNodeKind {
+  CLUSTER_NODE_KIND_UNSPECIFIED = 0,
+  CLUSTER_NODE_KIND_ROOT = 1,
+  CLUSTER_NODE_KIND_INTERNAL = 2,
+  CLUSTER_NODE_KIND_LEAF = 3,
+  /** CLUSTER_NODE_KIND_NOT_CLUSTERABLE - top-level bucket for excluded photos */
+  CLUSTER_NODE_KIND_NOT_CLUSTERABLE = 4,
+  /** CLUSTER_NODE_KIND_SEGMENT - device segment (time_only anti-injection guard) */
+  CLUSTER_NODE_KIND_SEGMENT = 5,
+  UNRECOGNIZED = -1,
+}
+
+export interface ListClusteringMethodsRequest {
+}
+
+export interface ListClusteringMethodsResponse {
+  methods: ClusteringMethodDescriptor[];
+}
+
+/**
+ * A method the registry can run. `required_photo_fields` drives the
+ * not_clusterable partition (a photo missing any required field is excluded).
+ */
+export interface ClusteringMethodDescriptor {
+  /** stable id, e.g. "time_only" */
+  id: string;
+  /** human label */
+  displayName: string;
+  description: string;
+  /** e.g. ["taken_at"] */
+  requiredPhotoFields: string[];
+  /** JSON object of default params */
+  defaultParamsJson: string;
+}
+
 export interface GenerateClustersRequest {
+  /** caller-supplied from the validated session in api-gateway */
+  userId: string;
+  /** "all" (only value in this slice) */
   scope: string;
+  /** method id from the registry (required) */
+  method: string;
+  /** JSON overriding method defaults; "" -> defaults */
+  paramsJson: string;
 }
 
 export interface GenerateClustersResponse {
-  jobId: string;
+  /** == job_id, UUID v7 */
+  resultId: string;
+  /** PENDING on accept */
+  status: ClusteringStatus;
+}
+
+export interface GetClusteringResultRequest {
+  resultId: string;
+  /** owner scope */
+  userId: string;
+}
+
+export interface ListClusteringResultsRequest {
+  /** owner scope */
+  userId: string;
+}
+
+export interface ListClusteringResultsResponse {
+  results: ClusteringResultSummary[];
+}
+
+export interface ClusteringResultSummary {
+  id: string;
+  method: string;
+  status: ClusteringStatus;
+  /** total photos in the run (incl. not_clusterable) */
+  photoCount: number;
+  /** root span; "" if empty / not ready */
+  dateFrom: string;
+  dateTo: string;
+  createdAt: string;
+}
+
+/** The full immutable result tree. */
+export interface ClusteringResult {
+  id: string;
+  userId: string;
+  method: string;
+  paramsJson: string;
+  /** determinism + future carry-over anchor */
+  inputFingerprint: string;
+  status: ClusteringStatus;
+  /** when FAILED */
+  errorMessage: string;
+  createdAt: string;
+  /** absent until READY */
+  root: ClusterNode | undefined;
+}
+
+/**
+ * One node in the cluster tree. Internal nodes carry children; a photo's
+ * membership ("link") lives as a ClusterItem on the node it enters at.
+ */
+export interface ClusterNode {
+  /** per-run UUID v7 (stable id for a future notes-service) */
+  id: string;
+  kind: ClusterNodeKind;
+  /** dendrogram merge height; 0 for leaves */
+  mergeDistance: number;
+  dateFrom: string;
+  dateTo: string;
+  /** aggregate over subtree */
+  photoCount: number;
+  coverPhotoId: string;
+  /** device label for a SEGMENT node; "" otherwise */
+  segmentLabel: string;
+  children: ClusterNode[];
+  /** photos entering at THIS node */
+  items: ClusterItem[];
+}
+
+/** Membership of one photo at its entry node (a "link" to a photo). */
+export interface ClusterItem {
+  photoId: string;
 }
 
 export const PHOTOOPS_CLUSTER_V1_PACKAGE_NAME = "photoops.cluster.v1";
 
+function createBaseListClusteringMethodsRequest(): ListClusteringMethodsRequest {
+  return {};
+}
+
+export const ListClusteringMethodsRequest: MessageFns<ListClusteringMethodsRequest> = {
+  encode(_: ListClusteringMethodsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListClusteringMethodsRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListClusteringMethodsRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBaseListClusteringMethodsResponse(): ListClusteringMethodsResponse {
+  return { methods: [] };
+}
+
+export const ListClusteringMethodsResponse: MessageFns<ListClusteringMethodsResponse> = {
+  encode(message: ListClusteringMethodsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.methods) {
+      ClusteringMethodDescriptor.encode(v!, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListClusteringMethodsResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListClusteringMethodsResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.methods.push(ClusteringMethodDescriptor.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBaseClusteringMethodDescriptor(): ClusteringMethodDescriptor {
+  return { id: "", displayName: "", description: "", requiredPhotoFields: [], defaultParamsJson: "" };
+}
+
+export const ClusteringMethodDescriptor: MessageFns<ClusteringMethodDescriptor> = {
+  encode(message: ClusteringMethodDescriptor, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.id !== "") {
+      writer.uint32(10).string(message.id);
+    }
+    if (message.displayName !== "") {
+      writer.uint32(18).string(message.displayName);
+    }
+    if (message.description !== "") {
+      writer.uint32(26).string(message.description);
+    }
+    for (const v of message.requiredPhotoFields) {
+      writer.uint32(34).string(v!);
+    }
+    if (message.defaultParamsJson !== "") {
+      writer.uint32(42).string(message.defaultParamsJson);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ClusteringMethodDescriptor {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseClusteringMethodDescriptor();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.id = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.displayName = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.description = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.requiredPhotoFields.push(reader.string());
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.defaultParamsJson = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
 function createBaseGenerateClustersRequest(): GenerateClustersRequest {
-  return { scope: "" };
+  return { userId: "", scope: "", method: "", paramsJson: "" };
 }
 
 export const GenerateClustersRequest: MessageFns<GenerateClustersRequest> = {
   encode(message: GenerateClustersRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.userId !== "") {
+      writer.uint32(10).string(message.userId);
+    }
     if (message.scope !== "") {
-      writer.uint32(10).string(message.scope);
+      writer.uint32(18).string(message.scope);
+    }
+    if (message.method !== "") {
+      writer.uint32(26).string(message.method);
+    }
+    if (message.paramsJson !== "") {
+      writer.uint32(34).string(message.paramsJson);
     }
     return writer;
   },
@@ -47,7 +323,31 @@ export const GenerateClustersRequest: MessageFns<GenerateClustersRequest> = {
             break;
           }
 
+          message.userId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
           message.scope = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.method = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.paramsJson = reader.string();
           continue;
         }
       }
@@ -61,13 +361,16 @@ export const GenerateClustersRequest: MessageFns<GenerateClustersRequest> = {
 };
 
 function createBaseGenerateClustersResponse(): GenerateClustersResponse {
-  return { jobId: "" };
+  return { resultId: "", status: 0 };
 }
 
 export const GenerateClustersResponse: MessageFns<GenerateClustersResponse> = {
   encode(message: GenerateClustersResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.jobId !== "") {
-      writer.uint32(10).string(message.jobId);
+    if (message.resultId !== "") {
+      writer.uint32(10).string(message.resultId);
+    }
+    if (message.status !== 0) {
+      writer.uint32(16).int32(message.status);
     }
     return writer;
   },
@@ -84,7 +387,15 @@ export const GenerateClustersResponse: MessageFns<GenerateClustersResponse> = {
             break;
           }
 
-          message.jobId = reader.string();
+          message.resultId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.status = reader.int32() as any;
           continue;
         }
       }
@@ -97,25 +408,629 @@ export const GenerateClustersResponse: MessageFns<GenerateClustersResponse> = {
   },
 };
 
+function createBaseGetClusteringResultRequest(): GetClusteringResultRequest {
+  return { resultId: "", userId: "" };
+}
+
+export const GetClusteringResultRequest: MessageFns<GetClusteringResultRequest> = {
+  encode(message: GetClusteringResultRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.resultId !== "") {
+      writer.uint32(10).string(message.resultId);
+    }
+    if (message.userId !== "") {
+      writer.uint32(18).string(message.userId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetClusteringResultRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetClusteringResultRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.resultId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.userId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBaseListClusteringResultsRequest(): ListClusteringResultsRequest {
+  return { userId: "" };
+}
+
+export const ListClusteringResultsRequest: MessageFns<ListClusteringResultsRequest> = {
+  encode(message: ListClusteringResultsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.userId !== "") {
+      writer.uint32(10).string(message.userId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListClusteringResultsRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListClusteringResultsRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.userId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBaseListClusteringResultsResponse(): ListClusteringResultsResponse {
+  return { results: [] };
+}
+
+export const ListClusteringResultsResponse: MessageFns<ListClusteringResultsResponse> = {
+  encode(message: ListClusteringResultsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.results) {
+      ClusteringResultSummary.encode(v!, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListClusteringResultsResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListClusteringResultsResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.results.push(ClusteringResultSummary.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBaseClusteringResultSummary(): ClusteringResultSummary {
+  return { id: "", method: "", status: 0, photoCount: 0, dateFrom: "", dateTo: "", createdAt: "" };
+}
+
+export const ClusteringResultSummary: MessageFns<ClusteringResultSummary> = {
+  encode(message: ClusteringResultSummary, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.id !== "") {
+      writer.uint32(10).string(message.id);
+    }
+    if (message.method !== "") {
+      writer.uint32(18).string(message.method);
+    }
+    if (message.status !== 0) {
+      writer.uint32(24).int32(message.status);
+    }
+    if (message.photoCount !== 0) {
+      writer.uint32(32).int32(message.photoCount);
+    }
+    if (message.dateFrom !== "") {
+      writer.uint32(42).string(message.dateFrom);
+    }
+    if (message.dateTo !== "") {
+      writer.uint32(50).string(message.dateTo);
+    }
+    if (message.createdAt !== "") {
+      writer.uint32(58).string(message.createdAt);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ClusteringResultSummary {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseClusteringResultSummary();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.id = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.method = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.status = reader.int32() as any;
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.photoCount = reader.int32();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.dateFrom = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.dateTo = reader.string();
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.createdAt = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBaseClusteringResult(): ClusteringResult {
+  return {
+    id: "",
+    userId: "",
+    method: "",
+    paramsJson: "",
+    inputFingerprint: "",
+    status: 0,
+    errorMessage: "",
+    createdAt: "",
+    root: undefined,
+  };
+}
+
+export const ClusteringResult: MessageFns<ClusteringResult> = {
+  encode(message: ClusteringResult, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.id !== "") {
+      writer.uint32(10).string(message.id);
+    }
+    if (message.userId !== "") {
+      writer.uint32(18).string(message.userId);
+    }
+    if (message.method !== "") {
+      writer.uint32(26).string(message.method);
+    }
+    if (message.paramsJson !== "") {
+      writer.uint32(34).string(message.paramsJson);
+    }
+    if (message.inputFingerprint !== "") {
+      writer.uint32(42).string(message.inputFingerprint);
+    }
+    if (message.status !== 0) {
+      writer.uint32(48).int32(message.status);
+    }
+    if (message.errorMessage !== "") {
+      writer.uint32(58).string(message.errorMessage);
+    }
+    if (message.createdAt !== "") {
+      writer.uint32(66).string(message.createdAt);
+    }
+    if (message.root !== undefined) {
+      ClusterNode.encode(message.root, writer.uint32(74).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ClusteringResult {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseClusteringResult();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.id = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.userId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.method = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.paramsJson = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.inputFingerprint = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.status = reader.int32() as any;
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+        }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.createdAt = reader.string();
+          continue;
+        }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.root = ClusterNode.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBaseClusterNode(): ClusterNode {
+  return {
+    id: "",
+    kind: 0,
+    mergeDistance: 0,
+    dateFrom: "",
+    dateTo: "",
+    photoCount: 0,
+    coverPhotoId: "",
+    segmentLabel: "",
+    children: [],
+    items: [],
+  };
+}
+
+export const ClusterNode: MessageFns<ClusterNode> = {
+  encode(message: ClusterNode, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.id !== "") {
+      writer.uint32(10).string(message.id);
+    }
+    if (message.kind !== 0) {
+      writer.uint32(16).int32(message.kind);
+    }
+    if (message.mergeDistance !== 0) {
+      writer.uint32(25).double(message.mergeDistance);
+    }
+    if (message.dateFrom !== "") {
+      writer.uint32(34).string(message.dateFrom);
+    }
+    if (message.dateTo !== "") {
+      writer.uint32(42).string(message.dateTo);
+    }
+    if (message.photoCount !== 0) {
+      writer.uint32(48).int32(message.photoCount);
+    }
+    if (message.coverPhotoId !== "") {
+      writer.uint32(58).string(message.coverPhotoId);
+    }
+    if (message.segmentLabel !== "") {
+      writer.uint32(66).string(message.segmentLabel);
+    }
+    for (const v of message.children) {
+      ClusterNode.encode(v!, writer.uint32(74).fork()).join();
+    }
+    for (const v of message.items) {
+      ClusterItem.encode(v!, writer.uint32(82).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ClusterNode {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseClusterNode();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.id = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.kind = reader.int32() as any;
+          continue;
+        }
+        case 3: {
+          if (tag !== 25) {
+            break;
+          }
+
+          message.mergeDistance = reader.double();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.dateFrom = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.dateTo = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 48) {
+            break;
+          }
+
+          message.photoCount = reader.int32();
+          continue;
+        }
+        case 7: {
+          if (tag !== 58) {
+            break;
+          }
+
+          message.coverPhotoId = reader.string();
+          continue;
+        }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.segmentLabel = reader.string();
+          continue;
+        }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.children.push(ClusterNode.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 10: {
+          if (tag !== 82) {
+            break;
+          }
+
+          message.items.push(ClusterItem.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBaseClusterItem(): ClusterItem {
+  return { photoId: "" };
+}
+
+export const ClusterItem: MessageFns<ClusterItem> = {
+  encode(message: ClusterItem, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.photoId !== "") {
+      writer.uint32(10).string(message.photoId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ClusterItem {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseClusterItem();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.photoId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+/**
+ * Deterministic hierarchical clustering of a user's photos into an immutable
+ * tree. Clustering methods are pluggable behind a registry (SOLID): this slice
+ * ships `time_only`; space-time is a registered-later seam. Runs are async
+ * (result_id == async job id); see process.proto for the RabbitMQ contract.
+ */
+
 export interface ClusterServiceClient {
   health(request: HealthCheckRequest): Observable<HealthCheckResponse>;
 
+  /** The clustering methods this service can run (the registry surface). */
+
+  listClusteringMethods(request: ListClusteringMethodsRequest): Observable<ListClusteringMethodsResponse>;
+
+  /**
+   * Start an async clustering run over the caller's photos. Returns immediately
+   * with a PENDING result whose id equals the async job id.
+   */
+
   generateClusters(request: GenerateClustersRequest): Observable<GenerateClustersResponse>;
+
+  /** One clustering result as the full immutable tree, owner-scoped. */
+
+  getClusteringResult(request: GetClusteringResultRequest): Observable<ClusteringResult>;
+
+  /** The caller's clustering results (metadata only, no tree). */
+
+  listClusteringResults(request: ListClusteringResultsRequest): Observable<ListClusteringResultsResponse>;
 }
+
+/**
+ * Deterministic hierarchical clustering of a user's photos into an immutable
+ * tree. Clustering methods are pluggable behind a registry (SOLID): this slice
+ * ships `time_only`; space-time is a registered-later seam. Runs are async
+ * (result_id == async job id); see process.proto for the RabbitMQ contract.
+ */
 
 export interface ClusterServiceController {
   health(
     request: HealthCheckRequest,
   ): Promise<HealthCheckResponse> | Observable<HealthCheckResponse> | HealthCheckResponse;
 
+  /** The clustering methods this service can run (the registry surface). */
+
+  listClusteringMethods(
+    request: ListClusteringMethodsRequest,
+  ): Promise<ListClusteringMethodsResponse> | Observable<ListClusteringMethodsResponse> | ListClusteringMethodsResponse;
+
+  /**
+   * Start an async clustering run over the caller's photos. Returns immediately
+   * with a PENDING result whose id equals the async job id.
+   */
+
   generateClusters(
     request: GenerateClustersRequest,
   ): Promise<GenerateClustersResponse> | Observable<GenerateClustersResponse> | GenerateClustersResponse;
+
+  /** One clustering result as the full immutable tree, owner-scoped. */
+
+  getClusteringResult(
+    request: GetClusteringResultRequest,
+  ): Promise<ClusteringResult> | Observable<ClusteringResult> | ClusteringResult;
+
+  /** The caller's clustering results (metadata only, no tree). */
+
+  listClusteringResults(
+    request: ListClusteringResultsRequest,
+  ): Promise<ListClusteringResultsResponse> | Observable<ListClusteringResultsResponse> | ListClusteringResultsResponse;
 }
 
 export function ClusterServiceControllerMethods() {
   return function (constructor: Function) {
-    const grpcMethods: string[] = ["health", "generateClusters"];
+    const grpcMethods: string[] = [
+      "health",
+      "listClusteringMethods",
+      "generateClusters",
+      "getClusteringResult",
+      "listClusteringResults",
+    ];
     for (const method of grpcMethods) {
       const descriptor: any = Reflect.getOwnPropertyDescriptor(constructor.prototype, method);
       GrpcMethod("ClusterService", method)(constructor.prototype[method], method, descriptor);
@@ -130,6 +1045,12 @@ export function ClusterServiceControllerMethods() {
 
 export const CLUSTER_SERVICE_NAME = "ClusterService";
 
+/**
+ * Deterministic hierarchical clustering of a user's photos into an immutable
+ * tree. Clustering methods are pluggable behind a registry (SOLID): this slice
+ * ships `time_only`; space-time is a registered-later seam. Runs are async
+ * (result_id == async job id); see process.proto for the RabbitMQ contract.
+ */
 export type ClusterServiceService = typeof ClusterServiceService;
 export const ClusterServiceService = {
   health: {
@@ -141,6 +1062,22 @@ export const ClusterServiceService = {
     responseSerialize: (value: HealthCheckResponse): Buffer => Buffer.from(HealthCheckResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer): HealthCheckResponse => HealthCheckResponse.decode(value),
   },
+  /** The clustering methods this service can run (the registry surface). */
+  listClusteringMethods: {
+    path: "/photoops.cluster.v1.ClusterService/ListClusteringMethods" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: ListClusteringMethodsRequest): Buffer =>
+      Buffer.from(ListClusteringMethodsRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ListClusteringMethodsRequest => ListClusteringMethodsRequest.decode(value),
+    responseSerialize: (value: ListClusteringMethodsResponse): Buffer =>
+      Buffer.from(ListClusteringMethodsResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ListClusteringMethodsResponse => ListClusteringMethodsResponse.decode(value),
+  },
+  /**
+   * Start an async clustering run over the caller's photos. Returns immediately
+   * with a PENDING result whose id equals the async job id.
+   */
   generateClusters: {
     path: "/photoops.cluster.v1.ClusterService/GenerateClusters" as const,
     requestStream: false as const,
@@ -152,11 +1089,44 @@ export const ClusterServiceService = {
       Buffer.from(GenerateClustersResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer): GenerateClustersResponse => GenerateClustersResponse.decode(value),
   },
+  /** One clustering result as the full immutable tree, owner-scoped. */
+  getClusteringResult: {
+    path: "/photoops.cluster.v1.ClusterService/GetClusteringResult" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: GetClusteringResultRequest): Buffer =>
+      Buffer.from(GetClusteringResultRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): GetClusteringResultRequest => GetClusteringResultRequest.decode(value),
+    responseSerialize: (value: ClusteringResult): Buffer => Buffer.from(ClusteringResult.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ClusteringResult => ClusteringResult.decode(value),
+  },
+  /** The caller's clustering results (metadata only, no tree). */
+  listClusteringResults: {
+    path: "/photoops.cluster.v1.ClusterService/ListClusteringResults" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: ListClusteringResultsRequest): Buffer =>
+      Buffer.from(ListClusteringResultsRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ListClusteringResultsRequest => ListClusteringResultsRequest.decode(value),
+    responseSerialize: (value: ListClusteringResultsResponse): Buffer =>
+      Buffer.from(ListClusteringResultsResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ListClusteringResultsResponse => ListClusteringResultsResponse.decode(value),
+  },
 } as const;
 
 export interface ClusterServiceServer extends UntypedServiceImplementation {
   health: handleUnaryCall<HealthCheckRequest, HealthCheckResponse>;
+  /** The clustering methods this service can run (the registry surface). */
+  listClusteringMethods: handleUnaryCall<ListClusteringMethodsRequest, ListClusteringMethodsResponse>;
+  /**
+   * Start an async clustering run over the caller's photos. Returns immediately
+   * with a PENDING result whose id equals the async job id.
+   */
   generateClusters: handleUnaryCall<GenerateClustersRequest, GenerateClustersResponse>;
+  /** One clustering result as the full immutable tree, owner-scoped. */
+  getClusteringResult: handleUnaryCall<GetClusteringResultRequest, ClusteringResult>;
+  /** The caller's clustering results (metadata only, no tree). */
+  listClusteringResults: handleUnaryCall<ListClusteringResultsRequest, ListClusteringResultsResponse>;
 }
 
 export interface MessageFns<T> {

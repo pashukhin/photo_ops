@@ -1,0 +1,14 @@
+version: v2
+managed:
+  enabled: true
+# cluster-service is the first Python gRPC service: it SERVES cluster/v1 and is a
+# CLIENT of photo/v1 (ListPhotoSpacetime), so it needs both message stubs and the
+# grpc servicer/stub. Separate template from buf.gen.python.yaml (media-worker
+# needs message stubs only, and a different output dir).
+plugins:
+  - remote: buf.build/protocolbuffers/python
+    out: ../apps/cluster-service/src/photoops_proto
+  - remote: buf.build/protocolbuffers/pyi
+    out: ../apps/cluster-service/src/photoops_proto
+  - remote: buf.build/grpc/python
+    out: ../apps/cluster-service/src/photoops_proto
