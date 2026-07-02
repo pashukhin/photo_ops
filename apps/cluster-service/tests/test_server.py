@@ -56,6 +56,16 @@ def test_generate_unknown_method_aborts() -> None:
     assert ctx.code == grpc.StatusCode.INVALID_ARGUMENT
 
 
+def test_generate_invalid_params_json_aborts() -> None:
+    svc, _, _ = _servicer()
+    ctx = FakeContext()
+    with pytest.raises(_Abort):
+        svc.GenerateClusters(
+            pb.GenerateClustersRequest(user_id="u1", method="time_only", params_json="{bad"), ctx
+        )
+    assert ctx.code == grpc.StatusCode.INVALID_ARGUMENT
+
+
 def test_get_result_is_owner_scoped() -> None:
     svc, _, _ = _servicer()
     req = pb.GenerateClustersRequest(user_id="u1", method="time_only")

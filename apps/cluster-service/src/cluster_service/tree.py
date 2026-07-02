@@ -7,7 +7,7 @@ ordering and spans here never compare aware-vs-naive datetimes.
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .model import NodeKind, PhotoPoint, TreeNode
 
@@ -55,8 +55,11 @@ def build_segment_tree(
     import numpy as np
     from scipy.cluster.hierarchy import linkage, to_tree
 
-    # 1-D feature = capture time in seconds; euclidean distance = |Δt|.
-    seconds = np.array([[p.taken_at.timestamp()] for p in pts])  # type: ignore[union-attr]
+    # 1-D feature = capture time in seconds; euclidean distance = |Δt|. taken_at is
+    # naive (codec-flattened); treat it as UTC so .timestamp() is host-TZ/DST-independent.
+    seconds = np.array(
+        [[p.taken_at.replace(tzinfo=timezone.utc).timestamp()] for p in pts]  # type: ignore[union-attr]
+    )
     sci_root = to_tree(linkage(seconds, method="average", metric="euclidean"))
 
     def build(node: "object") -> TreeNode:

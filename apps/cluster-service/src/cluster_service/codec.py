@@ -63,7 +63,9 @@ def _resolve_taken_at(taken_at_utc: str, taken_at_local: str) -> datetime | None
             dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
         return dt
     if taken_at_local:
-        return datetime.fromisoformat(taken_at_local)
+        # local is a tz-less wall-clock; drop any stray offset so PhotoPoint.taken_at
+        # stays naive (mixing an aware local with a naive utc would raise on compare).
+        return datetime.fromisoformat(taken_at_local).replace(tzinfo=None)
     return None
 
 

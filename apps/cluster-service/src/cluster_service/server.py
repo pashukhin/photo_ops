@@ -6,6 +6,7 @@ when the worker's cluster.result arrives (mirrors photo-service finalizing).
 """
 from __future__ import annotations
 
+import json
 import logging
 from collections.abc import Callable
 
@@ -56,8 +57,13 @@ class ClusterServicer(pb_grpc.ClusterServiceServicer):
             context.abort(
                 grpc.StatusCode.INVALID_ARGUMENT, f"unknown clustering method: {request.method!r}"
             )
-        result_id = self._id_factory()
         params_json = request.params_json or "{}"
+        try:
+            json.loads(params_json)  # reject bad params synchronously, not as an async FAILED
+        except json.JSONDecodeError:
+            context.abort(grpc.StatusCode.INVALID_ARGUMENT, "params must be valid JSON")
+        result_id = self._id_factory()
+        correlation_id = self._id_factory()  # thread trace context through the async flow
         scope = request.scope or "all"
         self._store.create_pending(
             result_id=result_id,
@@ -74,8 +80,9 @@ class ClusterServicer(pb_grpc.ClusterServiceServicer):
                     user_id=request.user_id,
                     method=request.method,
                     params_json=params_json,
+                    correlation_id=correlation_id,
                 ),
-                correlation_id="",
+                correlation_id=correlation_id,
             ),
         )
         return pb.GenerateClustersResponse(

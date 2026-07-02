@@ -58,6 +58,14 @@ def test_photo_point_local_only() -> None:
     assert pt.taken_at == datetime(2024, 6, 15, 9, 0, 0)
 
 
+def test_photo_point_local_offset_flattened_to_naive() -> None:
+    # a stray offset on the tz-less local wall-clock is dropped (kept naive)
+    ps = photo_service_pb2.PhotoSpacetime(photo_id="p", taken_at_local="2024-06-15T09:00:00+05:00")
+    pt = photo_point_from_proto(ps)
+    assert pt.taken_at == datetime(2024, 6, 15, 9, 0, 0)
+    assert pt.taken_at.tzinfo is None
+
+
 def test_photo_point_no_time_and_optional_coords() -> None:
     ps = photo_service_pb2.PhotoSpacetime(photo_id="p3")
     pt = photo_point_from_proto(ps)

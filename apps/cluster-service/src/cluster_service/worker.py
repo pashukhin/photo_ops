@@ -23,7 +23,6 @@ from .metering import RawUsage, RssMemorySampler, build_consumption_event
 from .pipeline import run_clustering
 from .ports import PhotoSpacetimeReader
 from .store import Store
-from .tree import count_nodes
 
 log = logging.getLogger(__name__)
 
@@ -105,7 +104,9 @@ class ClusterWorker:
             wall_seconds=self._clock() - t0,
             cpu_seconds=self._cpu_clock() - c0,
             byte_seconds=sampler.byte_seconds(),
-            clusters_generated=count_nodes(tree.root),
+            # One billable clustering operation (mirrors photo_processed=1). The
+            # tree's node/photo counts are on the result, not the usage ledger.
+            clusters_generated=1,
         )
         self._store.save_tree(
             result_id=job.result_id, tree=tree, consumption_json=_usage_json(usage)

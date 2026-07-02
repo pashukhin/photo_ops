@@ -8,7 +8,6 @@ memory-time integral (∫ RSS dt), approximated by sampling RSS over the run.
 from __future__ import annotations
 
 import os
-import threading
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -45,9 +44,13 @@ def _default_rss_reader() -> int:
 
 
 class RssMemorySampler:
-    """Accumulates (time, RSS) samples to approximate byte_seconds. The sampling
-    schedule is external: call sample() on a cadence (see run_periodic for the
-    threaded driver), then read byte_seconds()."""
+    """Accumulates (time, RSS) samples and integrates them into byte_seconds
+    (memory-time integral). The sampling schedule is external: the worker samples
+    at the start and end of a run (a start/end trapezoid estimate).
+
+    *Seam:* a periodic in-run sampler (a daemon thread ticking sample() on a
+    cadence) would refine the integral for long runs; deferred while runs are
+    fast and compute units are not yet priced (ADR-0004 / ADR-0005)."""
 
     def __init__(
         self,
@@ -63,15 +66,6 @@ class RssMemorySampler:
 
     def byte_seconds(self) -> float:
         return integrate_byte_seconds(self._samples)
-
-
-def run_periodic(
-    sampler: RssMemorySampler, interval: float, stop: threading.Event
-) -> None:  # pragma: no cover - threaded IO driver, exercised at component/smoke level
-    """Sample until `stop` is set. Runs on a daemon thread around the compute."""
-    while not stop.is_set():
-        sampler.sample()
-        stop.wait(interval)
 
 
 def build_consumption_event(
