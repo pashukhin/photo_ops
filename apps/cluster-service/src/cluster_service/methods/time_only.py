@@ -45,13 +45,35 @@ class TimeOnlyMethod(ClusteringMethod):
         params: dict,
         id_factory: Callable[[], str],
     ) -> list[TreeNode]:
-        # Group by device (stable), build a per-device SEGMENT node whose child is
-        # the device's time dendrogram, ordered by earliest capture then label.
-        raise NotImplementedError(
-            "time_only.cluster — GREEN pending (photo_ops-9dk): group by "
-            f"{device_label!r}, build {NodeKind.SEGMENT} nodes over "
-            f"{build_segment_tree!r}"
-        )
+        # Hard-partition by capture device (anti-injection), then time-cluster
+        # within each device. Segments are ordered by earliest capture then label
+        # for determinism.
+        groups: dict[str, list[PhotoPoint]] = {}
+        for p in points:
+            groups.setdefault(device_label(p.camera_make, p.camera_model), []).append(p)
+
+        segments: list[TreeNode] = []
+        for label, pts in sorted(groups.items(), key=lambda kv: (min(_stamps(kv[1])), kv[0])):
+            ordered = sorted(pts, key=lambda p: (p.taken_at, p.photo_id))
+            subtree = build_segment_tree(ordered, id_factory)
+            segments.append(
+                TreeNode(
+                    id=id_factory(),
+                    kind=NodeKind.SEGMENT,
+                    segment_label=label,
+                    date_from=subtree.date_from,
+                    date_to=subtree.date_to,
+                    photo_count=subtree.photo_count,
+                    cover_photo_id=subtree.cover_photo_id,
+                    children=[subtree],
+                )
+            )
+        return segments
+
+
+def _stamps(points: list[PhotoPoint]) -> list:
+    # time_only requires taken_at, so every point here has one.
+    return [p.taken_at for p in points]
 
 
 register(TimeOnlyMethod())

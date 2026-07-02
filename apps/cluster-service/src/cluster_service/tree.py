@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from datetime import datetime
 
-from .model import PhotoPoint, TreeNode
+from .model import NodeKind, PhotoPoint, TreeNode
 
 
 def pick_cover(points: Sequence[PhotoPoint]) -> str | None:
@@ -41,7 +41,6 @@ def build_segment_tree(
 ) -> TreeNode:
     """Cluster one device segment's points by capture time into a dendrogram tree.
 
-    Contract (GREEN — photo_ops-9dk):
     - 1 point  → a single LEAF node carrying that photo as its only item.
     - N points → scipy average-linkage over the 1-D time values yields a binary
       dendrogram; each merge becomes an INTERNAL node with merge_distance = the
@@ -49,4 +48,48 @@ def build_segment_tree(
       item at that (entry) node. Aggregates (photo_count, date span, cover) are
       filled bottom-up. Closer-in-time photos share a nearer common ancestor.
     """
-    raise NotImplementedError("build_segment_tree — GREEN pending (photo_ops-9dk)")
+    pts = list(points)
+    if len(pts) == 1:
+        return _leaf(pts[0], id_factory)
+
+    import numpy as np
+    from scipy.cluster.hierarchy import linkage, to_tree
+
+    # 1-D feature = capture time in seconds; euclidean distance = |Δt|.
+    seconds = np.array([[p.taken_at.timestamp()] for p in pts])  # type: ignore[union-attr]
+    sci_root = to_tree(linkage(seconds, method="average", metric="euclidean"))
+
+    def build(node: "object") -> TreeNode:
+        if node.is_leaf():  # type: ignore[attr-defined]
+            return _leaf(pts[node.id], id_factory)  # type: ignore[attr-defined]
+        children = [build(node.get_left()), build(node.get_right())]  # type: ignore[attr-defined]
+        # Children come from leaves (each has a capture time + cover), so these
+        # aggregates are always populated.
+        froms = [c.date_from for c in children if c.date_from is not None]
+        tos = [c.date_to for c in children if c.date_to is not None]
+        best = min(children, key=lambda c: (c.date_from or datetime.min, c.cover_photo_id or ""))
+        return TreeNode(
+            id=id_factory(),
+            kind=NodeKind.INTERNAL,
+            merge_distance=float(node.dist),  # type: ignore[attr-defined]
+            date_from=min(froms) if froms else None,
+            date_to=max(tos) if tos else None,
+            photo_count=sum(c.photo_count for c in children),
+            cover_photo_id=best.cover_photo_id,
+            children=children,
+        )
+
+    return build(sci_root)
+
+
+def _leaf(point: PhotoPoint, id_factory: Callable[[], str]) -> TreeNode:
+    return TreeNode(
+        id=id_factory(),
+        kind=NodeKind.LEAF,
+        merge_distance=0.0,
+        date_from=point.taken_at,
+        date_to=point.taken_at,
+        photo_count=1,
+        cover_photo_id=point.photo_id,
+        items=[point.photo_id],
+    )
