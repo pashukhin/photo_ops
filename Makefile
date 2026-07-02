@@ -1,4 +1,4 @@
-.PHONY: install proto proto-check build build-libs typecheck test lint gate gate-media gate-usage vet-usage lint-usage test-usage test-api test-identity test-photo test-web test-media-worker lint-media-worker dev down reset logs status ps-all logs-svc sh restart-svc up-svc migrate migrate-identity migrate-photo migrate-usage smoke-upload smoke-auth smoke-contract smoke-media smoke-stack smoke-ui smoke-usage smoke-coverage coverage coverage-go coverage-py coverage-ts coverage-diff coverage-selftest skeleton-gate coverage-gate smoke-skeleton-gate smoke-coverage-gate test-guard smoke-test-guard test-guard-selftest lint-hook-selftest
+.PHONY: install proto proto-check build build-libs typecheck test lint gate gate-media gate-usage vet-usage lint-usage test-usage test-api test-identity test-photo test-web test-media-worker lint-media-worker dev down reset logs status ps-all logs-svc sh restart-svc up-svc migrate migrate-identity migrate-photo migrate-usage migrate-cluster smoke-upload smoke-auth smoke-contract smoke-media smoke-stack smoke-ui smoke-usage smoke-coverage coverage coverage-go coverage-py coverage-ts coverage-diff coverage-selftest skeleton-gate coverage-gate smoke-skeleton-gate smoke-coverage-gate test-guard smoke-test-guard test-guard-selftest lint-hook-selftest
 
 ifneq (,$(wildcard .env))
 include .env
@@ -120,7 +120,7 @@ up-svc:
 	@test -n "$(svc)" || { echo "usage: make up-svc svc=<service ...>"; exit 2; }
 	$(DC) up -d --build $(svc)
 
-migrate: migrate-identity migrate-photo migrate-usage
+migrate: migrate-identity migrate-photo migrate-usage migrate-cluster
 
 migrate-identity:
 	$(DC) exec -T postgres psql -U "$${POSTGRES_SUPERUSER}" -d postgres < infra/postgres/init/001-create-databases.sql
@@ -134,6 +134,10 @@ migrate-photo:
 migrate-usage:
 	$(DC) exec -T postgres psql -U "$${POSTGRES_SUPERUSER}" -d postgres < infra/postgres/init/001-create-databases.sql
 	$(DC) exec -T postgres psql "$${USAGE_DATABASE_URL}" < apps/usage-service/migrations/0001_create_usage_tables.sql
+
+migrate-cluster:
+	$(DC) exec -T postgres psql -U "$${POSTGRES_SUPERUSER}" -d postgres < infra/postgres/init/001-create-databases.sql
+	$(DC) exec -T postgres psql "$${CLUSTER_DATABASE_URL}" < apps/cluster-service/migrations/0001_create_cluster_tables.sql
 
 smoke-upload:
 	scripts/smoke-upload.sh
