@@ -132,11 +132,11 @@ def photos(node):
         acc |= photos(c)
     return acc
 
-if res.get("photoCount") != 5:
-    fail(f"expected photoCount=5, got {res.get('photoCount')}")
 root = res.get("root")
 if not root or root.get("kind") != "root":
     fail("missing root node")
+if root.get("photoCount") != 5:
+    fail(f"expected root photoCount=5, got {root.get('photoCount')}")
 
 segments = {c.get("segmentLabel"): photos(c) for c in root["children"] if c.get("kind") == "segment"}
 notclust = [c for c in root["children"] if c.get("kind") == "not_clusterable"]
