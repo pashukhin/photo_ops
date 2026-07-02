@@ -16,10 +16,11 @@ cd "${REPO_ROOT}"
 
 TESTFILE="apps/usage-service/internal/usage/zzguard_test.go"
 
-# Precondition: clean working tree (a hard reset would destroy uncommitted work).
-if [[ -n "$(git status --porcelain)" ]]; then
-    echo "smoke-test-guard: ABORT — working tree not clean; commit/stash first" >&2
-    git status --porcelain >&2
+# Precondition: no uncommitted changes to TRACKED files (a hard reset would
+# destroy them). Untracked files are ignored — `git reset --hard` leaves them be.
+if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
+    echo "smoke-test-guard: ABORT — tracked files have uncommitted changes; commit/stash first" >&2
+    git status --porcelain --untracked-files=no >&2
     exit 1
 fi
 
