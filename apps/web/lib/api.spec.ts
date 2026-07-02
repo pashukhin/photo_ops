@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { completeUpload, createUploadIntent, getPhoto, getUsageSummary, listPhotos, listUsageEvents, signUp, uploadFileToPresignedUrl } from './api';
+import { completeUpload, createUploadIntent, generateClusters, getClusteringResult, getPhoto, getUsageSummary, listClusteringMethods, listClusteringResults, listPhotos, listUsageEvents, signUp, uploadFileToPresignedUrl } from './api';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -110,6 +110,44 @@ describe('web API helper', () => {
 
     expect(result).toEqual({ lines: [], estimatedMonthlyCost: '0.00', currency: 'USD' });
     expect(fetchMock).toHaveBeenCalledWith('http://localhost:3001/v1/usage/summary', expect.objectContaining({ credentials: 'include' }));
+  });
+
+  it('generateClusters posts method + scope + params to the gateway (session 013)', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(JSON.stringify({ resultId: 'r1', status: 'pending' })));
+
+    const result = await generateClusters({ method: 'time_only', params: { linkage: 'average' } });
+
+    expect(result).toEqual({ resultId: 'r1', status: 'pending' });
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:3001/v1/clusters/generate',
+      expect.objectContaining({
+        method: 'POST',
+        credentials: 'include',
+        body: JSON.stringify({ method: 'time_only', scope: 'all', params: { linkage: 'average' } })
+      })
+    );
+  });
+
+  it('listClusteringResults / listClusteringMethods GET with credentials (session 013)', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(() => Promise.resolve(new Response(JSON.stringify({ results: [], methods: [] }))));
+
+    await expect(listClusteringResults()).resolves.toEqual({ results: [] });
+    await expect(listClusteringMethods()).resolves.toEqual({ methods: [] });
+    expect(fetchMock).toHaveBeenCalledWith('http://localhost:3001/v1/clustering-results', expect.objectContaining({ credentials: 'include' }));
+    expect(fetchMock).toHaveBeenCalledWith('http://localhost:3001/v1/clustering-methods', expect.objectContaining({ credentials: 'include' }));
+  });
+
+  it('getClusteringResult GETs the result by id (session 013)', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ id: 'r1', status: 'ready', root: null })));
+
+    const result = await getClusteringResult('r1');
+
+    expect(result).toMatchObject({ id: 'r1', status: 'ready' });
+    expect(fetchMock).toHaveBeenCalledWith('http://localhost:3001/v1/clustering-results/r1', expect.objectContaining({ credentials: 'include' }));
   });
 
   it('uses backend error messages for signup failures', async () => {

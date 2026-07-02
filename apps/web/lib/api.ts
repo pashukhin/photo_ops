@@ -247,6 +247,94 @@ export async function listUsageEvents(_params: ListUsageEventsParams = {}): Prom
   return response.json() as Promise<UsageEvents>;
 }
 
+// --- Clustering (session 013) -----------------------------------------------
+
+export interface ClusteringMethod {
+  id: string;
+  displayName: string;
+  description: string;
+  requiredPhotoFields: string[];
+  defaultParamsJson: string;
+}
+
+export interface ClusterNode {
+  id: string;
+  kind: string; // 'root' | 'internal' | 'leaf' | 'not_clusterable' | 'segment'
+  mergeDistance: number;
+  dateFrom: string;
+  dateTo: string;
+  photoCount: number;
+  coverPhotoId: string;
+  segmentLabel: string;
+  children: ClusterNode[];
+  items: string[]; // photo ids entering at this node
+}
+
+export interface ClusteringResult {
+  id: string;
+  userId: string;
+  method: string;
+  paramsJson: string;
+  inputFingerprint: string;
+  status: string; // 'pending' | 'ready' | 'failed'
+  errorMessage: string;
+  createdAt: string;
+  root: ClusterNode | null;
+}
+
+export interface ClusteringResultSummary {
+  id: string;
+  method: string;
+  status: string;
+  photoCount: number;
+  dateFrom: string;
+  dateTo: string;
+  createdAt: string;
+}
+
+export async function listClusteringMethods(): Promise<{ methods: ClusteringMethod[] }> {
+  const response = await fetch(`${API_BASE_URL}/v1/clustering-methods`, { credentials: 'include', cache: 'no-store' });
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, `ListClusteringMethods failed: ${response.status}`));
+  }
+  const body = (await response.json()) as { methods?: ClusteringMethod[] };
+  return { methods: body.methods ?? [] };
+}
+
+export async function listClusteringResults(): Promise<{ results: ClusteringResultSummary[] }> {
+  const response = await fetch(`${API_BASE_URL}/v1/clustering-results`, { credentials: 'include', cache: 'no-store' });
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, `ListClusteringResults failed: ${response.status}`));
+  }
+  const body = (await response.json()) as { results?: ClusteringResultSummary[] };
+  return { results: body.results ?? [] };
+}
+
+export async function getClusteringResult(resultId: string): Promise<ClusteringResult> {
+  const response = await fetch(`${API_BASE_URL}/v1/clustering-results/${resultId}`, { credentials: 'include', cache: 'no-store' });
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, `GetClusteringResult failed: ${response.status}`));
+  }
+  return response.json() as Promise<ClusteringResult>;
+}
+
+export async function generateClusters(input: {
+  method: string;
+  scope?: string;
+  params?: Record<string, unknown>;
+}): Promise<{ resultId: string; status: string }> {
+  const response = await fetch(`${API_BASE_URL}/v1/clusters/generate`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ method: input.method, scope: input.scope ?? 'all', params: input.params })
+  });
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, `GenerateClusters failed: ${response.status}`));
+  }
+  return response.json() as Promise<{ resultId: string; status: string }>;
+}
+
 export async function uploadFileToPresignedUrl(uploadUrl: string, file: File) {
   const response = await fetch(uploadUrl, {
     method: 'PUT',
