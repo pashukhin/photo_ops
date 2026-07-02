@@ -21,6 +21,11 @@ def pick_cover(points: Sequence[PhotoPoint]) -> str | None:
     return chosen.photo_id
 
 
+def count_nodes(node: TreeNode) -> int:
+    """Total nodes in the subtree rooted at `node` (the domain 'clusters generated' counter)."""
+    return 1 + sum(count_nodes(c) for c in node.children)
+
+
 def time_span(points: Sequence[PhotoPoint]) -> tuple[datetime | None, datetime | None]:
     """(earliest, latest) capture instant over points, ignoring those without a
     time. (None, None) when no point has a time."""

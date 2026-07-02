@@ -26,6 +26,7 @@ class StoredResult:
     error_message: str = ""
     photo_count: int = 0
     created_at: str = ""
+    consumption_json: str = ""
     root: TreeNode | None = None
 
 
@@ -45,9 +46,11 @@ class Store(Protocol):
         self, *, result_id: str, user_id: str, method: str, params_json: str, scope: str
     ) -> None: ...
 
-    def save_success(
+    def save_tree(
         self, *, result_id: str, tree: ClusterTree, consumption_json: str
     ) -> None: ...
+
+    def mark_ready(self, *, result_id: str) -> None: ...
 
     def mark_failed(self, *, result_id: str, error_message: str) -> None: ...
 
@@ -80,14 +83,22 @@ class InMemoryStore:
         )
         self._order.append(result_id)
 
-    def save_success(self, *, result_id: str, tree: ClusterTree, consumption_json: str) -> None:
+    def save_tree(self, *, result_id: str, tree: ClusterTree, consumption_json: str) -> None:
+        # Worker persists the computed tree; status stays PENDING until the
+        # result-consumer flips it (mirrors photo-service finalizing on the result).
         r = self._results[result_id]
-        if r.status == "ready":  # already finalized — nothing to overwrite
+        if r.status != "pending":  # already finalized — immutable, don't overwrite
             return
-        r.status = "ready"
         r.input_fingerprint = tree.input_fingerprint
         r.photo_count = tree.photo_count
         r.root = tree.root
+        r.consumption_json = consumption_json
+
+    def mark_ready(self, *, result_id: str) -> None:
+        r = self._results[result_id]
+        if r.status == "failed":  # a failed run never becomes ready
+            return
+        r.status = "ready"
 
     def mark_failed(self, *, result_id: str, error_message: str) -> None:
         r = self._results[result_id]

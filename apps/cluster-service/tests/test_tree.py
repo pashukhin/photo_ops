@@ -2,8 +2,22 @@ from __future__ import annotations
 
 from conftest import BASE, collect_items, make_point
 
-from cluster_service.model import NodeKind
-from cluster_service.tree import build_segment_tree, pick_cover, time_span
+from cluster_service.model import NodeKind, TreeNode
+from cluster_service.tree import build_segment_tree, count_nodes, pick_cover, time_span
+
+
+def test_count_nodes() -> None:
+    root = TreeNode(
+        id="r",
+        kind=NodeKind.ROOT,
+        children=[
+            TreeNode(id="l1", kind=NodeKind.LEAF),
+            TreeNode(
+                id="s", kind=NodeKind.SEGMENT, children=[TreeNode(id="l2", kind=NodeKind.LEAF)]
+            ),
+        ],
+    )
+    assert count_nodes(root) == 4
 
 
 def test_pick_cover_earliest_then_id() -> None:

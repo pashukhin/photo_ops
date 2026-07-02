@@ -31,15 +31,28 @@ def test_create_pending_is_idempotent() -> None:
     assert s.get(result_id="r1", user_id="u1").status == "pending"
 
 
-def test_save_success_finalizes() -> None:
+def test_save_tree_keeps_pending_until_mark_ready() -> None:
     s = InMemoryStore()
     _pending(s)
-    s.save_success(result_id="r1", tree=_tree(), consumption_json="{}")
+    s.save_tree(result_id="r1", tree=_tree(), consumption_json='{"wall_seconds":1}')
     r = s.get(result_id="r1", user_id="u1")
-    assert r.status == "ready"
+    # tree persisted, but status stays pending until the result-consumer flips it
+    assert r.status == "pending"
     assert r.input_fingerprint == "fp1"
     assert r.photo_count == 2
     assert r.root is not None
+    assert r.consumption_json == '{"wall_seconds":1}'
+
+    s.mark_ready(result_id="r1")
+    assert s.get(result_id="r1", user_id="u1").status == "ready"
+
+
+def test_failed_run_never_becomes_ready() -> None:
+    s = InMemoryStore()
+    _pending(s)
+    s.mark_failed(result_id="r1", error_message="boom")
+    s.mark_ready(result_id="r1")  # no-op after failure
+    assert s.get(result_id="r1", user_id="u1").status == "failed"
 
 
 def test_mark_failed() -> None:
@@ -61,7 +74,8 @@ def test_get_is_owner_scoped() -> None:
 def test_list_reports_span_after_ready() -> None:
     s = InMemoryStore()
     _pending(s)
-    s.save_success(result_id="r1", tree=_tree(), consumption_json="{}")
+    s.save_tree(result_id="r1", tree=_tree(), consumption_json="{}")
+    s.mark_ready(result_id="r1")
     (summary,) = s.list_for_user(user_id="u1")
     assert summary.status == "ready"
     assert summary.date_from == datetime(2024, 6, 15, 12, 0, 0)
