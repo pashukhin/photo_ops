@@ -36,7 +36,7 @@ the osq measurement tooling (`make coverage-diff`, already on this branch):
 | Gate behaviour: untested new stub → FAIL; stub with a covering test → PASS | executable **smoke** (`scripts/smoke-skeleton-gate.sh`, throwaway-probe + trap, mirroring `smoke-coverage.sh`) |
 | RED coverage collected despite failing tests | `COVERAGE_ALLOW_FAIL` branch in `coverage-{go,py,ts}` recipes; asserted by the smoke |
 | Gate commands / thresholds | `make skeleton-gate` / `make coverage-gate` + `coverage-diff --fail-under` |
-| GREEN gate enforced on PRs | `.github/workflows/ci.yml` job (base `origin/main`, full fetch) |
+| GREEN gate enforced on PRs | `.github/workflows/ci.yml` job (base = PR base SHA `github.event.pull_request.base.sha`, `fetch-depth: 0`) |
 | **Process rule**: when to run each gate + return-to-rework (spec-change protocol) | AGENTS.md Workflow Rules + writing-plans / subagent-driven-development skills — the one thing that *must* be prose |
 | Why 100% / two gates | this note + the `q2n` issue |
 

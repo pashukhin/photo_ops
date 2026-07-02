@@ -12,7 +12,7 @@
 
 - Both gates: new/changed-code coverage must be **100%**, via `COVERAGE_FAIL_UNDER` (default 100, overridable).
 - RED path collects coverage while tolerating a non-zero test exit (`COVERAGE_ALLOW_FAIL=1`); GREEN path requires passing tests.
-- Gate base ref = merge-base with `main` (diff-cover `--compare-branch`). CI uses `origin/main` with full fetch.
+- Gate base ref = merge-base with `main` (diff-cover `--compare-branch`). CI uses the PR base SHA (`github.event.pull_request.base.sha`) with `fetch-depth: 0`.
 - Neither gate is folded into the always-on `make gate`. RED gate is local-only (never in CI). GREEN gate runs in CI on PRs.
 - Throwaway smoke probes are appended to MEASURED source files and ALWAYS reverted via an EXIT trap; never committed.
 - Do NOT weaken the osq tooling's guarded tests (`scripts/coverage/tests/*`).
@@ -122,10 +122,10 @@ git commit -m "skeleton(q2n): make coverage-gate + RED smoke (covered -> pass, u
 **Files:**
 - Modify: `.github/workflows/ci.yml` — add a `coverage-gate` job triggered on `pull_request`.
 
-**GREEN obligation:** add a job that checks out with full history (`fetch-depth: 0`), sets up the same toolchains the existing jobs use (Node/pnpm + Python + Go), and runs `make coverage-gate` with `COVERAGE_BASE=origin/main`. The local GREEN-gate behaviour is already pinned by Task 2's smoke; CI just invokes the same target against the PR base. This layer is config, not code — its correctness is the job definition + the Task 2 smoke.
+**GREEN obligation:** add a job that checks out with full history (`fetch-depth: 0`), sets up the same toolchains the existing jobs use (Node/pnpm + Python + Go), and runs `make coverage-gate` with `COVERAGE_BASE=${{ github.event.pull_request.base.sha }}`. The local GREEN-gate behaviour is already pinned by Task 2's smoke; CI just invokes the same target against the PR base. This layer is config, not code — its correctness is the job definition + the Task 2 smoke.
 
-- [ ] **Step 1: Add the `coverage-gate` job** to `ci.yml` (see existing `quality`/`media-worker`/`usage-service` jobs for the toolchain setup to mirror). `on: pull_request`; `fetch-depth: 0`; steps: setup toolchains → build coverage venv (`$(COV_STAMP)` via `make coverage-selftest` or install) → `COVERAGE_BASE=origin/main make coverage-gate`.
-- [ ] **Step 2: Validate the workflow** locally with `actionlint` if available, else assert the YAML parses and the job invokes `make coverage-gate` with `COVERAGE_BASE=origin/main`.
+- [ ] **Step 1: Add the `coverage-gate` job** to `ci.yml` (see existing `quality`/`media-worker`/`usage-service` jobs for the toolchain setup to mirror). `on: pull_request`; `fetch-depth: 0`; steps: setup toolchains → build coverage venv (`$(COV_STAMP)` via `make coverage-selftest` or install) → `COVERAGE_BASE=${{ github.event.pull_request.base.sha }} make coverage-gate`.
+- [ ] **Step 2: Validate the workflow** locally with `actionlint` if available, else assert the YAML parses and the job invokes `make coverage-gate` with `COVERAGE_BASE=${{ github.event.pull_request.base.sha }}`.
 - [ ] **Step 3: Commit** — `ci(q2n): coverage-gate job on PRs (GREEN new-code 100%)`.
 
 ---
