@@ -187,6 +187,62 @@ real product session (011), so it ships product *and* tests process.
 
 ---
 
+## Decision 7 — Automated pre-review gate tier (built 2026-07, post-011)
+
+Date: 2026-07-03 · Status: **applied** — all gates on `main`, enforced in CI,
+exercised in-anger by sessions 012–013. A post-hoc addition that **closes the
+loop** on what Decisions 1 & 5 left deferred/quick-win (`photo_ops-mp0`,
+`photo_ops-8d5`) and records the synthesis the per-feature specs do not state:
+*a tier of automatic gates now stands around the skeleton→GREEN flow so the human
+skeleton-review checkpoint (Decision 1) is handed a mechanically-trustworthy
+skeleton.*
+
+**Why.** Decision 1 relocated the human checkpoint from "approve the prose" to
+"approve the skeleton commit." That only pays off if the human spends attention on
+**design/intent**, not on mechanical checks a machine can do. The recurring
+failure it must stop: **a skeleton missing half the spec** — new stubs with no
+covering RED test (s012 shipped `internal/usage/reader.go` as an untested stub;
+`photo_ops-osq`/`q2n`). "Code expresses intent, tests express expected behavior"
+⇒ an untested new stub is an unspecified obligation. So: mechanize the checks that
+gate **review-readiness** and **GREEN completion**; leave **judgment** to the
+human and the final review.
+
+**What was built** (mechanics live in `AGENTS.md` Workflow Rules + each feature's
+`docs/superpowers/specs/2026-07-0*-*-design.md` — not restated here):
+
+| Gate | Fires | Nature | Issue |
+| --- | --- | --- | --- |
+| edit-time lint hook (`scripts/lint-changed`) | during authoring (`PostToolUse` Write\|Edit) | **advisory** per-file lint (eslint/ruff/gofmt) | `8d5` |
+| `make skeleton-gate` | at **skeleton → human-review handoff** | **hard**: 100% new/changed code has a covering RED test, else not review-ready → back to author (spec-change protocol) | `q2n` on `osq` `coverage-diff` |
+| `make test-guard` | on commits + CI PR job | **hard**: no test deleted/weakened/renamed-away without an `Allow-test-removal:` trailer | `mp0` (part) |
+| `make coverage-gate` | at **branch completion** + CI PR job | **hard**: 100% new/changed code GREEN-covered (`COVERAGE_FAIL_UNDER=<n>` overrides; new-code-scoped so legacy gaps don't block) | `q2n` |
+| executable e2e/smoke | at branch completion, when a boundary is crossed | **hard where applicable** (pure-internal/library exempt): live-stack `make smoke-*` | `dqb` |
+
+**Where they sit in the exSDD flow** (Decision 1 shape, gates inserted):
+`brainstorm → author skeleton [edit-time lint] → skeleton-gate ⟶ HUMAN SKELETON
+REVIEW → subagents fill GREEN [test-guard] → coverage-gate + executable smoke →
+final whole-branch review`. Only two gates sit *before* the human — the edit-time
+lint (advisory) and `skeleton-gate` (hard); the rest gate the GREEN/branch tier.
+
+**Negative space — NOT built (honest):**
+- **No automatic *review*.** No gate runs an LLM / `/code-review` automatically
+  before or at the human skeleton checkpoint. The edit-time hook is advisory
+  *lint*, not review. Adopting native `/code-review` for the **final** branch
+  review is still a **manual, open** intent (`photo_ops-41q`) — not automation and
+  not pre-skeleton. The skeleton checkpoint stays a human judgment act; the
+  automation here is **pass/fail gates**, not review.
+- **Anti-gaming deferred** (`photo_ops-lm9`, trigger-gated): mutation testing /
+  visible-hidden acceptance-test split (a skeleton can still assert its own trivial
+  correctness), and proto/schema/migration diff-flagging for a forced
+  design-change note. Build only if a session surfaces gaming or silent contract
+  drift the current gates miss.
+
+**Issue ledger:** `osq`/`q2n`/`8d5`/`dqb` closed (delivered); `mp0` closed
+(test-integrity guard delivered; remainder → `lm9`); open: `41q`
+(final/automatic review), `lm9` (anti-gaming).
+
+---
+
 ## The experiment — validating executable-spec (cheap, in this repo)
 
 **Default (chosen):** run executable-spec on **011 (UI gallery — exploratory,
