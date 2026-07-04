@@ -1,12 +1,26 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
+import { useSession } from '@/lib/session';
 
-// GREEN obligation (session 014): gate on useSession().status — 'loading' → a
+// Gates the authenticated route group on session status: 'loading' → a
 // non-blocking loading state (no children, no redirect); 'anonymous' →
-// useRouter().replace('/login') in an effect + no children; 'authenticated' →
-// {children}. The stub renders an inert placeholder so all three cases are RED.
+// redirect to /login (in an effect, since redirecting during render is a
+// React error) + no children; 'authenticated' → render {children}.
 export function AuthGuard({ children }: { children: ReactNode }) {
-  void children;
-  return <div data-authguard-stub />;
+  const { status } = useSession();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (status === 'anonymous') {
+      router.replace('/login');
+    }
+  }, [status, router]);
+
+  if (status === 'authenticated') {
+    return <>{children}</>;
+  }
+
+  return null;
 }
