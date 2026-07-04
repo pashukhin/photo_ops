@@ -1,9 +1,26 @@
 'use client';
 
-// GREEN obligation (session 014): if useSession().status === 'authenticated' →
-// useRouter().replace('/photos') (a logged-in user never sits on /login); else
-// render <LoginScreen/>. The stub renders nothing so both cases are RED via
-// assertion (never throw: a thrown stub makes vitest exit 2, no coverage written).
+// GREEN (session 014): an already-authenticated visitor must never sit on
+// /login, so redirect them to /photos as a side effect once status settles;
+// otherwise render the login/sign-up screen.
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useSession } from '@/lib/session';
+import { LoginScreen } from '@/components/auth/LoginScreen';
+
 export default function LoginPage() {
-  return null;
+  const { status } = useSession();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (status === 'authenticated') {
+      router.replace('/photos');
+    }
+  }, [status, router]);
+
+  if (status === 'authenticated') {
+    return null;
+  }
+
+  return <LoginScreen />;
 }

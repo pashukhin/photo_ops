@@ -1,6 +1,9 @@
-// GREEN obligation (session 014): redirect('/photos') — `/` is no longer a page,
-// Photos is the app's home section. The stub renders nothing so the redirect test
-// is RED via assertion (never throw: a thrown stub makes vitest exit 2, no coverage).
-export default function RootPage() {
-  return null;
+import { redirect } from 'next/navigation';
+
+// GREEN (session 014): `/` is no longer a page — Photos is the app's home
+// section. redirect() has return type `never`; returning its value (rather
+// than a bare statement) keeps RootPage's inferred return type `never`
+// instead of `void`, which is required for it to type as a JSX component.
+export default function RootPage(): never {
+  return redirect('/photos');
 }
