@@ -66,4 +66,24 @@ describe('AppShell', () => {
     fireEvent.click(screen.getByRole('button', { name: /log out/i }));
     await waitFor(() => expect(logout).toHaveBeenCalledTimes(1));
   });
+
+  it('renders the nav but no user menu when there is no user', () => {
+    // why: the user menu is guarded on a present user (defensive null branch)
+    vi.mocked(session.useSession).mockReturnValue({
+      user: null,
+      status: 'authenticated',
+      login: vi.fn(),
+      signUp: vi.fn(),
+      logout,
+      refresh: vi.fn()
+    });
+    render(
+      <AppShell>
+        <p>section</p>
+      </AppShell>
+    );
+    expect(screen.getByRole('link', { name: 'Photos' })).toBeTruthy();
+    expect(screen.queryByText('Ada')).toBeNull();
+    expect(screen.queryByRole('button', { name: /log out/i })).toBeNull();
+  });
 });

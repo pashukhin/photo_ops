@@ -47,4 +47,15 @@ describe('LoginScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: /^log in$/i }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/bad creds/i);
   });
+
+  it('shows an inline error when sign-up fails', async () => {
+    // why: a failed sign-up (e.g. email taken) must surface on its own form
+    signUp.mockRejectedValue(new Error('email taken'));
+    render(<LoginScreen />);
+    fireEvent.change(screen.getByLabelText(/display name/i), { target: { value: 'Ada' } });
+    fireEvent.change(screen.getByLabelText(/sign-?up e-?mail/i), { target: { value: 'a@b.co' } });
+    fireEvent.change(screen.getByLabelText(/sign-?up password/i), { target: { value: 'pw' } });
+    fireEvent.click(screen.getByRole('button', { name: /sign up/i }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/email taken/i);
+  });
 });

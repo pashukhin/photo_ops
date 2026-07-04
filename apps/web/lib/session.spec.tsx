@@ -109,6 +109,27 @@ describe('SessionProvider', () => {
     expect(api.getCurrentUser).toHaveBeenCalledTimes(2);
   });
 
+  it('ignores a superseded mount fetch that rejects late', async () => {
+    // why: a stale getCurrentUser rejection must not clobber a newer result
+    let rejectFirst!: (e: Error) => void;
+    const first = new Promise<typeof USER | null>((_resolve, reject) => {
+      rejectFirst = reject;
+    });
+    vi.mocked(api.getCurrentUser).mockReturnValueOnce(first).mockResolvedValue(USER);
+    const { result } = renderHook(() => useSession(), { wrapper });
+    // mount fetch (id 1) is pending on `first`; a refresh (id 2) supersedes it
+    await act(async () => {
+      await result.current.refresh();
+    });
+    await waitFor(() => expect(result.current.status).toBe('authenticated'));
+    // the stale mount fetch now rejects — its catch must no-op, not go anonymous
+    await act(async () => {
+      rejectFirst(new Error('late'));
+      await Promise.resolve();
+    });
+    expect(result.current.status).toBe('authenticated');
+  });
+
   it('useSession throws outside a provider', () => {
     // why: misuse must fail loud, not read a stale/undefined session
     expect(() => renderHook(() => useSession())).toThrow(/SessionProvider/);

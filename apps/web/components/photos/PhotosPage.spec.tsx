@@ -11,6 +11,9 @@ vi.mock('@/lib/api', () => ({
 }));
 
 beforeEach(() => {
+  // Reset call history between tests (sibling-spec convention) so per-test
+  // "not called" / call-count assertions don't see calls from earlier tests.
+  vi.clearAllMocks();
   vi.mocked(api.createUploadIntent).mockResolvedValue({ photoId: 'p1', uploadUrl: 'http://minio/put' });
   vi.mocked(api.uploadFileToPresignedUrl).mockResolvedValue(undefined);
   vi.mocked(api.completeUpload).mockResolvedValue({} as api.PhotoAsset);
@@ -32,5 +35,23 @@ describe('PhotosPage', () => {
     await waitFor(() => expect(api.createUploadIntent).toHaveBeenCalledWith(file));
     await waitFor(() => expect(api.uploadFileToPresignedUrl).toHaveBeenCalledWith('http://minio/put', file));
     await waitFor(() => expect(api.completeUpload).toHaveBeenCalledWith('p1'));
+  });
+
+  it('shows a message and uploads nothing when no file is chosen', async () => {
+    // why: the no-file guard must not fire a bogus upload
+    render(<PhotosPage />);
+    fireEvent.click(screen.getByRole('button', { name: /upload/i }));
+    expect(await screen.findByText(/choose a jpeg/i)).toBeTruthy();
+    expect(api.createUploadIntent).not.toHaveBeenCalled();
+  });
+
+  it('surfaces an upload error', async () => {
+    // why: a failed upload must tell the user, not fail silently
+    vi.mocked(api.createUploadIntent).mockRejectedValue(new Error('intent boom'));
+    render(<PhotosPage />);
+    const file = new File(['x'], 'p.jpg', { type: 'image/jpeg' });
+    fireEvent.change(screen.getByLabelText(/upload/i), { target: { files: [file] } });
+    fireEvent.click(screen.getByRole('button', { name: /upload/i }));
+    expect(await screen.findByText(/intent boom/i)).toBeTruthy();
   });
 });
