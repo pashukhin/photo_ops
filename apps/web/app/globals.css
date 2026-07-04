@@ -74,10 +74,3 @@ button,
 input {
   font: inherit;
 }
-
-.panel {
-  border: 1px solid #2a3140;
-  background: #171b24;
-  border-radius: 16px;
-  padding: 24px;
-}

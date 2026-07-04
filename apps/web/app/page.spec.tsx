@@ -1,13 +1,14 @@
-import React from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
-import HomePage from './page';
+import { render } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import RootPage from './page';
 
-describe('HomePage', () => {
-  it('renders a visible auth status alert near the auth forms', () => {
-    const html = renderToStaticMarkup(<HomePage />);
+const redirect = vi.fn();
+vi.mock('next/navigation', () => ({ redirect: (u: string) => redirect(u) }));
 
-    expect(html).toContain('role="alert"');
-    expect(html).toContain('aria-live="polite"');
+describe('RootPage', () => {
+  it('redirects to /photos', () => {
+    // why: / is not a page anymore — Photos is the app's home section
+    render(<RootPage />);
+    expect(redirect).toHaveBeenCalledWith('/photos');
   });
 });
