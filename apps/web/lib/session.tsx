@@ -1,7 +1,7 @@
 'use client';
 
-import { createContext, useContext, type ReactNode } from 'react';
-import type { CurrentUser } from '@/lib/api';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { getCurrentUser, login as apiLogin, logout as apiLogout, signUp as apiSignUp, type CurrentUser } from '@/lib/api';
 
 export type SessionStatus = 'loading' | 'anonymous' | 'authenticated';
 
@@ -16,22 +16,63 @@ export interface SessionContextValue {
 
 const SessionContext = createContext<SessionContextValue | null>(null);
 
-// GREEN obligation (session 014): fetch getCurrentUser on mount into {user,status}
-// (authenticated with the user, or anonymous on null/reject — never throw); implement
-// login/signUp/logout/refresh via lib/api (see lib/session.spec.tsx). The stub
-// provides a resolvable context whose methods are unimplemented, so useSession()
-// works but the behavior tests are RED.
+interface SessionState {
+  user: CurrentUser | null;
+  status: SessionStatus;
+}
+
 export function SessionProvider({ children }: { children: ReactNode }) {
+  const [state, setState] = useState<SessionState>({ user: null, status: 'loading' });
+  // Guards against a mount/refresh fetch resolving after a later mutation
+  // (login/signUp/logout) has already settled the session — the mutation's
+  // result must win, not a stale getCurrentUser() response.
+  const requestIdRef = useRef(0);
+
+  const fetchSession = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
+    try {
+      const user = await getCurrentUser();
+      if (requestIdRef.current !== requestId) {
+        return;
+      }
+      setState(user ? { user, status: 'authenticated' } : { user: null, status: 'anonymous' });
+    } catch {
+      if (requestIdRef.current !== requestId) {
+        return;
+      }
+      setState({ user: null, status: 'anonymous' });
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchSession();
+  }, [fetchSession]);
+
+  const login = useCallback(async (email: string, password: string) => {
+    const user = await apiLogin({ email, password });
+    requestIdRef.current += 1;
+    setState({ user, status: 'authenticated' });
+  }, []);
+
+  const signUp = useCallback(async (email: string, password: string, displayName: string) => {
+    const user = await apiSignUp({ email, password, displayName });
+    requestIdRef.current += 1;
+    setState({ user, status: 'authenticated' });
+  }, []);
+
+  const logout = useCallback(async () => {
+    await apiLogout();
+    requestIdRef.current += 1;
+    setState({ user: null, status: 'anonymous' });
+  }, []);
+
   const value: SessionContextValue = {
-    user: null,
-    status: 'loading',
-    // NotImplemented (GREEN obligation above): inert no-ops so useSession() works
-    // and the behavior specs are RED via assertions (delegation never happens),
-    // without throwing — a thrown stub makes vitest exit 2 and skip coverage.
-    login: () => Promise.resolve(),
-    signUp: () => Promise.resolve(),
-    logout: () => Promise.resolve(),
-    refresh: () => Promise.resolve()
+    user: state.user,
+    status: state.status,
+    login,
+    signUp,
+    logout,
+    refresh: fetchSession
   };
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

@@ -24,6 +24,11 @@ function Probe() {
 const wrapper = ({ children }: { children: ReactNode }) => <SessionProvider>{children}</SessionProvider>;
 
 beforeEach(() => {
+  // Reset call history between tests (matches the convention used by sibling
+  // specs, e.g. PhotoGallery.spec.tsx) — otherwise mock call counts accumulate
+  // across `it` blocks in this file and calledTimes() assertions (e.g. the
+  // mount-fetch and refresh tests) would count renders from earlier tests.
+  vi.clearAllMocks();
   vi.mocked(api.getCurrentUser).mockResolvedValue(USER);
   vi.mocked(api.login).mockResolvedValue(USER);
   vi.mocked(api.signUp).mockResolvedValue(USER);
