@@ -81,10 +81,13 @@ describe('SessionProvider', () => {
 
   it('login rejects when the api fails (so the UI can show it)', async () => {
     // why: LoginScreen shows the inline error, so login must surface the failure
+    // AND leave the session anonymous (the login screen stays for a retry).
     vi.mocked(api.getCurrentUser).mockResolvedValue(null);
     vi.mocked(api.login).mockRejectedValue(new Error('bad creds'));
     const { result } = renderHook(() => useSession(), { wrapper });
+    await waitFor(() => expect(result.current.status).toBe('anonymous'));
     await expect(result.current.login('a@b.co', 'x')).rejects.toThrow('bad creds');
+    expect(result.current.status).toBe('anonymous');
   });
 
   it('logout delegates to api.logout and clears the session', async () => {
