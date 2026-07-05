@@ -1,5 +1,37 @@
 @import "tailwindcss";
 
+/* Map the shadcn design tokens onto Tailwind v4 color utilities. Without this,
+   `bg-background`/`bg-card`/`bg-primary`/`text-muted-foreground`/… are NOT
+   generated (Tailwind v4 needs @theme), so they were inert — the Dialog had no
+   background (transparent over the dark overlay → unreadable), buttons had no
+   fill, and cards were indistinguishable from the page. `inline` keeps the
+   utilities referencing the CSS vars so :root/.dark overrides still apply
+   (photo_ops-zv7 follow-up). */
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+}
+
 @layer base {
   :root {
     /* Coherent light theme, gently warmed for comfort (photo_ops-zv7): a soft

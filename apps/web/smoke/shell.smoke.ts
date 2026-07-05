@@ -13,7 +13,14 @@ test('shell: sign in, navigate sections, log out', async ({ page }) => {
   await page.getByLabel(/display name/i).fill('Smoke Shell');
   await page.getByLabel(/sign-?up e-?mail/i).fill(email);
   await page.getByLabel(/sign-?up password/i).fill('smoke-password-123');
-  await page.getByRole('button', { name: /sign up/i }).click();
+
+  // Guard the shadcn token layer (photo_ops-fth): the primary button must have a
+  // real background. If the Tailwind v4 @theme mapping is missing, bg-primary is
+  // inert (transparent) and the whole token theme — including the Dialog
+  // background — silently breaks. jsdom can't see this; the live smoke must.
+  const signUp = page.getByRole('button', { name: /sign up/i });
+  await expect(signUp).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await signUp.click();
 
   await expect(page).toHaveURL(/\/photos$/);
   await page.getByRole('link', { name: 'Clusters' }).click();
