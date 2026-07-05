@@ -166,6 +166,7 @@ describe('ClusterView', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     }); // methods + results load
+    vi.mocked(api.getClusteringResult).mockClear(); // this file's beforeEach doesn't clear; ignore leaked calls
     fireEvent.click(screen.getByText('Generate clusters'));
     await act(async () => {
       await vi.advanceTimersByTimeAsync(CLUSTER_POLL_MS * (CLUSTER_POLL_MAX_ATTEMPTS + 2));

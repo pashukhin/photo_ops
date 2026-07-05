@@ -28,15 +28,15 @@ function TreeNodeView({ node, depth }: { node: ClusterNode; depth: number }) {
     <li>
       <div data-testid="cluster-node" style={{ paddingLeft: depth * 16 }}>
         <span className="font-medium">{label}</span>
-        <span className="text-sm text-gray-500"> · {node.photoCount} photos</span>
+        <span className="text-sm text-muted-foreground"> · {node.photoCount} photos</span>
         {node.dateFrom ? (
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-muted-foreground">
             {' '}
             · {node.dateFrom} – {node.dateTo}
           </span>
         ) : null}
         {node.items.length > 0 ? (
-          <span className="text-sm text-gray-500"> · {node.items.join(', ')}</span>
+          <span className="text-sm text-muted-foreground"> · {node.items.join(', ')}</span>
         ) : null}
       </div>
       {node.children.length > 0 ? (
@@ -87,9 +87,10 @@ export function ClusterView() {
       let result = await getClusteringResult(resultId);
       while (result.status === 'pending') {
         if (attempts >= CLUSTER_POLL_MAX_ATTEMPTS) {
-          // GREEN: surface a user-facing "timed out" error via setError instead
-          // of throwing this sentinel.
-          throw new Error('NOT_IMPLEMENTED: poll timeout');
+          setError(
+            `Clustering is still pending; it timed out after ${CLUSTER_POLL_MAX_ATTEMPTS} checks. Try again.`
+          );
+          return;
         }
         attempts += 1;
         await new Promise((resolve) => setTimeout(resolve, CLUSTER_POLL_MS));
@@ -129,12 +130,12 @@ export function ClusterView() {
         </button>
       </div>
 
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
       <div>
         <h2 className="text-lg font-semibold">Results</h2>
         {results.length === 0 ? (
-          <p className="text-sm text-gray-500">No clustering results yet.</p>
+          <p className="text-sm text-muted-foreground">No clustering results yet.</p>
         ) : (
           <ul className="space-y-1">
             {results.map((r) => (
@@ -158,13 +159,13 @@ export function ClusterView() {
         <div>
           <h2 className="text-lg font-semibold">Tree · {active.status}</h2>
           {active.status === 'failed' ? (
-            <p className="text-sm text-red-600">{active.errorMessage}</p>
+            <p className="text-sm text-destructive">{active.errorMessage}</p>
           ) : active.root ? (
             <ul>
               <TreeNodeView node={active.root} depth={0} />
             </ul>
           ) : (
-            <p className="text-sm text-gray-500">Not ready.</p>
+            <p className="text-sm text-muted-foreground">Not ready.</p>
           )}
         </div>
       ) : null}
