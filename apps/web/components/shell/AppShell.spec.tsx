@@ -67,6 +67,18 @@ describe('AppShell', () => {
     await waitFor(() => expect(logout).toHaveBeenCalledTimes(1));
   });
 
+  it('surfaces feedback when logout fails', async () => {
+    // why: 'void logout()' drops a rejection silently; a failed logout must be visible
+    logout.mockRejectedValue(new Error('logout failed'));
+    render(
+      <AppShell>
+        <p>section</p>
+      </AppShell>
+    );
+    fireEvent.click(screen.getByRole('button', { name: /log out/i }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/log ?out/i);
+  });
+
   it('renders the nav but no user menu when there is no user', () => {
     // why: the user menu is guarded on a present user (defensive null branch)
     vi.mocked(session.useSession).mockReturnValue({

@@ -54,4 +54,17 @@ describe('AuthGuard', () => {
     expect(screen.queryByText('secret')).toBeNull();
     expect(replace).not.toHaveBeenCalled();
   });
+
+  it('shows a non-blocking loading affordance while loading', () => {
+    // why: a blank screen during session resolve reads as broken; show a loading state
+    mockStatus('loading');
+    render(
+      <AuthGuard>
+        <p>secret</p>
+      </AuthGuard>
+    );
+    expect(screen.getByRole('status')).toHaveTextContent(/loading/i);
+    expect(screen.queryByText('secret')).toBeNull(); // still no children, no redirect
+    expect(replace).not.toHaveBeenCalled();
+  });
 });
