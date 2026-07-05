@@ -183,6 +183,31 @@ the skeleton is not review-ready until `make skeleton-gate` is green.
   exploration across Photos / Clusters / Usage / login. No behavior RED test
   (pure visual change; the existing behavior tests already pin structure).
 
+### 6b. `ojc` — multi-file upload (added mid-session, user-approved)
+
+- **Unit:** `apps/web/components/photos/PhotosPage.tsx` only. `lib/api` +
+  backend unchanged — `createUploadIntent`/`uploadFileToPresignedUrl`/
+  `completeUpload` are already per-file.
+- **Now:** the upload form takes a single file (`input.files?.[0]`) through one
+  intent→PUT→complete flow.
+- **Change:** the file input gains `multiple`; on submit the batch is uploaded
+  **sequentially and resiliently** — each file runs the 3-step flow; a failed
+  file is recorded (by `name — reason`) and the batch **continues**;
+  `reloadToken` bumps after each success so photos appear as they finish. Status
+  shows "Uploading {i} of {n}…" then "Uploaded {ok} of {n}." plus, if any failed,
+  "Failed: a.jpg — reason, …". A single-file selection is just a batch of one
+  (existing single-file behavior preserved). The no-file guard message
+  ("Choose a JPEG file first") is unchanged.
+- **Interface kept:** the `PhotosPage` export, the upload action + gallery
+  composition; `lib/api` signatures — unchanged.
+- **Scope note:** this is a *feature*, not polish/bugfix — added mid-session at
+  the user's request and folded into 015 because it is small and web-only. It
+  gets its own RED tests and a full gate + `smoke-ui` re-run.
+- **RED:** (1) two files both succeed → `createUploadIntent` called once per
+  file, `completeUpload` for both, status "Uploaded 2 of 2."; (2) first of two
+  fails → the second still completes, status "Uploaded 1 of 2" + the failed
+  filename + reason (resilience). Extends `PhotosPage.spec.tsx`.
+
 ### 6. `di8` (partial) — RabbitMqBus reconnect-on-publish
 
 - **Unit:** `apps/cluster-service/src/cluster_service/messaging/rabbitmq.py`.

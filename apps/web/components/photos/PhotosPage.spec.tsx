@@ -54,4 +54,35 @@ describe('PhotosPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /upload/i }));
     expect(await screen.findByText(/intent boom/i)).toBeTruthy();
   });
+
+  it('uploads multiple selected files sequentially', async () => {
+    // why: selecting several JPEGs must upload each through the full flow, not just the first
+    render(<PhotosPage />);
+    const f1 = new File(['a'], 'a.jpg', { type: 'image/jpeg' });
+    const f2 = new File(['b'], 'b.jpg', { type: 'image/jpeg' });
+    fireEvent.change(screen.getByLabelText(/upload/i), { target: { files: [f1, f2] } });
+    fireEvent.click(screen.getByRole('button', { name: /upload/i }));
+    await waitFor(() => expect(api.createUploadIntent).toHaveBeenCalledTimes(2));
+    expect(api.createUploadIntent).toHaveBeenCalledWith(f1);
+    expect(api.createUploadIntent).toHaveBeenCalledWith(f2);
+    expect(api.completeUpload).toHaveBeenCalledTimes(2);
+    expect(await screen.findByText(/uploaded 2 of 2/i)).toBeTruthy();
+  });
+
+  it('continues the batch when one file fails and reports it by name + reason', async () => {
+    // why: a single bad file must not abort the whole batch; the rest still upload
+    vi.mocked(api.createUploadIntent)
+      .mockRejectedValueOnce(new Error('boom-a')) // a.jpg fails at intent
+      .mockResolvedValue({ photoId: 'p2', uploadUrl: 'http://minio/put' }); // b.jpg ok
+    render(<PhotosPage />);
+    const f1 = new File(['a'], 'a.jpg', { type: 'image/jpeg' });
+    const f2 = new File(['b'], 'b.jpg', { type: 'image/jpeg' });
+    fireEvent.change(screen.getByLabelText(/upload/i), { target: { files: [f1, f2] } });
+    fireEvent.click(screen.getByRole('button', { name: /upload/i }));
+    await waitFor(() => expect(api.createUploadIntent).toHaveBeenCalledTimes(2)); // both attempted
+    expect(api.completeUpload).toHaveBeenCalledTimes(1); // only b.jpg completed
+    const status = await screen.findByText(/uploaded 1 of 2/i);
+    expect(status.textContent).toMatch(/a\.jpg/); // the failed file is named
+    expect(status.textContent).toMatch(/boom-a/); // with its reason
+  });
 });
