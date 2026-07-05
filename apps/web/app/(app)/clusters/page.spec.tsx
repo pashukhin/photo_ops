@@ -6,7 +6,8 @@ vi.mock('@/lib/api', () => ({
   listClusteringMethods: vi.fn().mockResolvedValue({ methods: [] }),
   listClusteringResults: vi.fn().mockResolvedValue({ results: [] }),
   getClusteringResult: vi.fn(),
-  generateClusters: vi.fn()
+  generateClusters: vi.fn(),
+  listPhotos: vi.fn().mockResolvedValue({ photos: [], totalCount: 0 })
 }));
 
 describe('ClustersPage', () => {
