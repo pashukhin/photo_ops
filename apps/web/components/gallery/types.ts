@@ -12,3 +12,11 @@ export interface GalleryQuery {
 // Poll interval (ms) used to refresh the current page while any visible photo is
 // still uploading/processing. Stops once every photo is settled.
 export const GALLERY_POLL_MS = 4000;
+
+// Hardening bounds for the poll loop (photo_ops-gfs):
+// - a transient fetch error must not stop polling — tolerate this many
+//   consecutive failures (counter resets on success) before giving up;
+// - a status that never settles (worker down) must not poll forever — stop
+//   after this many ticks.
+export const GALLERY_POLL_MAX_ERRORS = 3;
+export const GALLERY_POLL_MAX_TICKS = 60;
