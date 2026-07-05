@@ -45,6 +45,7 @@ export default tseslint.config(
             "packages/*/vitest.config.ts",
             "apps/api-gateway/vitest.config.ts",
             "apps/photo-service/vitest.config.ts",
+            "apps/publication-service/vitest.config.ts",
           ],
         },
         tsconfigRootDir: import.meta.dirname,

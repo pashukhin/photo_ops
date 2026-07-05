@@ -13,32 +13,137 @@ import { HealthCheckRequest, HealthCheckResponse } from "../../common/v1/common"
 
 export const protobufPackage = "photoops.publication.v1";
 
-export interface CreateDraftFromClusterRequest {
-  clusterId: string;
+export enum PostStatus {
+  POST_STATUS_UNSPECIFIED = 0,
+  POST_STATUS_DRAFT = 1,
+  POST_STATUS_PUBLISHED = 2,
+  POST_STATUS_UNPUBLISHED = 3,
+  UNRECOGNIZED = -1,
 }
 
-export interface CreateDraftFromClusterResponse {
+export enum PostVisibility {
+  POST_VISIBILITY_UNSPECIFIED = 0,
+  POST_VISIBILITY_PRIVATE = 1,
+  POST_VISIBILITY_UNLISTED = 2,
+  POST_VISIBILITY_PUBLIC = 3,
+  UNRECOGNIZED = -1,
+}
+
+export interface CreatePostFromClusterRequest {
+  /** caller-supplied from the validated session in api-gateway */
+  userId: string;
+  /** clustering result (owner scope + read key) */
+  resultId: string;
+  /** node whose subtree becomes the post */
+  nodeId: string;
+  /** optional; "" -> default */
+  title: string;
+}
+
+export interface GetPostRequest {
   postId: string;
+  /** owner scope */
+  userId: string;
+}
+
+export interface ListPostsRequest {
+  /** owner scope */
+  userId: string;
+}
+
+export interface ListPostsResponse {
+  posts: PostSummary[];
+}
+
+export interface UpdatePostRequest {
+  postId: string;
+  /** owner scope */
+  userId: string;
+  title?: string | undefined;
+  body?: string | undefined;
+  visibility?: PostVisibility | undefined;
+  locationLabel?: string | undefined;
+  mapEnabled?:
+    | boolean
+    | undefined;
+  /** ISO instant; "" clears */
+  dateFrom?: string | undefined;
+  dateTo?: string | undefined;
+}
+
+/** A photo story drafted from a cluster and eventually published. */
+export interface Post {
+  id: string;
+  userId: string;
+  /** cluster node id the post was drafted from */
+  sourceClusterId: string;
+  /** clustering result id (re-fetch / provenance) */
+  sourceResultId: string;
+  title: string;
+  body: string;
+  status: PostStatus;
+  visibility: PostVisibility;
+  /** "" until published (session 019) */
+  slug: string;
+  locationLabel: string;
+  /** ISO instant; "" if unset */
+  dateFrom: string;
+  dateTo: string;
+  mapEnabled: boolean;
+  /** "" until published (session 019) */
+  publishedAt: string;
+  createdAt: string;
+  updatedAt: string;
+  photos: PostPhoto[];
+}
+
+/** One photo in a post, with its order and caption within the story. */
+export interface PostPhoto {
+  photoId: string;
+  order: number;
+  caption: string;
+}
+
+/** A post without its photos/body, for list views. */
+export interface PostSummary {
+  id: string;
+  title: string;
+  status: PostStatus;
+  visibility: PostVisibility;
+  dateFrom: string;
+  dateTo: string;
+  photoCount: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export const PHOTOOPS_PUBLICATION_V1_PACKAGE_NAME = "photoops.publication.v1";
 
-function createBaseCreateDraftFromClusterRequest(): CreateDraftFromClusterRequest {
-  return { clusterId: "" };
+function createBaseCreatePostFromClusterRequest(): CreatePostFromClusterRequest {
+  return { userId: "", resultId: "", nodeId: "", title: "" };
 }
 
-export const CreateDraftFromClusterRequest: MessageFns<CreateDraftFromClusterRequest> = {
-  encode(message: CreateDraftFromClusterRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
-    if (message.clusterId !== "") {
-      writer.uint32(10).string(message.clusterId);
+export const CreatePostFromClusterRequest: MessageFns<CreatePostFromClusterRequest> = {
+  encode(message: CreatePostFromClusterRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.userId !== "") {
+      writer.uint32(10).string(message.userId);
+    }
+    if (message.resultId !== "") {
+      writer.uint32(18).string(message.resultId);
+    }
+    if (message.nodeId !== "") {
+      writer.uint32(26).string(message.nodeId);
+    }
+    if (message.title !== "") {
+      writer.uint32(34).string(message.title);
     }
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): CreateDraftFromClusterRequest {
+  decode(input: BinaryReader | Uint8Array, length?: number): CreatePostFromClusterRequest {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseCreateDraftFromClusterRequest();
+    const message = createBaseCreatePostFromClusterRequest();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -47,7 +152,31 @@ export const CreateDraftFromClusterRequest: MessageFns<CreateDraftFromClusterReq
             break;
           }
 
-          message.clusterId = reader.string();
+          message.userId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.resultId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.nodeId = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.title = reader.string();
           continue;
         }
       }
@@ -60,22 +189,25 @@ export const CreateDraftFromClusterRequest: MessageFns<CreateDraftFromClusterReq
   },
 };
 
-function createBaseCreateDraftFromClusterResponse(): CreateDraftFromClusterResponse {
-  return { postId: "" };
+function createBaseGetPostRequest(): GetPostRequest {
+  return { postId: "", userId: "" };
 }
 
-export const CreateDraftFromClusterResponse: MessageFns<CreateDraftFromClusterResponse> = {
-  encode(message: CreateDraftFromClusterResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+export const GetPostRequest: MessageFns<GetPostRequest> = {
+  encode(message: GetPostRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
     if (message.postId !== "") {
       writer.uint32(10).string(message.postId);
+    }
+    if (message.userId !== "") {
+      writer.uint32(18).string(message.userId);
     }
     return writer;
   },
 
-  decode(input: BinaryReader | Uint8Array, length?: number): CreateDraftFromClusterResponse {
+  decode(input: BinaryReader | Uint8Array, length?: number): GetPostRequest {
     const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
     const end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseCreateDraftFromClusterResponse();
+    const message = createBaseGetPostRequest();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -87,6 +219,14 @@ export const CreateDraftFromClusterResponse: MessageFns<CreateDraftFromClusterRe
           message.postId = reader.string();
           continue;
         }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.userId = reader.string();
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -97,28 +237,701 @@ export const CreateDraftFromClusterResponse: MessageFns<CreateDraftFromClusterRe
   },
 };
 
+function createBaseListPostsRequest(): ListPostsRequest {
+  return { userId: "" };
+}
+
+export const ListPostsRequest: MessageFns<ListPostsRequest> = {
+  encode(message: ListPostsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.userId !== "") {
+      writer.uint32(10).string(message.userId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListPostsRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListPostsRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.userId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBaseListPostsResponse(): ListPostsResponse {
+  return { posts: [] };
+}
+
+export const ListPostsResponse: MessageFns<ListPostsResponse> = {
+  encode(message: ListPostsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.posts) {
+      PostSummary.encode(v!, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ListPostsResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseListPostsResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.posts.push(PostSummary.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBaseUpdatePostRequest(): UpdatePostRequest {
+  return { postId: "", userId: "" };
+}
+
+export const UpdatePostRequest: MessageFns<UpdatePostRequest> = {
+  encode(message: UpdatePostRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.postId !== "") {
+      writer.uint32(10).string(message.postId);
+    }
+    if (message.userId !== "") {
+      writer.uint32(18).string(message.userId);
+    }
+    if (message.title !== undefined) {
+      writer.uint32(26).string(message.title);
+    }
+    if (message.body !== undefined) {
+      writer.uint32(34).string(message.body);
+    }
+    if (message.visibility !== undefined) {
+      writer.uint32(40).int32(message.visibility);
+    }
+    if (message.locationLabel !== undefined) {
+      writer.uint32(50).string(message.locationLabel);
+    }
+    if (message.mapEnabled !== undefined) {
+      writer.uint32(56).bool(message.mapEnabled);
+    }
+    if (message.dateFrom !== undefined) {
+      writer.uint32(66).string(message.dateFrom);
+    }
+    if (message.dateTo !== undefined) {
+      writer.uint32(74).string(message.dateTo);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UpdatePostRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUpdatePostRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.postId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.userId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.title = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.body = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 40) {
+            break;
+          }
+
+          message.visibility = reader.int32() as any;
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.locationLabel = reader.string();
+          continue;
+        }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.mapEnabled = reader.bool();
+          continue;
+        }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.dateFrom = reader.string();
+          continue;
+        }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.dateTo = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBasePost(): Post {
+  return {
+    id: "",
+    userId: "",
+    sourceClusterId: "",
+    sourceResultId: "",
+    title: "",
+    body: "",
+    status: 0,
+    visibility: 0,
+    slug: "",
+    locationLabel: "",
+    dateFrom: "",
+    dateTo: "",
+    mapEnabled: false,
+    publishedAt: "",
+    createdAt: "",
+    updatedAt: "",
+    photos: [],
+  };
+}
+
+export const Post: MessageFns<Post> = {
+  encode(message: Post, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.id !== "") {
+      writer.uint32(10).string(message.id);
+    }
+    if (message.userId !== "") {
+      writer.uint32(18).string(message.userId);
+    }
+    if (message.sourceClusterId !== "") {
+      writer.uint32(26).string(message.sourceClusterId);
+    }
+    if (message.sourceResultId !== "") {
+      writer.uint32(34).string(message.sourceResultId);
+    }
+    if (message.title !== "") {
+      writer.uint32(42).string(message.title);
+    }
+    if (message.body !== "") {
+      writer.uint32(50).string(message.body);
+    }
+    if (message.status !== 0) {
+      writer.uint32(56).int32(message.status);
+    }
+    if (message.visibility !== 0) {
+      writer.uint32(64).int32(message.visibility);
+    }
+    if (message.slug !== "") {
+      writer.uint32(74).string(message.slug);
+    }
+    if (message.locationLabel !== "") {
+      writer.uint32(82).string(message.locationLabel);
+    }
+    if (message.dateFrom !== "") {
+      writer.uint32(90).string(message.dateFrom);
+    }
+    if (message.dateTo !== "") {
+      writer.uint32(98).string(message.dateTo);
+    }
+    if (message.mapEnabled !== false) {
+      writer.uint32(104).bool(message.mapEnabled);
+    }
+    if (message.publishedAt !== "") {
+      writer.uint32(114).string(message.publishedAt);
+    }
+    if (message.createdAt !== "") {
+      writer.uint32(122).string(message.createdAt);
+    }
+    if (message.updatedAt !== "") {
+      writer.uint32(130).string(message.updatedAt);
+    }
+    for (const v of message.photos) {
+      PostPhoto.encode(v!, writer.uint32(138).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): Post {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBasePost();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.id = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.userId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.sourceClusterId = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.sourceResultId = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.title = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.body = reader.string();
+          continue;
+        }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.status = reader.int32() as any;
+          continue;
+        }
+        case 8: {
+          if (tag !== 64) {
+            break;
+          }
+
+          message.visibility = reader.int32() as any;
+          continue;
+        }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.slug = reader.string();
+          continue;
+        }
+        case 10: {
+          if (tag !== 82) {
+            break;
+          }
+
+          message.locationLabel = reader.string();
+          continue;
+        }
+        case 11: {
+          if (tag !== 90) {
+            break;
+          }
+
+          message.dateFrom = reader.string();
+          continue;
+        }
+        case 12: {
+          if (tag !== 98) {
+            break;
+          }
+
+          message.dateTo = reader.string();
+          continue;
+        }
+        case 13: {
+          if (tag !== 104) {
+            break;
+          }
+
+          message.mapEnabled = reader.bool();
+          continue;
+        }
+        case 14: {
+          if (tag !== 114) {
+            break;
+          }
+
+          message.publishedAt = reader.string();
+          continue;
+        }
+        case 15: {
+          if (tag !== 122) {
+            break;
+          }
+
+          message.createdAt = reader.string();
+          continue;
+        }
+        case 16: {
+          if (tag !== 130) {
+            break;
+          }
+
+          message.updatedAt = reader.string();
+          continue;
+        }
+        case 17: {
+          if (tag !== 138) {
+            break;
+          }
+
+          message.photos.push(PostPhoto.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBasePostPhoto(): PostPhoto {
+  return { photoId: "", order: 0, caption: "" };
+}
+
+export const PostPhoto: MessageFns<PostPhoto> = {
+  encode(message: PostPhoto, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.photoId !== "") {
+      writer.uint32(10).string(message.photoId);
+    }
+    if (message.order !== 0) {
+      writer.uint32(16).int32(message.order);
+    }
+    if (message.caption !== "") {
+      writer.uint32(26).string(message.caption);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PostPhoto {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBasePostPhoto();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.photoId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 16) {
+            break;
+          }
+
+          message.order = reader.int32();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.caption = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBasePostSummary(): PostSummary {
+  return {
+    id: "",
+    title: "",
+    status: 0,
+    visibility: 0,
+    dateFrom: "",
+    dateTo: "",
+    photoCount: 0,
+    createdAt: "",
+    updatedAt: "",
+  };
+}
+
+export const PostSummary: MessageFns<PostSummary> = {
+  encode(message: PostSummary, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.id !== "") {
+      writer.uint32(10).string(message.id);
+    }
+    if (message.title !== "") {
+      writer.uint32(18).string(message.title);
+    }
+    if (message.status !== 0) {
+      writer.uint32(24).int32(message.status);
+    }
+    if (message.visibility !== 0) {
+      writer.uint32(32).int32(message.visibility);
+    }
+    if (message.dateFrom !== "") {
+      writer.uint32(42).string(message.dateFrom);
+    }
+    if (message.dateTo !== "") {
+      writer.uint32(50).string(message.dateTo);
+    }
+    if (message.photoCount !== 0) {
+      writer.uint32(56).int32(message.photoCount);
+    }
+    if (message.createdAt !== "") {
+      writer.uint32(66).string(message.createdAt);
+    }
+    if (message.updatedAt !== "") {
+      writer.uint32(74).string(message.updatedAt);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PostSummary {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBasePostSummary();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.id = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.title = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.status = reader.int32() as any;
+          continue;
+        }
+        case 4: {
+          if (tag !== 32) {
+            break;
+          }
+
+          message.visibility = reader.int32() as any;
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.dateFrom = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.dateTo = reader.string();
+          continue;
+        }
+        case 7: {
+          if (tag !== 56) {
+            break;
+          }
+
+          message.photoCount = reader.int32();
+          continue;
+        }
+        case 8: {
+          if (tag !== 66) {
+            break;
+          }
+
+          message.createdAt = reader.string();
+          continue;
+        }
+        case 9: {
+          if (tag !== 74) {
+            break;
+          }
+
+          message.updatedAt = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+/**
+ * A user's photo stories ("posts"). A post is drafted from a cluster NODE: at
+ * creation the node's subtree photos are SNAPSHOTTED into post_photos (cluster
+ * results are immutable — ADR-0005 — and the post is independently editable).
+ * Owner scope only: user_id is caller-supplied from the validated session in
+ * api-gateway; no cross-service FK; UUID v7. slug + Publish/Unpublish land in
+ * session 019 (the columns exist but stay empty here).
+ */
+
 export interface PublicationServiceClient {
   health(request: HealthCheckRequest): Observable<HealthCheckResponse>;
 
-  createDraftFromCluster(request: CreateDraftFromClusterRequest): Observable<CreateDraftFromClusterResponse>;
+  /**
+   * Create a draft post from a cluster node. Reads the clustering result from
+   * cluster-service, snapshots the node's subtree photos (tree order) into
+   * post_photos, and seeds date_from/date_to from the node.
+   */
+
+  createPostFromCluster(request: CreatePostFromClusterRequest): Observable<Post>;
+
+  /** One post (with its photos), owner-scoped. */
+
+  getPost(request: GetPostRequest): Observable<Post>;
+
+  /** The caller's posts (summaries — no photos/body). */
+
+  listPosts(request: ListPostsRequest): Observable<ListPostsResponse>;
+
+  /** Update a post's scalar fields (post_photos mutation lands in session 018). */
+
+  updatePost(request: UpdatePostRequest): Observable<Post>;
 }
+
+/**
+ * A user's photo stories ("posts"). A post is drafted from a cluster NODE: at
+ * creation the node's subtree photos are SNAPSHOTTED into post_photos (cluster
+ * results are immutable — ADR-0005 — and the post is independently editable).
+ * Owner scope only: user_id is caller-supplied from the validated session in
+ * api-gateway; no cross-service FK; UUID v7. slug + Publish/Unpublish land in
+ * session 019 (the columns exist but stay empty here).
+ */
 
 export interface PublicationServiceController {
   health(
     request: HealthCheckRequest,
   ): Promise<HealthCheckResponse> | Observable<HealthCheckResponse> | HealthCheckResponse;
 
-  createDraftFromCluster(
-    request: CreateDraftFromClusterRequest,
-  ):
-    | Promise<CreateDraftFromClusterResponse>
-    | Observable<CreateDraftFromClusterResponse>
-    | CreateDraftFromClusterResponse;
+  /**
+   * Create a draft post from a cluster node. Reads the clustering result from
+   * cluster-service, snapshots the node's subtree photos (tree order) into
+   * post_photos, and seeds date_from/date_to from the node.
+   */
+
+  createPostFromCluster(request: CreatePostFromClusterRequest): Promise<Post> | Observable<Post> | Post;
+
+  /** One post (with its photos), owner-scoped. */
+
+  getPost(request: GetPostRequest): Promise<Post> | Observable<Post> | Post;
+
+  /** The caller's posts (summaries — no photos/body). */
+
+  listPosts(request: ListPostsRequest): Promise<ListPostsResponse> | Observable<ListPostsResponse> | ListPostsResponse;
+
+  /** Update a post's scalar fields (post_photos mutation lands in session 018). */
+
+  updatePost(request: UpdatePostRequest): Promise<Post> | Observable<Post> | Post;
 }
 
 export function PublicationServiceControllerMethods() {
   return function (constructor: Function) {
-    const grpcMethods: string[] = ["health", "createDraftFromCluster"];
+    const grpcMethods: string[] = ["health", "createPostFromCluster", "getPost", "listPosts", "updatePost"];
     for (const method of grpcMethods) {
       const descriptor: any = Reflect.getOwnPropertyDescriptor(constructor.prototype, method);
       GrpcMethod("PublicationService", method)(constructor.prototype[method], method, descriptor);
@@ -133,6 +946,14 @@ export function PublicationServiceControllerMethods() {
 
 export const PUBLICATION_SERVICE_NAME = "PublicationService";
 
+/**
+ * A user's photo stories ("posts"). A post is drafted from a cluster NODE: at
+ * creation the node's subtree photos are SNAPSHOTTED into post_photos (cluster
+ * results are immutable — ADR-0005 — and the post is independently editable).
+ * Owner scope only: user_id is caller-supplied from the validated session in
+ * api-gateway; no cross-service FK; UUID v7. slug + Publish/Unpublish land in
+ * session 019 (the columns exist but stay empty here).
+ */
 export type PublicationServiceService = typeof PublicationServiceService;
 export const PublicationServiceService = {
   health: {
@@ -144,23 +965,67 @@ export const PublicationServiceService = {
     responseSerialize: (value: HealthCheckResponse): Buffer => Buffer.from(HealthCheckResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer): HealthCheckResponse => HealthCheckResponse.decode(value),
   },
-  createDraftFromCluster: {
-    path: "/photoops.publication.v1.PublicationService/CreateDraftFromCluster" as const,
+  /**
+   * Create a draft post from a cluster node. Reads the clustering result from
+   * cluster-service, snapshots the node's subtree photos (tree order) into
+   * post_photos, and seeds date_from/date_to from the node.
+   */
+  createPostFromCluster: {
+    path: "/photoops.publication.v1.PublicationService/CreatePostFromCluster" as const,
     requestStream: false as const,
     responseStream: false as const,
-    requestSerialize: (value: CreateDraftFromClusterRequest): Buffer =>
-      Buffer.from(CreateDraftFromClusterRequest.encode(value).finish()),
-    requestDeserialize: (value: Buffer): CreateDraftFromClusterRequest => CreateDraftFromClusterRequest.decode(value),
-    responseSerialize: (value: CreateDraftFromClusterResponse): Buffer =>
-      Buffer.from(CreateDraftFromClusterResponse.encode(value).finish()),
-    responseDeserialize: (value: Buffer): CreateDraftFromClusterResponse =>
-      CreateDraftFromClusterResponse.decode(value),
+    requestSerialize: (value: CreatePostFromClusterRequest): Buffer =>
+      Buffer.from(CreatePostFromClusterRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): CreatePostFromClusterRequest => CreatePostFromClusterRequest.decode(value),
+    responseSerialize: (value: Post): Buffer => Buffer.from(Post.encode(value).finish()),
+    responseDeserialize: (value: Buffer): Post => Post.decode(value),
+  },
+  /** One post (with its photos), owner-scoped. */
+  getPost: {
+    path: "/photoops.publication.v1.PublicationService/GetPost" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: GetPostRequest): Buffer => Buffer.from(GetPostRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): GetPostRequest => GetPostRequest.decode(value),
+    responseSerialize: (value: Post): Buffer => Buffer.from(Post.encode(value).finish()),
+    responseDeserialize: (value: Buffer): Post => Post.decode(value),
+  },
+  /** The caller's posts (summaries — no photos/body). */
+  listPosts: {
+    path: "/photoops.publication.v1.PublicationService/ListPosts" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: ListPostsRequest): Buffer => Buffer.from(ListPostsRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ListPostsRequest => ListPostsRequest.decode(value),
+    responseSerialize: (value: ListPostsResponse): Buffer => Buffer.from(ListPostsResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): ListPostsResponse => ListPostsResponse.decode(value),
+  },
+  /** Update a post's scalar fields (post_photos mutation lands in session 018). */
+  updatePost: {
+    path: "/photoops.publication.v1.PublicationService/UpdatePost" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: UpdatePostRequest): Buffer => Buffer.from(UpdatePostRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): UpdatePostRequest => UpdatePostRequest.decode(value),
+    responseSerialize: (value: Post): Buffer => Buffer.from(Post.encode(value).finish()),
+    responseDeserialize: (value: Buffer): Post => Post.decode(value),
   },
 } as const;
 
 export interface PublicationServiceServer extends UntypedServiceImplementation {
   health: handleUnaryCall<HealthCheckRequest, HealthCheckResponse>;
-  createDraftFromCluster: handleUnaryCall<CreateDraftFromClusterRequest, CreateDraftFromClusterResponse>;
+  /**
+   * Create a draft post from a cluster node. Reads the clustering result from
+   * cluster-service, snapshots the node's subtree photos (tree order) into
+   * post_photos, and seeds date_from/date_to from the node.
+   */
+  createPostFromCluster: handleUnaryCall<CreatePostFromClusterRequest, Post>;
+  /** One post (with its photos), owner-scoped. */
+  getPost: handleUnaryCall<GetPostRequest, Post>;
+  /** The caller's posts (summaries — no photos/body). */
+  listPosts: handleUnaryCall<ListPostsRequest, ListPostsResponse>;
+  /** Update a post's scalar fields (post_photos mutation lands in session 018). */
+  updatePost: handleUnaryCall<UpdatePostRequest, Post>;
 }
 
 export interface MessageFns<T> {

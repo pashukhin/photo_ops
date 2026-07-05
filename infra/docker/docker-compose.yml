@@ -112,11 +112,13 @@ services:
       PHOTO_SERVICE_GRPC_URL: photo-service:${PHOTO_SERVICE_GRPC_PORT}
       USAGE_SERVICE_GRPC_URL: usage-service:${USAGE_SERVICE_GRPC_PORT}
       CLUSTER_SERVICE_GRPC_URL: cluster-service:${CLUSTER_SERVICE_GRPC_PORT}
+      PUBLICATION_SERVICE_GRPC_URL: publication-service:${PUBLICATION_SERVICE_GRPC_PORT}
     depends_on:
       - identity-service
       - photo-service
       - usage-service
       - cluster-service
+      - publication-service
     ports:
       - "3001:3001"
 
@@ -192,8 +194,18 @@ services:
     build:
       context: ../..
       dockerfile: apps/publication-service/Dockerfile
+    environment:
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      PUBLICATION_DATABASE_URL: ${PUBLICATION_DATABASE_URL}
+      PUBLICATION_SERVICE_GRPC_PORT: ${PUBLICATION_SERVICE_GRPC_PORT}
+      CLUSTER_SERVICE_GRPC_URL: cluster-service:${CLUSTER_SERVICE_GRPC_PORT}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      cluster-service:
+        condition: service_started
     ports:
-      - "3012:3012"
+      - "${PUBLICATION_SERVICE_GRPC_PORT}:${PUBLICATION_SERVICE_GRPC_PORT}"
 
   usage-service:
     build:

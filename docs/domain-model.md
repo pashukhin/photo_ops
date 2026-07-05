@@ -314,7 +314,8 @@ Projected fields:
 
 - `id`
 - `user_id`
-- `source_cluster_id`
+- `source_cluster_id` (the cluster node the post was drafted from)
+- `source_result_id` (the clustering result that node lives in — the re-fetch / provenance key)
 - `title`
 - `body`
 - `status`
@@ -343,7 +344,10 @@ Visibility values:
 Rules:
 
 - `user_id` references `identity-service` without a cross-service foreign key.
-- `source_cluster_id` references `cluster-service` without a cross-service foreign key.
+- `source_cluster_id` (a cluster node id) and `source_result_id` (its clustering
+  result id) reference `cluster-service` without a cross-service foreign key. A
+  post snapshots the node's subtree photo membership into `post_photos` at
+  creation; it does not track the live cluster (results are immutable — ADR-0005).
 - Only published posts with public or unlisted visibility can be publicly rendered.
 
 ### PostPhoto
