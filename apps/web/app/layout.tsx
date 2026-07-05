@@ -1,15 +1,18 @@
 import './globals.css';
 import type { ReactNode } from 'react';
+import { SessionProvider } from '@/lib/session';
 
 export const metadata = {
   title: 'PhotoOps',
-  description: 'Architecture frame upload slice'
+  description: 'Photo management — upload, gallery, clustering, usage'
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <SessionProvider>{children}</SessionProvider>
+      </body>
     </html>
   );
 }

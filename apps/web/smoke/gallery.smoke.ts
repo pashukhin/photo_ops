@@ -5,22 +5,22 @@ import { expect, test } from '@playwright/test';
 // gateway /photos + auth-cookie integration). Run via `make smoke-ui`.
 //
 // Scope (deliberately thin — Principle 5): a freshly signed-up user lands on the
-// gallery and sees its empty state + the search control. The data-rich
-// table+modal+preview path is covered by the jsdom component tests + the manual
-// e2e scenario + `make smoke-media` (which proves upload->ready data exists). A
-// data-seeded UI smoke (upload -> open modal -> preview) is a possible follow-up.
+// gallery and sees its empty state + the search control. Since session 014 the
+// sign-up form lives on /login (the guard redirects `/` → /login) and a successful
+// sign-up lands on /photos. The data-rich table+modal+preview path is covered by
+// the jsdom component tests + the manual e2e scenario + `make smoke-media`.
 test('gallery renders for a freshly signed-up user', async ({ page }) => {
   const email = `smoke-ui-${Date.now()}@example.com`;
 
-  await page.goto('/');
+  await page.goto('/'); // guard redirects to /login
 
-  await page.getByPlaceholder('Display name').fill('Smoke UI');
-  await page.getByPlaceholder('E-mail').first().fill(email);
-  await page.getByPlaceholder('Password').first().fill('smoke-password-123');
+  await page.getByLabel(/display name/i).fill('Smoke UI');
+  await page.getByLabel(/sign-?up e-?mail/i).fill(email);
+  await page.getByLabel(/sign-?up password/i).fill('smoke-password-123');
   await page.getByRole('button', { name: /sign up/i }).click();
 
-  // Signed-in view shows the gallery section with its empty state + search control.
-  await expect(page.getByRole('heading', { name: /your photos/i })).toBeVisible();
+  // Lands on /photos; the gallery shows its empty state + search control.
+  await expect(page).toHaveURL(/\/photos$/);
   await expect(page.getByText(/no photos/i)).toBeVisible();
   await expect(page.getByLabel(/search/i)).toBeVisible();
 });

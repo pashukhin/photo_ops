@@ -313,7 +313,9 @@ coverage-cluster: $(CL_STAMP)
 # apps/publication-service and apps/connector-service are skipped (no-op tests).
 # packages/proto-ts is skipped (generated code, no tests).
 # COVERAGE_ALLOW_FAIL=1: tolerate non-zero vitest exit and still normalize the
-# cobertura output (vitest writes the report even when tests fail).
+# cobertura output. --coverage.reportOnFailure=true is required for this: vitest
+# v2 skips the coverage report on a failing run by default, which breaks the
+# skeleton-gate (RED-by-design TS tests) — with the flag it always emits the XML.
 # Depends on build-libs: service vitest suites import @photoops/observability etc.,
 # whose package.json main/exports point at dist/ (gitignored). Without a prior
 # lib build (clean checkout / the coverage-gate CI job), vitest fails with
@@ -335,6 +337,7 @@ coverage-ts: build-libs $(COV_STAMP)
 	        --coverage \
 	        --coverage.provider=v8 \
 	        --coverage.reporter=cobertura \
+	        --coverage.reportOnFailure=true \
 	        "--coverage.reportsDirectory=../../$$TMP_DIR" \
 	        2>&1; \
 	    WS_EXIT=$$?; \
