@@ -31,6 +31,13 @@ interface FilterState {
 
 const EMPTY_FILTER: FilterState = { from: '', to: '', resourceType: '', eventType: '' };
 
+// GREEN (photo_ops-rh0): render occurred_at as a localized medium date (UTC),
+// not raw RFC3339 — e.g. '2026-06-15T09:30:00Z' → 'Jun 15, 2026'.
+export function formatUsageDate(iso: string): string {
+  void iso;
+  throw new Error('NotImplementedError');
+}
+
 function buildParams(filter: FilterState, page: number): ListUsageEventsParams {
   const params: ListUsageEventsParams = { page, pageSize: PAGE_SIZE };
   if (filter.from) params.from = filter.from;
