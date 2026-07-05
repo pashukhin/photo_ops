@@ -85,6 +85,18 @@ class RabbitMqBus:
         self._declared.add(name)
 
     def publish(self, destination: str, message: BusMessage) -> None:
+        # The server role only publishes on demand and never services the
+        # connection, so an idle broker heartbeat can drop it; the next publish
+        # then raises. Reconnect once and retry so a dropped idle connection
+        # recovers transparently instead of surfacing a 500 (photo_ops-di8).
+        try:
+            self._publish_once(destination, message)
+        except pika.exceptions.AMQPConnectionError:
+            log.warning("rabbitmq publish failed (connection lost); reconnecting and retrying")
+            self._reconnect()
+            self._publish_once(destination, message)
+
+    def _publish_once(self, destination: str, message: BusMessage) -> None:
         self._ensure_topology(destination)
         self._channel.basic_publish(
             exchange=destination,
@@ -92,6 +104,15 @@ class RabbitMqBus:
             body=message.body,
             properties=pika.BasicProperties(delivery_mode=2, correlation_id=message.correlation_id),
         )
+
+    def _reconnect(self) -> None:
+        try:
+            self._connection.close()
+        except Exception:  # pragma: no cover - best-effort close of an already-dead connection
+            log.debug("ignored error closing dropped RabbitMQ connection", exc_info=True)
+        self._connection = self._factory()
+        self._channel = self._connection.channel()
+        self._declared = set()  # topology must be re-declared on the fresh channel
 
     def consume(  # pragma: no cover - live-broker IO
         self, source: str, handler: Callable[[BusMessage], None]

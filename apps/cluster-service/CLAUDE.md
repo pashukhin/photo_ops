@@ -32,7 +32,14 @@ clustering (session 013). Two roles from one image/package:
   owns generation + drift detection.
 - Real IO adapters (RabbitMqBus, PostgresStore, PhotoServiceClient, entrypoints)
   are `# pragma: no cover` — thin IO, exercised by the smoke; logic is covered
-  against the in-memory fakes.
+  against the in-memory fakes. Exception (session 015, `photo_ops-di8`):
+  `RabbitMqBus.__init__` takes an injectable `connection_factory`, so its
+  reconnect-on-publish path (`publish`/`_publish_once`/`_reconnect`/
+  `_ensure_topology`) is unit-covered with a fake channel
+  (`tests/test_rabbitmq_reconnect.py`); only the real pika connect + consume/
+  start/close stay `# pragma: no cover`. The server role holds a single
+  long-lived connection it never services, so an idle-dropped connection is
+  reopened + topology re-declared on the next publish rather than 500-ing.
 - `PhotoPoint.taken_at` is a naive datetime (codec flattens tz; mixed-tz is an
   approximation seam). Results are immutable once READY; re-clustering creates a
   new co-existing result. Cross-service ids are UUID v7, no cross-service FK.
