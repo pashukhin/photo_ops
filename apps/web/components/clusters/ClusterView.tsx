@@ -18,6 +18,9 @@ import type {
 // offers a method picker + Generate (async: poll the new result until it leaves
 // pending), and renders a chosen result's immutable tree as a nested list.
 export const CLUSTER_POLL_MS = 2000;
+// Max poll iterations before generate() gives up on a stuck-PENDING run (worker
+// down / DLQ) and surfaces a timeout instead of spinning forever (photo_ops-n7w).
+export const CLUSTER_POLL_MAX_ATTEMPTS = 30;
 
 function TreeNodeView({ node, depth }: { node: ClusterNode; depth: number }) {
   const label = node.segmentLabel || node.kind;
@@ -80,8 +83,15 @@ export function ClusterView() {
     setError(null);
     try {
       const { resultId } = await generateClusters({ method: selectedMethod });
+      let attempts = 0;
       let result = await getClusteringResult(resultId);
       while (result.status === 'pending') {
+        if (attempts >= CLUSTER_POLL_MAX_ATTEMPTS) {
+          // GREEN: surface a user-facing "timed out" error via setError instead
+          // of throwing this sentinel.
+          throw new Error('NOT_IMPLEMENTED: poll timeout');
+        }
+        attempts += 1;
         await new Promise((resolve) => setTimeout(resolve, CLUSTER_POLL_MS));
         result = await getClusteringResult(resultId);
       }

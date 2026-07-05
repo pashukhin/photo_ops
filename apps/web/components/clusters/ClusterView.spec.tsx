@@ -1,7 +1,7 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as api from '../../lib/api';
-import { ClusterView } from './ClusterView';
+import { ClusterView, CLUSTER_POLL_MS, CLUSTER_POLL_MAX_ATTEMPTS } from './ClusterView';
 
 vi.mock('../../lib/api', () => ({
   listClusteringMethods: vi.fn(),
@@ -156,5 +156,25 @@ describe('ClusterView', () => {
     fireEvent.click(await screen.findByText('Generate clusters'));
     await screen.findByText('Canon EOS R5', undefined, { timeout: 5000 });
     expect(vi.mocked(api.getClusteringResult).mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('stops polling and surfaces a timeout when a run never leaves pending', async () => {
+    // why: a stuck-PENDING run (worker down / DLQ) must fail with an error, not spin forever
+    vi.useFakeTimers();
+    vi.mocked(api.getClusteringResult).mockResolvedValue({ ...TREE, status: 'pending', root: null });
+    render(<ClusterView />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    }); // methods + results load
+    fireEvent.click(screen.getByText('Generate clusters'));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(CLUSTER_POLL_MS * (CLUSTER_POLL_MAX_ATTEMPTS + 2));
+    });
+    expect(screen.getByText(/timed out/i)).toBeTruthy();
+    // bounded: the poll did not run away
+    expect(vi.mocked(api.getClusteringResult).mock.calls.length).toBeLessThanOrEqual(
+      CLUSTER_POLL_MAX_ATTEMPTS + 2
+    );
+    vi.useRealTimers();
   });
 });
