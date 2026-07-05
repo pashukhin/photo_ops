@@ -36,10 +36,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         return;
       }
       setState(user ? { user, status: 'authenticated' } : { user: null, status: 'anonymous' });
-    } catch {
+    } catch (e: unknown) {
       if (requestIdRef.current !== requestId) {
         return;
       }
+      // A gateway/auth outage otherwise looks identical to signed-out; log it so
+      // the failure is diagnosable (tests spy/suppress this to keep output clean).
+      console.warn('session: getCurrentUser failed; treating as anonymous', e);
       setState({ user: null, status: 'anonymous' });
     }
   }, []);
