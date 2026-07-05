@@ -31,11 +31,14 @@ interface FilterState {
 
 const EMPTY_FILTER: FilterState = { from: '', to: '', resourceType: '', eventType: '' };
 
-// GREEN (photo_ops-rh0): render occurred_at as a localized medium date (UTC),
-// not raw RFC3339 — e.g. '2026-06-15T09:30:00Z' → 'Jun 15, 2026'.
+// Render occurred_at as a localized medium date (UTC, so a given instant renders
+// stably regardless of the viewer's timezone) — e.g. '2026-06-15T09:30:00Z' →
+// 'Jun 15, 2026' — instead of raw RFC3339 (photo_ops-rh0).
+const USAGE_DATE_FORMAT = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeZone: 'UTC' });
 export function formatUsageDate(iso: string): string {
-  void iso;
-  throw new Error('NotImplementedError');
+  const date = new Date(iso);
+  if (isNaN(date.getTime())) return iso;
+  return USAGE_DATE_FORMAT.format(date);
 }
 
 function buildParams(filter: FilterState, page: number): ListUsageEventsParams {
@@ -172,7 +175,7 @@ function UsageTable({ lines, filteredTotalAmount, currency }: UsageTableProps) {
         <TableBody>
           {lines.map((line, i) => (
             <TableRow key={i}>
-              <TableCell>{line.occurredAt}</TableCell>
+              <TableCell>{formatUsageDate(line.occurredAt)}</TableCell>
               <TableCell>{line.eventType}</TableCell>
               <TableCell>{line.resourceType}</TableCell>
               <TableCell>
@@ -248,6 +251,8 @@ export function UsageReport() {
     ? [...new Set(summary.lines.map((l) => l.eventType))].filter(Boolean)
     : [];
 
+  const hasActiveFilter = Boolean(filter.from || filter.to || filter.resourceType || filter.eventType);
+
   function handleFilterChange(next: FilterState) {
     setFilter(next);
     setPage(1);
@@ -273,7 +278,9 @@ export function UsageReport() {
           {error}
         </div>
       ) : lines.length === 0 ? (
-        <p className="text-center text-muted-foreground py-8">No usage events found.</p>
+        <p className="text-center text-muted-foreground py-8">
+          {hasActiveFilter ? 'No usage events match these filters.' : 'No usage events found.'}
+        </p>
       ) : (
         <>
           <UsageTable lines={lines} filteredTotalAmount={filteredTotalAmount} currency={currency} />
