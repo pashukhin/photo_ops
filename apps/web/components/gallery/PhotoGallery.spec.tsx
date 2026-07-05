@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PhotoAsset } from '../../lib/api';
 import * as api from '../../lib/api';
 import { PhotoGallery } from './PhotoGallery';
-import { GALLERY_POLL_MS, GALLERY_POLL_MAX_TICKS } from './types';
+import { GALLERY_POLL_MS, GALLERY_POLL_MAX_ERRORS, GALLERY_POLL_MAX_TICKS } from './types';
 
 vi.mock('../../lib/api', () => ({
   listPhotos: vi.fn(),
@@ -203,6 +203,51 @@ describe('PhotoGallery (session 011)', () => {
     });
     // initial + at most MAX_TICKS polls, not MAX_TICKS + 10
     expect(vi.mocked(api.listPhotos).mock.calls.length).toBeLessThanOrEqual(GALLERY_POLL_MAX_TICKS + 1);
+
+    vi.useRealTimers();
+  });
+
+  it('stops polling after too many consecutive poll errors', async () => {
+    // why: a persistently failing poll (backend down) must give up, not hammer forever
+    vi.useFakeTimers();
+    vi.mocked(api.listPhotos)
+      .mockResolvedValueOnce({ photos: [PROCESSING_PHOTO], totalCount: 1 }) // initial
+      .mockRejectedValue(new Error('down')); // every poll fails
+
+    render(<PhotoGallery />);
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(GALLERY_POLL_MS * (GALLERY_POLL_MAX_ERRORS + 3));
+    });
+    // initial + exactly MAX_ERRORS failing polls, then it gave up
+    expect(vi.mocked(api.listPhotos).mock.calls.length).toBe(1 + GALLERY_POLL_MAX_ERRORS);
+
+    vi.useRealTimers();
+  });
+
+  it('drops a stale poll response after the query changed (no clobber)', async () => {
+    // why: a poll tick in flight when the query changes must not overwrite the new view
+    vi.useFakeTimers();
+    let resolvePoll!: (v: { photos: PhotoAsset[]; totalCount: number }) => void;
+    vi.mocked(api.listPhotos)
+      .mockResolvedValueOnce({ photos: [PROCESSING_PHOTO], totalCount: 1 }) // initial (processing → polls)
+      .mockImplementationOnce(() => new Promise((res) => { resolvePoll = res; })) // poll tick: in-flight
+      .mockResolvedValue({ photos: [READY_PHOTO], totalCount: 1 }); // the new query's fetch
+
+    render(<PhotoGallery />);
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); }); // initial load
+    await act(async () => { await vi.advanceTimersByTimeAsync(GALLERY_POLL_MS); }); // poll tick fires (in-flight)
+
+    fireEvent.change(screen.getByLabelText(/search/i), { target: { value: 'x' } }); // query change bumps generation
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); }); // the new main fetch resolves (READY)
+
+    await act(async () => {
+      resolvePoll({ photos: [PROCESSING_PHOTO], totalCount: 999 }); // stale poll resolves late
+      await Promise.resolve();
+    });
+
+    expect(screen.getByText('beach.jpg')).toBeInTheDocument(); // the new query's result stands
+    expect(screen.queryByText('mountain.jpg')).toBeNull(); // stale response was dropped
 
     vi.useRealTimers();
   });

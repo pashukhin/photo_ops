@@ -8,7 +8,7 @@ import { PhotoTable } from './PhotoTable';
 import { GalleryPagination } from './GalleryPagination';
 import { PhotoDetailModal } from './PhotoDetailModal';
 import type { GalleryQuery } from './types';
-import { GALLERY_POLL_MS } from './types';
+import { GALLERY_POLL_MS, GALLERY_POLL_MAX_ERRORS, GALLERY_POLL_MAX_TICKS } from './types';
 
 // GREEN obligation (session 011): the gallery container that ties the toolbar,
 // table, pagination, and detail modal to the server-side query.
@@ -52,11 +52,16 @@ export function PhotoGallery({ reloadToken }: PhotoGalleryProps = {}) {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
+  // Bumped on every main fetch so an in-flight poll response for a now-stale
+  // page/query is dropped instead of clobbering the current view (photo_ops-gfs).
+  const pollGenerationRef = useRef(0);
+
   // Single fetch trigger: mount + any of page/query/reloadToken changing. The
   // cancelled guard drops a stale response if a newer fetch (or unmount) raced
   // ahead, so out-of-order resolutions can't clobber the current view.
   useEffect(() => {
     let cancelled = false;
+    pollGenerationRef.current += 1;
     setLoading(true);
     setError(null);
     listPhotos(buildParams(page, query))
@@ -87,14 +92,30 @@ export function PhotoGallery({ reloadToken }: PhotoGalleryProps = {}) {
 
   useEffect(() => {
     if (!shouldPoll) return;
+    let ticks = 0;
+    let consecutiveErrors = 0;
     const interval = setInterval(() => {
+      // Stop a never-settling status (e.g. worker down) from polling forever.
+      if (ticks >= GALLERY_POLL_MAX_TICKS) {
+        clearInterval(interval);
+        return;
+      }
+      ticks += 1;
+      const generation = pollGenerationRef.current;
       void listPhotos(buildParams(pageRef.current, queryRef.current))
         .then(({ photos: newPhotos, totalCount: tc }) => {
+          // Drop a stale response whose page/query has since changed.
+          if (generation !== pollGenerationRef.current) return;
+          consecutiveErrors = 0;
           setPhotos(newPhotos);
           setTotalCount(tc);
           if (allSettled(newPhotos)) clearInterval(interval);
         })
-        .catch(() => clearInterval(interval));
+        .catch(() => {
+          // Tolerate transient errors; only give up after a run of failures.
+          consecutiveErrors += 1;
+          if (consecutiveErrors >= GALLERY_POLL_MAX_ERRORS) clearInterval(interval);
+        });
     }, GALLERY_POLL_MS);
     return () => clearInterval(interval);
   }, [shouldPoll]);
