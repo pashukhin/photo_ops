@@ -15,6 +15,14 @@ the polyglot repo (session 012). Owns `usage-db`.
   extractable), `BuildSummary` (aggregate + estimate), `Reader` (read path).
 - `internal/store` — pgxpool adapter implementing `usage.Store`.
 - `internal/amqp` — RabbitMQ consumer driving the ledger from `usage.events`.
+  Split by testability: `consumer.go` holds the unit-covered logic (`Decode`,
+  `classifyDelivery`, `handleDelivery` — decode/record/ack-or-requeue; transient
+  errors requeue, poison dead-letters); `broker.go` holds the live-I/O wiring
+  (`Consumer.Start` connect+consume loop, `declareTopology`). `broker.go` is
+  unit-uncoverable (needs a live broker) and is **filtered out of the coverage
+  profile** in the `coverage-go` Makefile target (Go analogue of cluster-service's
+  `# pragma: no cover`); it is verified by `make smoke-usage`. Keep only broker
+  I/O in `broker.go` so the coverage exclusion never hides real logic.
 - `internal/grpcserver` — gRPC adapter for `GetUsageSummary`.
 - Schema: `migrations/` applied via `make migrate-usage`.
 - Gate: `make gate-usage` (`go vet` + `golangci-lint` + `go test`), composed into
