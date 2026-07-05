@@ -1,10 +1,10 @@
 # Session 016: P1 integrity bugfixes (photo + usage)
 
-Status: **In progress.** Branch `session-016-p1-integrity-bugfixes` (cut from
-`main` after the `m71` epic + bug-filing chore landed). RED-first fixes committed
-(`d93fc89`); full `make gate` green; live `make smoke-usage` green (2026-07-05 —
-one billable `photo_processed`, stable across re-fetch, no double-bill; exercises
-the one broker-delegation line coverage could not). Awaiting PR/merge.
+Status: **Done — merged 2026-07-05** (PR #5, merge commit `7d3a8d1`). RED-first
+fixes; full `make gate` + `make test-guard` + live `make smoke-usage` green;
+`coverage-gate` 100% new-code (broker wiring split into `broker.go`, excluded from
+the profile — the one line unit coverage could not reach). `photo_ops-v6c` and
+`photo_ops-35w` closed.
 
 > Human-readable scoping summary. This session is a narrow, verified bugfix slice
 > — no product-feature scope. Follows a deep project review that surfaced five
