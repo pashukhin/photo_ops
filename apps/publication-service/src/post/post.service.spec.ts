@@ -129,6 +129,19 @@ describe('PostDomainService.createPostFromCluster', () => {
     ).rejects.toThrow('cluster result not found');
   });
 
+  it('rejects when the result has no tree yet (not READY)', async () => {
+    // why: the cluster tree is absent until the run is READY — creating a post
+    // from a PENDING/FAILED result must give a clear signal, not a misleading
+    // 'node not found'.
+    const { service } = createService({
+      clusters: { getResult: vi.fn().mockResolvedValue({ id: 'result-1', userId: 'user-1', status: 1, root: null }) }
+    });
+
+    await expect(
+      service.createPostFromCluster({ userId: 'user-1', resultId: 'result-1', nodeId: 'node-A', title: '' })
+    ).rejects.toThrow('cluster result not ready');
+  });
+
   it('rejects when the node is absent from the result tree', async () => {
     // why: a post's source must be a real node of the result.
     const { service } = createService({

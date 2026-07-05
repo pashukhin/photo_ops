@@ -142,4 +142,20 @@ curl -fsS -b "$COOKIE_PATH" -X PATCH -H 'content-type: application/json' \
   | jq -e '.title == "Buenos Aires morning"' >/dev/null \
   || { echo "ASSERTION FAILED: PATCH title did not persist" >&2; exit 1; }
 
+# ---------------------------------------------------------------------------
+# 7. Owner scoping: a different user can neither read nor list this post
+# ---------------------------------------------------------------------------
+COOKIE2="$TMP/session2.cookie"
+curl -fsS -c "$COOKIE2" -H 'content-type: application/json' \
+  -d "{\"email\":\"pub-smoke-other-$STAMP@example.com\",\"password\":\"secret123\",\"displayName\":\"Other\"}" \
+  "$API_BASE_URL/auth/signup" >/dev/null
+
+CODE="$(curl -s -o /dev/null -w '%{http_code}' -b "$COOKIE2" "$API_BASE_URL/v1/posts/$POST_ID")"
+[ "$CODE" = "404" ] \
+  || { echo "ASSERTION FAILED: cross-user GET /v1/posts/:id returned $CODE (expected 404)" >&2; exit 1; }
+
+curl -fsS -b "$COOKIE2" "$API_BASE_URL/v1/posts" \
+  | jq -e '[.posts[].id] | index("'"$POST_ID"'") == null' >/dev/null \
+  || { echo "ASSERTION FAILED: post leaked into another user's list" >&2; exit 1; }
+
 echo "[smoke-publication] OK" >&2

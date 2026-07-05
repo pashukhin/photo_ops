@@ -10,6 +10,9 @@ const STATUS_TO_PROTO = { draft: 1, published: 2, unpublished: 3 } as const;
 const VISIBILITY_TO_PROTO = { private: 1, unlisted: 2, public: 3 } as const;
 const PROTO_TO_VISIBILITY: Record<number, PostVisibility> = { 1: 'private', 2: 'unlisted', 3: 'public' };
 
+// Domain error messages that map to gRPC NOT_FOUND (→ HTTP 404 at the gateway).
+const NOT_FOUND_MESSAGES = new Set(['post not found', 'cluster result not found', 'cluster node not found']);
+
 export interface ProtoPostPhoto {
   photoId: string;
   order: number;
@@ -64,13 +67,17 @@ export class PublicationGrpcController {
     nodeId: string;
     title?: string;
   }): Promise<ProtoPost> {
-    const record = await this.postService.createPostFromCluster({
-      userId: request.userId,
-      resultId: request.resultId,
-      nodeId: request.nodeId,
-      title: request.title ?? ''
-    });
-    return this.toProtoPost(record);
+    try {
+      const record = await this.postService.createPostFromCluster({
+        userId: request.userId,
+        resultId: request.resultId,
+        nodeId: request.nodeId,
+        title: request.title ?? ''
+      });
+      return this.toProtoPost(record);
+    } catch (error) {
+      throw this.mapDomainError(error);
+    }
   }
 
   @GrpcMethod('PublicationService', 'GetPost')
@@ -167,8 +174,15 @@ export class PublicationGrpcController {
   }
 
   private mapDomainError(error: unknown) {
-    if (error instanceof Error && error.message === 'post not found') {
-      return new RpcException({ code: status.NOT_FOUND, message: error.message });
+    if (error instanceof Error) {
+      // Missing/foreign post or cluster node/result → 404; a not-yet-ready run
+      // (a valid but premature request) → 400. Anything else stays UNKNOWN/500.
+      if (NOT_FOUND_MESSAGES.has(error.message)) {
+        return new RpcException({ code: status.NOT_FOUND, message: error.message });
+      }
+      if (error.message === 'cluster result not ready') {
+        return new RpcException({ code: status.INVALID_ARGUMENT, message: error.message });
+      }
     }
     return error;
   }

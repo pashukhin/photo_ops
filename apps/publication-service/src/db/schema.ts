@@ -25,7 +25,8 @@ export const posts = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
   },
   (table) => ({
-    userCreatedAtIdx: index('posts_user_created_at_idx').on(table.userId, table.createdAt)
+    // Matches the migration's (user_id, created_at DESC) — newest-first list scan.
+    userCreatedAtIdx: index('posts_user_created_at_idx').on(table.userId, table.createdAt.desc())
   })
 );
 

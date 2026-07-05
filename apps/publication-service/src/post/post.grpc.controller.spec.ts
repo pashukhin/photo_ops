@@ -135,6 +135,39 @@ describe('PublicationGrpcController', () => {
     });
   });
 
+  it('createPostFromCluster: maps a "cluster ... not found" domain error to NOT_FOUND', async () => {
+    // why: a bad/foreign result or node id is a client error (404), not a 500 —
+    // this handler must map its domain errors like the others.
+    const { controller } = createController({
+      createPostFromCluster: vi.fn().mockRejectedValue(new Error('cluster node not found'))
+    });
+
+    await expect(
+      controller.createPostFromCluster({ userId: 'user-1', resultId: 'r1', nodeId: 'ghost' })
+    ).rejects.toBeInstanceOf(RpcException);
+    await controller
+      .createPostFromCluster({ userId: 'user-1', resultId: 'r1', nodeId: 'ghost' })
+      .catch((err: RpcException) => {
+        expect((err.getError() as { code: number }).code).toBe(status.NOT_FOUND);
+      });
+  });
+
+  it('createPostFromCluster: maps "cluster result not ready" to INVALID_ARGUMENT', async () => {
+    // why: a premature request against a not-yet-READY run is a 400, not a 500.
+    const { controller } = createController({
+      createPostFromCluster: vi.fn().mockRejectedValue(new Error('cluster result not ready'))
+    });
+
+    await controller
+      .createPostFromCluster({ userId: 'user-1', resultId: 'r1', nodeId: 'n1' })
+      .catch((err: RpcException) => {
+        expect((err.getError() as { code: number }).code).toBe(status.INVALID_ARGUMENT);
+      });
+    await expect(
+      controller.createPostFromCluster({ userId: 'user-1', resultId: 'r1', nodeId: 'n1' })
+    ).rejects.toBeInstanceOf(RpcException);
+  });
+
   it('updatePost: maps a "post not found" domain error to a NOT_FOUND rpc error', async () => {
     // why: owner-scoped updates that miss must surface as a 404, like reads.
     const { controller } = createController({

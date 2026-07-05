@@ -65,6 +65,10 @@ export class PostDomainService {
     if (!tree) {
       throw new Error('cluster result not found');
     }
+    // The tree is absent until the run is READY (cluster proto contract).
+    if (!tree.root) {
+      throw new Error('cluster result not ready');
+    }
     const node = findNode(tree.root, input.nodeId);
     if (!node) {
       throw new Error('cluster node not found');
