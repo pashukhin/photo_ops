@@ -1,7 +1,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as api from '../../lib/api';
-import { UsageReport } from './UsageReport';
+import { UsageReport, formatUsageDate } from './UsageReport';
 
 vi.mock('../../lib/api', () => ({
   getUsageSummary: vi.fn(),
@@ -49,6 +49,24 @@ describe('UsageReport', () => {
     await screen.findByText('photo_processed');
     // …and its cost (the line amount / filtered total) is shown.
     expect(screen.getAllByText(/0\.05/).length).toBeGreaterThan(0);
+  });
+
+  it('renders occurred_at as a localized date, not raw RFC3339', () => {
+    // why: raw '2026-06-15T09:30:00Z' is unreadable; show a localized date
+    expect(formatUsageDate('2026-06-15T09:30:00Z')).toBe('Jun 15, 2026');
+  });
+
+  it('shows a filter-aware empty state when a filter yields no rows', async () => {
+    // why: a free-form type that matches nothing must explain itself, not look empty-by-default
+    vi.mocked(api.listUsageEvents).mockResolvedValue({
+      lines: [],
+      totalCount: 0,
+      filteredTotalAmount: '0.00',
+      currency: 'USD'
+    });
+    render(<UsageReport />);
+    fireEvent.change(await screen.findByLabelText(/resource type/i), { target: { value: 'nope' } });
+    expect(await screen.findByText(/filter/i)).toBeTruthy();
   });
 
   it('refetches with the new filter when the resource-type filter changes', async () => {

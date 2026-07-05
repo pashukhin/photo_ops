@@ -52,9 +52,21 @@ describe('SessionProvider', () => {
 
   it('treats a failed session fetch as anonymous (no white-screen)', async () => {
     // why: design edge-state — a fetch error must degrade to /login, not crash
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {}); // keep GREEN's warn out of test output
     vi.mocked(api.getCurrentUser).mockRejectedValue(new Error('boom'));
     render(<Probe />, { wrapper });
     await waitFor(() => expect(screen.getByText('status:anonymous;user:none')).toBeTruthy());
+    warn.mockRestore();
+  });
+
+  it('logs a warning when the session fetch fails (outage != silently signed-out)', async () => {
+    // why: a gateway/auth outage currently looks identical to signed-out; log it
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.mocked(api.getCurrentUser).mockRejectedValue(new Error('gateway down'));
+    render(<Probe />, { wrapper });
+    await waitFor(() => expect(screen.getByText('status:anonymous;user:none')).toBeTruthy());
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
   });
 
   it('login delegates to api.login and authenticates', async () => {

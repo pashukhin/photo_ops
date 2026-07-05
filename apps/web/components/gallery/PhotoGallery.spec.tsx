@@ -1,9 +1,9 @@
 import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PhotoAsset } from '../../lib/api';
 import * as api from '../../lib/api';
 import { PhotoGallery } from './PhotoGallery';
-import { GALLERY_POLL_MS } from './types';
+import { GALLERY_POLL_MS, GALLERY_POLL_MAX_ERRORS, GALLERY_POLL_MAX_TICKS } from './types';
 
 vi.mock('../../lib/api', () => ({
   listPhotos: vi.fn(),
@@ -44,6 +44,12 @@ const PROCESSING_PHOTO: PhotoAsset = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+// Restore real timers even if a fake-timer test fails before its own
+// vi.useRealTimers(), so a leaked fake clock can't hang a later test.
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('PhotoGallery (session 011)', () => {
@@ -166,5 +172,95 @@ describe('PhotoGallery (session 011)', () => {
 
     rerender(<PhotoGallery reloadToken={1} />);
     await waitFor(() => expect(api.listPhotos).toHaveBeenCalledTimes(2));
+  });
+
+  it('keeps polling after a transient poll error (does not stop on the first failure)', async () => {
+    // why: one flaky poll fetch must not silently freeze the table forever
+    vi.useFakeTimers();
+    vi.mocked(api.listPhotos)
+      .mockResolvedValueOnce({ photos: [PROCESSING_PHOTO], totalCount: 1 }) // initial
+      .mockRejectedValueOnce(new Error('transient')) // poll 1 fails
+      .mockResolvedValueOnce({ photos: [PROCESSING_PHOTO], totalCount: 1 }) // poll 2 ok, still processing
+      .mockResolvedValue({ photos: [READY_PHOTO], totalCount: 1 }); // poll 3 settles
+
+    render(<PhotoGallery />);
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(GALLERY_POLL_MS * 3); });
+    expect(api.listPhotos).toHaveBeenCalledTimes(4); // initial + 3 polls; the error did not abort polling
+
+    vi.useRealTimers();
+  });
+
+  it('stops polling a never-settling status after the tick cap', async () => {
+    // why: a stuck 'processing' (worker down) must not poll forever
+    vi.useFakeTimers();
+    vi.mocked(api.listPhotos).mockResolvedValue({ photos: [PROCESSING_PHOTO], totalCount: 1 });
+
+    render(<PhotoGallery />);
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(GALLERY_POLL_MS * (GALLERY_POLL_MAX_TICKS + 10));
+    });
+    // initial + at most MAX_TICKS polls, not MAX_TICKS + 10
+    expect(vi.mocked(api.listPhotos).mock.calls.length).toBeLessThanOrEqual(GALLERY_POLL_MAX_TICKS + 1);
+
+    vi.useRealTimers();
+  });
+
+  it('stops polling after too many consecutive poll errors', async () => {
+    // why: a persistently failing poll (backend down) must give up, not hammer forever
+    vi.useFakeTimers();
+    vi.mocked(api.listPhotos)
+      .mockResolvedValueOnce({ photos: [PROCESSING_PHOTO], totalCount: 1 }) // initial
+      .mockRejectedValue(new Error('down')); // every poll fails
+
+    render(<PhotoGallery />);
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(GALLERY_POLL_MS * (GALLERY_POLL_MAX_ERRORS + 3));
+    });
+    // initial + exactly MAX_ERRORS failing polls, then it gave up
+    expect(vi.mocked(api.listPhotos).mock.calls.length).toBe(1 + GALLERY_POLL_MAX_ERRORS);
+
+    vi.useRealTimers();
+  });
+
+  it('drops a stale poll response after the query changed (no clobber)', async () => {
+    // why: a poll tick in flight when the query changes must not overwrite the new view
+    vi.useFakeTimers();
+    let resolvePoll!: (v: { photos: PhotoAsset[]; totalCount: number }) => void;
+    vi.mocked(api.listPhotos)
+      .mockResolvedValueOnce({ photos: [PROCESSING_PHOTO], totalCount: 1 }) // initial (processing → polls)
+      .mockImplementationOnce(() => new Promise((res) => { resolvePoll = res; })) // poll tick: in-flight
+      .mockResolvedValue({ photos: [READY_PHOTO], totalCount: 1 }); // the new query's fetch
+
+    render(<PhotoGallery />);
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); }); // initial load
+    await act(async () => { await vi.advanceTimersByTimeAsync(GALLERY_POLL_MS); }); // poll tick fires (in-flight)
+
+    fireEvent.change(screen.getByLabelText(/search/i), { target: { value: 'x' } }); // query change bumps generation
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); }); // the new main fetch resolves (READY)
+
+    await act(async () => {
+      resolvePoll({ photos: [PROCESSING_PHOTO], totalCount: 999 }); // stale poll resolves late
+      await Promise.resolve();
+    });
+
+    expect(screen.getByText('beach.jpg')).toBeInTheDocument(); // the new query's result stands
+    expect(screen.queryByText('mountain.jpg')).toBeNull(); // stale response was dropped
+
+    vi.useRealTimers();
+  });
+
+  it('shows an error in the detail dialog when getPhoto fails', async () => {
+    // why: the modal must not open blank/silent on a failed detail fetch
+    vi.mocked(api.listPhotos).mockResolvedValue({ photos: [READY_PHOTO], totalCount: 1 });
+    vi.mocked(api.getPhoto).mockRejectedValue(new Error('detail boom'));
+
+    render(<PhotoGallery />);
+    fireEvent.click(await screen.findByText('beach.jpg'));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByText(/boom|error|failed/i)).toBeTruthy();
   });
 });

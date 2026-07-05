@@ -10,31 +10,11 @@ import {
 } from '@/components/ui/table';
 import type { PhotoAsset } from '../../lib/api';
 import { StatusBadge } from './StatusBadge';
+import { FALLBACK, fmt, fmtBytes, fmtDimensions } from './format';
 
 export interface PhotoTableProps {
   photos: PhotoAsset[];
   onRowClick: (photo: PhotoAsset) => void;
-}
-
-const FALLBACK = '—';
-
-function fmt(val: string | number | undefined | null): string {
-  if (val === undefined || val === null || val === '') return FALLBACK;
-  return String(val);
-}
-
-function fmtBytes(sizeBytes: string | undefined): string {
-  if (!sizeBytes) return FALLBACK;
-  const n = Number(sizeBytes);
-  if (isNaN(n)) return FALLBACK;
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
-  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function fmtDimensions(w?: number, h?: number): string {
-  if (!w || !h) return FALLBACK;
-  return `${w}×${h}`;
 }
 
 function CameraCell({ make, model }: { make?: string; model?: string }) {

@@ -22,5 +22,14 @@ export function AuthGuard({ children }: { children: ReactNode }) {
     return <>{children}</>;
   }
 
+  if (status === 'loading') {
+    // Non-blocking affordance instead of a blank screen while the session resolves.
+    return (
+      <div role="status" className="flex min-h-screen items-center justify-center text-muted-foreground">
+        Loading…
+      </div>
+    );
+  }
+
   return null;
 }

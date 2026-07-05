@@ -1,14 +1,31 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as api from '../../lib/api';
-import { ClusterView } from './ClusterView';
+import { ClusterView, CLUSTER_POLL_MS, CLUSTER_POLL_MAX_ATTEMPTS } from './ClusterView';
 
 vi.mock('../../lib/api', () => ({
   listClusteringMethods: vi.fn(),
   listClusteringResults: vi.fn(),
   getClusteringResult: vi.fn(),
-  generateClusters: vi.fn()
+  generateClusters: vi.fn(),
+  listPhotos: vi.fn()
 }));
+
+// Minimal PhotoAsset for the id→photo map ClusterView builds to render item
+// thumbnails; only id/filename/variants are consumed by the tree.
+function photoAsset(id: string): import('../../lib/api').PhotoAsset {
+  return {
+    id,
+    filename: `${id}.jpg`,
+    contentType: 'image/jpeg',
+    sizeBytes: '10',
+    objectKey: `k/${id}`,
+    status: 'ready',
+    createdAt: 'c',
+    updatedAt: 'u',
+    variants: [{ variantType: 'thumbnail', url: `http://img/${id}.jpg`, width: 40, height: 40 }]
+  } as unknown as import('../../lib/api').PhotoAsset;
+}
 
 const METHODS = {
   methods: [
@@ -77,6 +94,8 @@ beforeEach(() => {
   vi.mocked(api.listClusteringResults).mockResolvedValue(RESULTS);
   vi.mocked(api.getClusteringResult).mockResolvedValue(TREE);
   vi.mocked(api.generateClusters).mockResolvedValue({ resultId: 'r1', status: 'pending' });
+  // Default: the two item photos (p1, p2) resolve to thumbnails.
+  vi.mocked(api.listPhotos).mockResolvedValue({ photos: [photoAsset('p1'), photoAsset('p2')], totalCount: 2 });
 });
 
 describe('ClusterView', () => {
@@ -93,7 +112,8 @@ describe('ClusterView', () => {
     fireEvent.click(await screen.findByTestId('result-row'));
     expect(api.getClusteringResult).toHaveBeenCalledWith('r1');
     await screen.findByText('Canon EOS R5');
-    expect(screen.getByText(/p1, p2/)).toBeTruthy();
+    // items now render as photo thumbnails, not raw ids
+    expect(await screen.findByAltText('p1.jpg')).toBeTruthy();
   });
 
   it('generate runs the selected method and shows the ready tree', async () => {
@@ -156,5 +176,45 @@ describe('ClusterView', () => {
     fireEvent.click(await screen.findByText('Generate clusters'));
     await screen.findByText('Canon EOS R5', undefined, { timeout: 5000 });
     expect(vi.mocked(api.getClusteringResult).mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('renders cluster item photos as thumbnails from the resolved photo map', async () => {
+    // why: a cluster's leaf items should show photo thumbnails, not raw ids
+    render(<ClusterView />);
+    fireEvent.click(await screen.findByTestId('result-row'));
+    const img1 = await screen.findByAltText('p1.jpg');
+    expect(img1).toHaveAttribute('src', 'http://img/p1.jpg');
+    expect(screen.getByAltText('p2.jpg')).toHaveAttribute('src', 'http://img/p2.jpg');
+  });
+
+  it('falls back to the item id when its photo is not resolved', async () => {
+    // why: an item whose photo is missing/unready must not vanish — show its id
+    vi.mocked(api.listPhotos).mockResolvedValue({ photos: [], totalCount: 0 });
+    render(<ClusterView />);
+    fireEvent.click(await screen.findByTestId('result-row'));
+    await screen.findByText('Canon EOS R5');
+    expect(screen.getByText('p1')).toBeTruthy();
+    expect(screen.getByText('p2')).toBeTruthy();
+  });
+
+  it('stops polling and surfaces a timeout when a run never leaves pending', async () => {
+    // why: a stuck-PENDING run (worker down / DLQ) must fail with an error, not spin forever
+    vi.useFakeTimers();
+    vi.mocked(api.getClusteringResult).mockResolvedValue({ ...TREE, status: 'pending', root: null });
+    render(<ClusterView />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    }); // methods + results load
+    vi.mocked(api.getClusteringResult).mockClear(); // this file's beforeEach doesn't clear; ignore leaked calls
+    fireEvent.click(screen.getByText('Generate clusters'));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(CLUSTER_POLL_MS * (CLUSTER_POLL_MAX_ATTEMPTS + 2));
+    });
+    expect(screen.getByText(/timed out/i)).toBeTruthy();
+    // bounded: the poll did not run away
+    expect(vi.mocked(api.getClusteringResult).mock.calls.length).toBeLessThanOrEqual(
+      CLUSTER_POLL_MAX_ATTEMPTS + 2
+    );
+    vi.useRealTimers();
   });
 });

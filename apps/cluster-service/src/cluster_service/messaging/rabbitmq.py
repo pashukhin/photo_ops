@@ -19,16 +19,43 @@ from .port import BusMessage
 log = logging.getLogger(__name__)
 
 
-class RabbitMqBus:  # pragma: no cover - live-broker IO adapter (smoke-verified)
-    """Blocking RabbitMQ adapter implementing both messaging ports."""
+class RabbitMqBus:
+    """Blocking RabbitMQ adapter implementing both messaging ports.
 
-    def __init__(self, url: str, *, connect_attempts: int = 15, connect_delay: float = 2.0) -> None:
-        self._connection = self._connect(url, connect_attempts, connect_delay)
+    The connection is opened through an injectable ``connection_factory`` so the
+    reconnect-on-publish logic (photo_ops-di8) is unit-testable with a fake
+    channel; the real pika connect stays ``# pragma: no cover`` (smoke-verified).
+    """
+
+    def __init__(
+        self,
+        url: str | None = None,
+        *,
+        connect_attempts: int = 15,
+        connect_delay: float = 2.0,
+        connection_factory: "Callable[[], pika.BlockingConnection] | None" = None,
+    ) -> None:
+        if connection_factory is None:  # pragma: no cover - real connect path
+            connection_factory = self._default_factory(url, connect_attempts, connect_delay)
+        self._factory = connection_factory
+        self._connection = self._factory()
         self._channel = self._connection.channel()
         self._declared: set[str] = set()
 
+    def _default_factory(  # pragma: no cover - live-broker IO
+        self, url: str | None, attempts: int, delay: float
+    ) -> "Callable[[], pika.BlockingConnection]":
+        assert url is not None, "url is required without a connection_factory"
+
+        def factory() -> "pika.BlockingConnection":
+            return self._connect(url, attempts, delay)
+
+        return factory
+
     @staticmethod
-    def _connect(url: str, attempts: int, delay: float) -> "pika.BlockingConnection":
+    def _connect(  # pragma: no cover - live-broker IO
+        url: str, attempts: int, delay: float
+    ) -> "pika.BlockingConnection":
         params = pika.URLParameters(url)
         for attempt in range(1, attempts + 1):
             try:
@@ -58,6 +85,18 @@ class RabbitMqBus:  # pragma: no cover - live-broker IO adapter (smoke-verified)
         self._declared.add(name)
 
     def publish(self, destination: str, message: BusMessage) -> None:
+        # The server role only publishes on demand and never services the
+        # connection, so an idle broker heartbeat can drop it; the next publish
+        # then raises. Reconnect once and retry so a dropped idle connection
+        # recovers transparently instead of surfacing a 500 (photo_ops-di8).
+        try:
+            self._publish_once(destination, message)
+        except pika.exceptions.AMQPConnectionError:
+            log.warning("rabbitmq publish failed (connection lost); reconnecting and retrying")
+            self._reconnect()
+            self._publish_once(destination, message)
+
+    def _publish_once(self, destination: str, message: BusMessage) -> None:
         self._ensure_topology(destination)
         self._channel.basic_publish(
             exchange=destination,
@@ -66,7 +105,18 @@ class RabbitMqBus:  # pragma: no cover - live-broker IO adapter (smoke-verified)
             properties=pika.BasicProperties(delivery_mode=2, correlation_id=message.correlation_id),
         )
 
-    def consume(self, source: str, handler: Callable[[BusMessage], None]) -> None:
+    def _reconnect(self) -> None:
+        try:
+            self._connection.close()
+        except Exception:  # pragma: no cover - best-effort close of an already-dead connection
+            log.debug("ignored error closing dropped RabbitMQ connection", exc_info=True)
+        self._connection = self._factory()
+        self._channel = self._connection.channel()
+        self._declared = set()  # topology must be re-declared on the fresh channel
+
+    def consume(  # pragma: no cover - live-broker IO
+        self, source: str, handler: Callable[[BusMessage], None]
+    ) -> None:
         self._ensure_topology(source)
         self._channel.basic_qos(prefetch_count=1)
 
@@ -81,10 +131,10 @@ class RabbitMqBus:  # pragma: no cover - live-broker IO adapter (smoke-verified)
 
         self._channel.basic_consume(queue=source, on_message_callback=_on_message)
 
-    def start(self) -> None:
+    def start(self) -> None:  # pragma: no cover - live-broker IO
         self._channel.start_consuming()
 
-    def close(self) -> None:
+    def close(self) -> None:  # pragma: no cover - live-broker IO
         try:
             if self._connection.is_open:
                 self._connection.close()

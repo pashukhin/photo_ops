@@ -5,41 +5,73 @@ import {
   generateClusters,
   getClusteringResult,
   listClusteringMethods,
-  listClusteringResults
+  listClusteringResults,
+  listPhotos
 } from '../../lib/api';
 import type {
   ClusterNode,
   ClusteringMethod,
   ClusteringResult,
-  ClusteringResultSummary
+  ClusteringResultSummary,
+  PhotoAsset
 } from '../../lib/api';
 
 // ClusterView — the clustering plane UI (session 013). Lists the user's results,
 // offers a method picker + Generate (async: poll the new result until it leaves
 // pending), and renders a chosen result's immutable tree as a nested list.
 export const CLUSTER_POLL_MS = 2000;
+// Max poll iterations before generate() gives up on a stuck-PENDING run (worker
+// down / DLQ) and surfaces a timeout instead of spinning forever (photo_ops-n7w).
+export const CLUSTER_POLL_MAX_ATTEMPTS = 30;
 
-function TreeNodeView({ node, depth }: { node: ClusterNode; depth: number }) {
+function TreeNodeView({
+  node,
+  depth,
+  photosById
+}: {
+  node: ClusterNode;
+  depth: number;
+  photosById: Map<string, PhotoAsset>;
+}) {
   const label = node.segmentLabel || node.kind;
   return (
     <li>
       <div data-testid="cluster-node" style={{ paddingLeft: depth * 16 }}>
         <span className="font-medium">{label}</span>
-        <span className="text-sm text-gray-500"> · {node.photoCount} photos</span>
+        <span className="text-sm text-muted-foreground"> · {node.photoCount} photos</span>
         {node.dateFrom ? (
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-muted-foreground">
             {' '}
             · {node.dateFrom} – {node.dateTo}
           </span>
         ) : null}
-        {node.items.length > 0 ? (
-          <span className="text-sm text-gray-500"> · {node.items.join(', ')}</span>
-        ) : null}
       </div>
+      {node.items.length > 0 ? (
+        <div className="mt-1 flex flex-wrap gap-1" style={{ paddingLeft: depth * 16 }}>
+          {node.items.map((id) => {
+            const photo = photosById.get(id);
+            const thumb = photo?.variants?.find((v) => v.variantType === 'thumbnail');
+            return thumb ? (
+              <img
+                key={id}
+                src={thumb.url}
+                alt={photo?.filename ?? id}
+                title={photo?.filename ?? id}
+                className="h-10 w-10 rounded object-cover"
+              />
+            ) : (
+              // Fallback: photo not resolved (unready / beyond the fetch cap) — show the id.
+              <span key={id} className="text-xs text-muted-foreground">
+                {id}
+              </span>
+            );
+          })}
+        </div>
+      ) : null}
       {node.children.length > 0 ? (
         <ul>
           {node.children.map((c) => (
-            <TreeNodeView key={c.id} node={c} depth={depth + 1} />
+            <TreeNodeView key={c.id} node={c} depth={depth + 1} photosById={photosById} />
           ))}
         </ul>
       ) : null}
@@ -54,6 +86,8 @@ export function ClusterView() {
   const [active, setActive] = useState<ClusteringResult | null>(null);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Resolves cluster item ids → photos so the tree can render thumbnails.
+  const [photosById, setPhotosById] = useState<Map<string, PhotoAsset>>(new Map());
 
   const refreshResults = useCallback(async () => {
     const { results } = await listClusteringResults();
@@ -68,6 +102,12 @@ export function ClusterView() {
       })
       .catch((e: unknown) => setError(String(e)));
     refreshResults().catch((e: unknown) => setError(String(e)));
+    // Fetch the user's ready photos once so item ids render as thumbnails
+    // (photo_ops-hec). Personal-scale cap; unresolved ids fall back to their id.
+    // Non-fatal — a fetch failure just leaves the ids as text.
+    listPhotos({ page: 1, pageSize: 500, status: ['ready'] })
+      .then(({ photos }) => setPhotosById(new Map(photos.map((p) => [p.id, p]))))
+      .catch(() => {});
   }, [refreshResults]);
 
   const view = useCallback(async (resultId: string) => {
@@ -80,8 +120,16 @@ export function ClusterView() {
     setError(null);
     try {
       const { resultId } = await generateClusters({ method: selectedMethod });
+      let attempts = 0;
       let result = await getClusteringResult(resultId);
       while (result.status === 'pending') {
+        if (attempts >= CLUSTER_POLL_MAX_ATTEMPTS) {
+          setError(
+            `Clustering is still pending; it timed out after ${CLUSTER_POLL_MAX_ATTEMPTS} checks. Try again.`
+          );
+          return;
+        }
+        attempts += 1;
         await new Promise((resolve) => setTimeout(resolve, CLUSTER_POLL_MS));
         result = await getClusteringResult(resultId);
       }
@@ -119,12 +167,12 @@ export function ClusterView() {
         </button>
       </div>
 
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
       <div>
         <h2 className="text-lg font-semibold">Results</h2>
         {results.length === 0 ? (
-          <p className="text-sm text-gray-500">No clustering results yet.</p>
+          <p className="text-sm text-muted-foreground">No clustering results yet.</p>
         ) : (
           <ul className="space-y-1">
             {results.map((r) => (
@@ -148,13 +196,13 @@ export function ClusterView() {
         <div>
           <h2 className="text-lg font-semibold">Tree · {active.status}</h2>
           {active.status === 'failed' ? (
-            <p className="text-sm text-red-600">{active.errorMessage}</p>
+            <p className="text-sm text-destructive">{active.errorMessage}</p>
           ) : active.root ? (
             <ul>
-              <TreeNodeView node={active.root} depth={0} />
+              <TreeNodeView node={active.root} depth={0} photosById={photosById} />
             </ul>
           ) : (
-            <p className="text-sm text-gray-500">Not ready.</p>
+            <p className="text-sm text-muted-foreground">Not ready.</p>
           )}
         </div>
       ) : null}

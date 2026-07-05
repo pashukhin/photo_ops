@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSession } from '@/lib/session';
@@ -20,6 +20,16 @@ const NAV_ITEMS = [
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { user, logout } = useSession();
+  const [logoutError, setLogoutError] = useState<string | null>(null);
+
+  const handleLogout = async () => {
+    setLogoutError(null);
+    try {
+      await logout();
+    } catch {
+      setLogoutError('Log out failed. Please try again.');
+    }
+  };
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -51,13 +61,21 @@ export function AppShell({ children }: { children: ReactNode }) {
           {user ? (
             <div className="flex items-center gap-3">
               <span className="text-sm text-muted-foreground">{user.displayName}</span>
-              <Button variant="outline" size="sm" onClick={() => void logout()}>
+              <Button variant="outline" size="sm" onClick={() => void handleLogout()}>
                 Log out
               </Button>
             </div>
           ) : null}
         </div>
       </header>
+      {logoutError ? (
+        <div
+          role="alert"
+          className="border-b border-destructive bg-destructive/10 px-4 py-2 text-sm text-destructive"
+        >
+          {logoutError}
+        </div>
+      ) : null}
       <main className="flex-1">{children}</main>
     </div>
   );

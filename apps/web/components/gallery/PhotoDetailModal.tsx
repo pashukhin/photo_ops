@@ -5,17 +5,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { getPhoto } from '../../lib/api';
 import type { PhotoAsset } from '../../lib/api';
+import { FALLBACK, fmt } from './format';
 
 export interface PhotoDetailModalProps {
   photoId: string | null; // null = closed
   onClose: () => void;
-}
-
-const FALLBACK = '—';
-
-function fmt(val: string | number | undefined | null): string {
-  if (val === undefined || val === null || val === '') return FALLBACK;
-  return String(val);
 }
 
 // GREEN obligation (session 011): when photoId is non-null, fetch
@@ -27,6 +21,7 @@ function fmt(val: string | number | undefined | null): string {
 export function PhotoDetailModal({ photoId, onClose }: PhotoDetailModalProps) {
   const [photo, setPhoto] = useState<PhotoAsset | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!photoId) {
@@ -35,6 +30,7 @@ export function PhotoDetailModal({ photoId, onClose }: PhotoDetailModalProps) {
     }
     let cancelled = false;
     setLoading(true);
+    setError(null);
     getPhoto(photoId)
       .then((p) => {
         if (!cancelled) {
@@ -42,8 +38,9 @@ export function PhotoDetailModal({ photoId, onClose }: PhotoDetailModalProps) {
           setLoading(false);
         }
       })
-      .catch(() => {
+      .catch((e: unknown) => {
         if (!cancelled) {
+          setError(e instanceof Error ? e.message : String(e));
           setLoading(false);
         }
       });
@@ -62,6 +59,12 @@ export function PhotoDetailModal({ photoId, onClose }: PhotoDetailModalProps) {
         </DialogHeader>
 
         {loading && <p>Loading…</p>}
+
+        {error && (
+          <p role="alert" className="text-sm text-destructive">
+            Failed to load photo detail: {error}
+          </p>
+        )}
 
         {photo && (
           <div className="space-y-4">
