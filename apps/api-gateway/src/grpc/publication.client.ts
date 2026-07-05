@@ -1,4 +1,7 @@
+import { ChannelCredentials, credentials, loadPackageDefinition } from '@grpc/grpc-js';
+import { loadSync } from '@grpc/proto-loader';
 import { Injectable } from '@nestjs/common';
+import { join } from 'node:path';
 
 // Raw gRPC shapes (proto-loader: camelCase keys, numeric enums, string dates).
 // The controller maps enums to strings and shapes the browser-facing DTO.
@@ -66,24 +69,90 @@ export interface PublicationGatewayClient {
   updatePost(input: UpdatePostInput): Promise<PostRaw>;
 }
 
-// GREEN holds a proto-loaded PublicationService gRPC client (mirroring
-// ClusterClient) targeting PUBLICATION_SERVICE_GRPC_URL and promisifies each
-// unary call. Excluded from unit coverage (IO adapter — smoke-covered).
+type Callback<T> = (error: Error | null, value: T) => void;
+
+interface GrpcPublicationServiceClient {
+  CreatePostFromCluster(input: CreatePostFromClusterInput, callback: Callback<PostRaw>): void;
+  GetPost(input: { userId: string; postId: string }, callback: Callback<PostRaw>): void;
+  ListPosts(input: { userId: string }, callback: Callback<{ posts: PostSummaryRaw[] }>): void;
+  UpdatePost(input: UpdatePostInput, callback: Callback<PostRaw>): void;
+}
+
 @Injectable()
 export class PublicationClient implements PublicationGatewayClient {
+  private readonly client: GrpcPublicationServiceClient;
+
+  constructor() {
+    const protoPath = join(process.cwd(), '../../proto/publication/v1/publication_service.proto');
+    const packageDefinition = loadSync(protoPath, {
+      keepCase: false,
+      longs: String,
+      enums: Number,
+      defaults: true,
+      oneofs: true,
+      includeDirs: [join(process.cwd(), '../../proto')]
+    });
+    const loaded = loadPackageDefinition(packageDefinition) as unknown as {
+      photoops: {
+        publication: {
+          v1: {
+            PublicationService: new (
+              target: string,
+              channelCredentials: ChannelCredentials
+            ) => GrpcPublicationServiceClient;
+          };
+        };
+      };
+    };
+    const target = process.env.PUBLICATION_SERVICE_GRPC_URL ?? 'publication-service:50058';
+    this.client = new loaded.photoops.publication.v1.PublicationService(target, credentials.createInsecure());
+  }
+
   createPostFromCluster(input: CreatePostFromClusterInput): Promise<PostRaw> {
-    return Promise.reject(new Error(`not implemented: createPostFromCluster ${input.resultId}/${input.nodeId}`));
+    return new Promise((resolve, reject) => {
+      this.client.CreatePostFromCluster(input, (error, value) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(value);
+      });
+    });
   }
 
   getPost(input: { userId: string; postId: string }): Promise<PostRaw> {
-    return Promise.reject(new Error(`not implemented: getPost ${input.userId}/${input.postId}`));
+    return new Promise((resolve, reject) => {
+      this.client.GetPost(input, (error, value) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(value);
+      });
+    });
   }
 
   listPosts(userId: string): Promise<{ posts: PostSummaryRaw[] }> {
-    return Promise.reject(new Error(`not implemented: listPosts ${userId}`));
+    return new Promise((resolve, reject) => {
+      this.client.ListPosts({ userId }, (error, value) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(value);
+      });
+    });
   }
 
   updatePost(input: UpdatePostInput): Promise<PostRaw> {
-    return Promise.reject(new Error(`not implemented: updatePost ${input.userId}/${input.postId}`));
+    return new Promise((resolve, reject) => {
+      this.client.UpdatePost(input, (error, value) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(value);
+      });
+    });
   }
 }

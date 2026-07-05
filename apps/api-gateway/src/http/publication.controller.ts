@@ -1,6 +1,11 @@
 import { Body, Controller, Get, Headers, Param, Patch, Post } from '@nestjs/common';
 import { AuthService } from '../auth/auth.service';
-import { PublicationClient } from '../grpc/publication.client';
+import { PostRaw, PostSummaryRaw, PublicationClient, UpdatePostInput } from '../grpc/publication.client';
+
+// Proto enum (numeric, from proto-loader) <-> browser-facing string.
+const STATUS: Record<number, string> = { 1: 'draft', 2: 'published', 3: 'unpublished' };
+const VISIBILITY: Record<number, string> = { 1: 'private', 2: 'unlisted', 3: 'public' };
+const VISIBILITY_TO_PROTO: Record<string, number> = { private: 1, unlisted: 2, public: 3 };
 
 export interface CreatePostBody {
   resultId: string;
@@ -18,9 +23,8 @@ export interface UpdatePostBody {
   dateTo?: string;
 }
 
-// Session-authed Post edge. Maps the browser DTO <-> gRPC: proto status/
-// visibility enum numbers <-> strings; userId comes from the validated session,
-// never the body. GREEN fills the bodies; the RED spec pins the mapping.
+// Session-authed Post edge. userId comes from the validated session, never the
+// body; proto status/visibility enum numbers map to browser strings.
 @Controller('v1')
 export class PublicationController {
   constructor(
@@ -29,32 +33,67 @@ export class PublicationController {
   ) {}
 
   @Post('posts')
-  createPost(
+  async createPost(
     @Headers('cookie') cookieHeader: string | undefined,
     @Body() body: CreatePostBody
-  ): Promise<unknown> {
-    return Promise.reject(new Error(`not implemented: createPost ${body.resultId}/${body.nodeId} (cookie=${typeof cookieHeader})`));
+  ) {
+    const auth = await this.authService.requireSession(cookieHeader);
+    const raw = await this.publicationClient.createPostFromCluster({
+      userId: auth.userId,
+      resultId: body.resultId,
+      nodeId: body.nodeId,
+      title: body.title ?? ''
+    });
+    return this.mapPost(raw);
   }
 
   @Get('posts')
-  listPosts(@Headers('cookie') cookieHeader: string | undefined): Promise<{ posts: unknown[] }> {
-    return Promise.reject(new Error(`not implemented: listPosts (cookie=${typeof cookieHeader})`));
+  async listPosts(@Headers('cookie') cookieHeader: string | undefined) {
+    const auth = await this.authService.requireSession(cookieHeader);
+    const { posts } = await this.publicationClient.listPosts(auth.userId);
+    return { posts: posts.map((summary) => this.mapSummary(summary)) };
   }
 
   @Get('posts/:postId')
-  getPost(
+  async getPost(
     @Headers('cookie') cookieHeader: string | undefined,
     @Param('postId') postId: string
-  ): Promise<unknown> {
-    return Promise.reject(new Error(`not implemented: getPost ${postId} (cookie=${typeof cookieHeader})`));
+  ) {
+    const auth = await this.authService.requireSession(cookieHeader);
+    return this.mapPost(await this.publicationClient.getPost({ userId: auth.userId, postId }));
   }
 
   @Patch('posts/:postId')
-  updatePost(
+  async updatePost(
     @Headers('cookie') cookieHeader: string | undefined,
     @Param('postId') postId: string,
     @Body() body: UpdatePostBody
-  ): Promise<unknown> {
-    return Promise.reject(new Error(`not implemented: updatePost ${postId} ${JSON.stringify(body)} (cookie=${typeof cookieHeader})`));
+  ) {
+    const auth = await this.authService.requireSession(cookieHeader);
+    const input: UpdatePostInput = { userId: auth.userId, postId };
+    if (body.title !== undefined) input.title = body.title;
+    if (body.body !== undefined) input.body = body.body;
+    if (body.visibility !== undefined) input.visibility = VISIBILITY_TO_PROTO[body.visibility];
+    if (body.locationLabel !== undefined) input.locationLabel = body.locationLabel;
+    if (body.mapEnabled !== undefined) input.mapEnabled = body.mapEnabled;
+    if (body.dateFrom !== undefined) input.dateFrom = body.dateFrom;
+    if (body.dateTo !== undefined) input.dateTo = body.dateTo;
+    return this.mapPost(await this.publicationClient.updatePost(input));
+  }
+
+  private mapPost(raw: PostRaw) {
+    return {
+      ...raw,
+      status: STATUS[raw.status] ?? 'unspecified',
+      visibility: VISIBILITY[raw.visibility] ?? 'unspecified'
+    };
+  }
+
+  private mapSummary(raw: PostSummaryRaw) {
+    return {
+      ...raw,
+      status: STATUS[raw.status] ?? 'unspecified',
+      visibility: VISIBILITY[raw.visibility] ?? 'unspecified'
+    };
   }
 }

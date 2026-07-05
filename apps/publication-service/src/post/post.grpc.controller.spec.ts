@@ -134,4 +134,25 @@ describe('PublicationGrpcController', () => {
       expect((err.getError() as { code: number }).code).toBe(status.NOT_FOUND);
     });
   });
+
+  it('updatePost: maps a "post not found" domain error to a NOT_FOUND rpc error', async () => {
+    // why: owner-scoped updates that miss must surface as a 404, like reads.
+    const { controller } = createController({
+      updatePost: vi.fn().mockRejectedValue(new Error('post not found'))
+    });
+
+    await expect(
+      controller.updatePost({ postId: 'ghost', userId: 'user-1', title: 'x' })
+    ).rejects.toBeInstanceOf(RpcException);
+  });
+
+  it('rethrows a non-not-found domain error unchanged (not wrapped as NOT_FOUND)', async () => {
+    // why: only 'post not found' is a 404; other failures must propagate as-is.
+    const boom = new Error('boom');
+    const { controller } = createController({
+      getPost: vi.fn().mockRejectedValue(boom)
+    });
+
+    await expect(controller.getPost({ postId: 'post-1', userId: 'user-1' })).rejects.toBe(boom);
+  });
 });
