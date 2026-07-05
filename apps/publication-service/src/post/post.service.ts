@@ -1,11 +1,34 @@
 import { Injectable } from '@nestjs/common';
+import { uuidv7 } from 'uuidv7';
 import {
   ClusterResultTree,
+  ClusterTreeNode,
   CreatePostRow,
   PostPatch,
   PostRecord,
   PostSummaryRecord
 } from './post.types';
+
+// Depth-first search for a node by id within a result tree.
+function findNode(node: ClusterTreeNode | null, id: string): ClusterTreeNode | null {
+  if (!node) return null;
+  if (node.id === id) return node;
+  for (const child of node.children) {
+    const found = findNode(child, id);
+    if (found) return found;
+  }
+  return null;
+}
+
+// Photos of a subtree in tree order: a node's own items, then its children
+// (pre-order). A photo enters at exactly one node, so no dedup is needed.
+function collectPhotos(node: ClusterTreeNode): string[] {
+  const acc = node.items.map((item) => item.photoId);
+  for (const child of node.children) {
+    acc.push(...collectPhotos(child));
+  }
+  return acc;
+}
 
 // Persistence port — the repository adapter (Drizzle/Postgres) implements this.
 export interface PostRepositoryPort {
@@ -37,21 +60,54 @@ export class PostDomainService {
   // Reads the clustering result (owner-scoped), locates the node, snapshots its
   // subtree photos in tree order into a new draft post, seeding date_from/date_to
   // from the node. Throws 'cluster result not found' / 'cluster node not found'.
-  createPostFromCluster(input: CreatePostFromClusterInput): Promise<PostRecord> {
-    return Promise.reject(new Error(`not implemented: createPostFromCluster ${input.resultId}/${input.nodeId}`));
+  async createPostFromCluster(input: CreatePostFromClusterInput): Promise<PostRecord> {
+    const tree = await this.clusters.getResult({ resultId: input.resultId, userId: input.userId });
+    if (!tree) {
+      throw new Error('cluster result not found');
+    }
+    const node = findNode(tree.root, input.nodeId);
+    if (!node) {
+      throw new Error('cluster node not found');
+    }
+    const row: CreatePostRow = {
+      id: uuidv7(),
+      userId: input.userId,
+      sourceClusterId: input.nodeId,
+      sourceResultId: input.resultId,
+      title: input.title,
+      body: '',
+      status: 'draft',
+      visibility: 'private',
+      slug: null,
+      // The cluster carries no place (ADR-0005) — location_label is not seeded.
+      locationLabel: '',
+      dateFrom: node.dateFrom ? new Date(node.dateFrom) : null,
+      dateTo: node.dateTo ? new Date(node.dateTo) : null,
+      mapEnabled: false,
+      photos: collectPhotos(node).map((photoId, order) => ({ photoId, order, caption: '' }))
+    };
+    return this.repository.createPostWithPhotos(row);
   }
 
   // Owner-scoped read; throws 'post not found' when absent or not owned.
-  getPost(userId: string, postId: string): Promise<PostRecord> {
-    return Promise.reject(new Error(`not implemented: getPost ${userId}/${postId}`));
+  async getPost(userId: string, postId: string): Promise<PostRecord> {
+    const post = await this.repository.findByIdForUser(userId, postId);
+    if (!post) {
+      throw new Error('post not found');
+    }
+    return post;
   }
 
   listPosts(userId: string): Promise<PostSummaryRecord[]> {
-    return Promise.reject(new Error(`not implemented: listPosts ${userId}`));
+    return this.repository.listForUser(userId);
   }
 
   // Owner-scoped scalar update; throws 'post not found' when absent or not owned.
-  updatePost(userId: string, postId: string, patch: PostPatch): Promise<PostRecord> {
-    return Promise.reject(new Error(`not implemented: updatePost ${userId}/${postId} ${JSON.stringify(patch)}`));
+  async updatePost(userId: string, postId: string, patch: PostPatch): Promise<PostRecord> {
+    const post = await this.repository.updateForUser(userId, postId, patch);
+    if (!post) {
+      throw new Error('post not found');
+    }
+    return post;
   }
 }

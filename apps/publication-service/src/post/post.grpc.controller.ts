@@ -1,13 +1,15 @@
 import { Controller } from '@nestjs/common';
-import { GrpcMethod } from '@nestjs/microservices';
+import { status } from '@grpc/grpc-js';
+import { GrpcMethod, RpcException } from '@nestjs/microservices';
 import { PostDomainService } from './post.service';
+import { PostPatch, PostRecord, PostSummaryRecord, PostVisibility } from './post.types';
 
-// Proto-facing shapes (proto-loader: camelCase keys, numeric enums, string
-// dates). The controller is the proto<->domain boundary: it maps status/
-// visibility strings to the proto enum numbers, Date|null to ISO-string|'', and
-// builds a PostPatch from only the present UpdatePost fields. Enum numbers MUST
-// match proto/publication/v1/publication_service.proto (draft=1/published=2/
-// unpublished=3; private=1/unlisted=2/public=3).
+// proto enum <-> domain string maps. Numeric values MUST match the proto enums
+// in proto/publication/v1/publication_service.proto.
+const STATUS_TO_PROTO = { draft: 1, published: 2, unpublished: 3 } as const;
+const VISIBILITY_TO_PROTO = { private: 1, unlisted: 2, public: 3 } as const;
+const PROTO_TO_VISIBILITY: Record<number, PostVisibility> = { 1: 'private', 2: 'unlisted', 3: 'public' };
+
 export interface ProtoPostPhoto {
   photoId: string;
   order: number;
@@ -56,27 +58,38 @@ export class PublicationGrpcController {
   }
 
   @GrpcMethod('PublicationService', 'CreatePostFromCluster')
-  createPostFromCluster(request: {
+  async createPostFromCluster(request: {
     userId: string;
     resultId: string;
     nodeId: string;
     title?: string;
   }): Promise<ProtoPost> {
-    return Promise.reject(new Error(`not implemented: CreatePostFromCluster ${request.resultId}/${request.nodeId}`));
+    const record = await this.postService.createPostFromCluster({
+      userId: request.userId,
+      resultId: request.resultId,
+      nodeId: request.nodeId,
+      title: request.title ?? ''
+    });
+    return this.toProtoPost(record);
   }
 
   @GrpcMethod('PublicationService', 'GetPost')
-  getPost(request: { postId: string; userId: string }): Promise<ProtoPost> {
-    return Promise.reject(new Error(`not implemented: GetPost ${request.postId}/${request.userId}`));
+  async getPost(request: { postId: string; userId: string }): Promise<ProtoPost> {
+    try {
+      return this.toProtoPost(await this.postService.getPost(request.userId, request.postId));
+    } catch (error) {
+      throw this.mapDomainError(error);
+    }
   }
 
   @GrpcMethod('PublicationService', 'ListPosts')
-  listPosts(request: { userId: string }): Promise<{ posts: ProtoPostSummary[] }> {
-    return Promise.reject(new Error(`not implemented: ListPosts ${request.userId}`));
+  async listPosts(request: { userId: string }): Promise<{ posts: ProtoPostSummary[] }> {
+    const summaries = await this.postService.listPosts(request.userId);
+    return { posts: summaries.map((summary) => this.toProtoSummary(summary)) };
   }
 
   @GrpcMethod('PublicationService', 'UpdatePost')
-  updatePost(request: {
+  async updatePost(request: {
     postId: string;
     userId: string;
     title?: string;
@@ -87,6 +100,76 @@ export class PublicationGrpcController {
     dateFrom?: string;
     dateTo?: string;
   }): Promise<ProtoPost> {
-    return Promise.reject(new Error(`not implemented: UpdatePost ${request.postId}/${request.userId}`));
+    try {
+      const record = await this.postService.updatePost(request.userId, request.postId, this.toPatch(request));
+      return this.toProtoPost(record);
+    } catch (error) {
+      throw this.mapDomainError(error);
+    }
+  }
+
+  // ---- proto<->domain mapping -----------------------------------------------
+
+  private toPatch(request: {
+    title?: string;
+    body?: string;
+    visibility?: number;
+    locationLabel?: string;
+    mapEnabled?: boolean;
+    dateFrom?: string;
+    dateTo?: string;
+  }): PostPatch {
+    const patch: PostPatch = {};
+    if (request.title !== undefined) patch.title = request.title;
+    if (request.body !== undefined) patch.body = request.body;
+    if (request.visibility !== undefined) patch.visibility = PROTO_TO_VISIBILITY[request.visibility];
+    if (request.locationLabel !== undefined) patch.locationLabel = request.locationLabel;
+    if (request.mapEnabled !== undefined) patch.mapEnabled = request.mapEnabled;
+    if (request.dateFrom !== undefined) patch.dateFrom = request.dateFrom ? new Date(request.dateFrom) : null;
+    if (request.dateTo !== undefined) patch.dateTo = request.dateTo ? new Date(request.dateTo) : null;
+    return patch;
+  }
+
+  private toProtoPost(record: PostRecord): ProtoPost {
+    return {
+      id: record.id,
+      userId: record.userId,
+      sourceClusterId: record.sourceClusterId,
+      sourceResultId: record.sourceResultId,
+      title: record.title,
+      body: record.body,
+      status: STATUS_TO_PROTO[record.status],
+      visibility: VISIBILITY_TO_PROTO[record.visibility],
+      slug: record.slug ?? '',
+      locationLabel: record.locationLabel,
+      dateFrom: record.dateFrom ? record.dateFrom.toISOString() : '',
+      dateTo: record.dateTo ? record.dateTo.toISOString() : '',
+      mapEnabled: record.mapEnabled,
+      publishedAt: record.publishedAt ? record.publishedAt.toISOString() : '',
+      createdAt: record.createdAt.toISOString(),
+      updatedAt: record.updatedAt.toISOString(),
+      photos: record.photos.map((p) => ({ photoId: p.photoId, order: p.order, caption: p.caption }))
+    };
+  }
+
+  private toProtoSummary(record: PostSummaryRecord): ProtoPostSummary {
+    return {
+      id: record.id,
+      title: record.title,
+      status: STATUS_TO_PROTO[record.status],
+      visibility: VISIBILITY_TO_PROTO[record.visibility],
+      dateFrom: record.dateFrom ? record.dateFrom.toISOString() : '',
+      dateTo: record.dateTo ? record.dateTo.toISOString() : '',
+      photoCount: record.photoCount,
+      createdAt: record.createdAt.toISOString(),
+      updatedAt: record.updatedAt.toISOString()
+    };
+  }
+
+  private mapDomainError(error: unknown) {
+    if (error instanceof Error && error.message === 'post not found') {
+      return new RpcException({ code: status.NOT_FOUND, message: error.message });
+    }
+    return error;
   }
 }
