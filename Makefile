@@ -240,6 +240,10 @@ coverage-diff: coverage $(COV_STAMP)
 # repo-root-relative paths (apps/usage-service/internal/…) for diff-cover.
 # COVERAGE_ALLOW_FAIL=1: tolerate non-zero test exit (skeleton gate needs coverage
 # even when tests are RED); go test still writes the coverprofile on failure.
+# broker.go (Consumer.Start + declareTopology — live RabbitMQ I/O, unit-uncoverable,
+# smoke-covered) is filtered out of the coverprofile so it is not scored by the
+# coverage gate — the Go analogue of cluster-service's `# pragma: no cover` broker
+# adapters. Keep ONLY live-I/O wiring in broker.go; all logic stays in consumer.go.
 coverage-go: $(COV_STAMP)
 	@mkdir -p .coverage
 	bash -euo pipefail -c 'cd apps/usage-service && \
@@ -251,6 +255,8 @@ coverage-go: $(COV_STAMP)
 	  if [ "$$TEST_EXIT" -ne 0 ] && [ "$${COVERAGE_ALLOW_FAIL:-0}" != "1" ]; then \
 	    exit $$TEST_EXIT; \
 	  fi; \
+	  grep -v '"'"'internal/amqp/broker.go:'"'"' ../../.coverage/go.out > ../../.coverage/go.out.tmp; \
+	  mv ../../.coverage/go.out.tmp ../../.coverage/go.out; \
 	  GOTOOLCHAIN=local go run github.com/boumenot/gocover-cobertura@v1.2.0 \
 	    < ../../.coverage/go.out \
 	  | ../../$(COV_DIR)/.venv/bin/python ../../scripts/coverage/normalize.py \

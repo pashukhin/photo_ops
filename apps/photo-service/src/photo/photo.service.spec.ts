@@ -343,6 +343,27 @@ describe('PhotoDomainService', () => {
     expect(publisher.publish).not.toHaveBeenCalled();
   });
 
+  it('completeUpload is idempotent: a duplicate complete for an already-processed photo does not reset status, reprocess, or re-bill', async () => {
+    const { service, repository, storage, publisher, usageEmitter } = createService();
+    // Photo already fully processed (status 'ready'); a retried / double-clicked /
+    // gRPC-retried CompleteUpload arrives. It must NOT regress status back to
+    // 'uploaded' or start a second billable processing run (charge-once key is the
+    // jobId, not the photoId, so a re-kick double-bills).
+    repository.findByIdForUser.mockResolvedValue(makePhotoRecord({ status: 'ready' }));
+    storage.objectExists.mockResolvedValue(true);
+    // The repo could still perform the transition if asked — assert the service does not ask.
+    repository.markUploadedForUser.mockResolvedValue(makePhotoRecord({ status: 'uploaded' }));
+
+    const result = await service.completeUpload('user-1', 'photo-1');
+
+    expect(repository.markUploadedForUser).not.toHaveBeenCalled();
+    expect(repository.markProcessingForUser).not.toHaveBeenCalled();
+    expect(repository.createProcessingJob).not.toHaveBeenCalled();
+    expect(publisher.publish).not.toHaveBeenCalled();
+    expect(usageEmitter.emitOriginalStored).not.toHaveBeenCalled();
+    expect(result.status).toBe('ready');
+  });
+
   it('finalize SUCCEEDED: upserts variants, applies attributes, marks ready', async () => {
     const { service, repository, logger } = createService();
     repository.finalizeJob.mockResolvedValue(true);
@@ -427,7 +448,9 @@ describe('PhotoDomainService', () => {
 
   it('publishes the active traceparent as the job correlation id', async () => {
     const { service, repository, storage, publisher } = createService();
-    repository.findByIdForUser.mockResolvedValue(makePhotoRecord({ status: 'uploaded' }));
+    // A first CompleteUpload starts from 'uploading' (CreateUploadIntent sets it);
+    // only then does the guarded uploading->uploaded->processing kickoff run.
+    repository.findByIdForUser.mockResolvedValue(makePhotoRecord({ status: 'uploading' }));
     storage.objectExists.mockResolvedValue(true);
     repository.markUploadedForUser.mockResolvedValue(makePhotoRecord({ status: 'uploaded' }));
     repository.markProcessingForUser.mockResolvedValue(true);

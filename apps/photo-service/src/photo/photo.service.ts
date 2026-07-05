@@ -88,6 +88,17 @@ export class PhotoDomainService {
       throw new Error('uploaded object not found');
     }
 
+    // Idempotency: only a photo still in 'uploading' may transition to 'uploaded'
+    // and kick off processing. A duplicate / retried / late CompleteUpload for a
+    // photo that already progressed (uploaded/processing/ready/failed) is a no-op
+    // returning current state. Without this guard, markUploadedForUser (unguarded)
+    // would regress the status back to 'uploaded', re-arming the guarded
+    // uploaded->processing transition and starting a SECOND billable processing run
+    // (charge-once keys on jobId, not photoId, so the re-run double-bills).
+    if (photo.status !== 'uploading') {
+      return photo;
+    }
+
     const uploaded = await this.repository.markUploadedForUser(userId, photoId);
 
     // Best-effort: emit usage for original storage. A publish failure must not
