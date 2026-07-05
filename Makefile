@@ -1,4 +1,4 @@
-.PHONY: install proto proto-check build build-libs typecheck test lint gate gate-media gate-usage gate-cluster vet-usage lint-usage test-usage lint-cluster test-cluster test-api test-identity test-photo test-web test-media-worker lint-media-worker dev down reset logs status ps-all logs-svc sh restart-svc up-svc migrate migrate-identity migrate-photo migrate-usage migrate-cluster smoke-upload smoke-auth smoke-contract smoke-media smoke-stack smoke-ui smoke-usage smoke-cluster smoke-coverage coverage coverage-go coverage-py coverage-cluster coverage-ts coverage-diff coverage-selftest skeleton-gate coverage-gate smoke-skeleton-gate smoke-coverage-gate test-guard smoke-test-guard test-guard-selftest lint-hook-selftest
+.PHONY: install proto proto-check build build-libs typecheck test lint gate gate-media gate-usage gate-cluster vet-usage lint-usage test-usage lint-cluster test-cluster test-api test-identity test-photo test-web test-media-worker lint-media-worker dev down reset logs status ps-all logs-svc sh restart-svc up-svc migrate migrate-identity migrate-photo migrate-usage migrate-cluster migrate-publication smoke-upload smoke-auth smoke-contract smoke-media smoke-stack smoke-ui smoke-usage smoke-cluster smoke-publication test-publication smoke-coverage coverage coverage-go coverage-py coverage-cluster coverage-ts coverage-diff coverage-selftest skeleton-gate coverage-gate smoke-skeleton-gate smoke-coverage-gate test-guard smoke-test-guard test-guard-selftest lint-hook-selftest
 
 ifneq (,$(wildcard .env))
 include .env
@@ -79,6 +79,9 @@ test-identity:
 test-photo:
 	pnpm --filter @photoops/photo-service test
 
+test-publication:
+	pnpm --filter @photoops/publication-service test
+
 test-web:
 	pnpm --filter @photoops/web test
 
@@ -123,7 +126,7 @@ up-svc:
 	@test -n "$(svc)" || { echo "usage: make up-svc svc=<service ...>"; exit 2; }
 	$(DC) up -d --build $(svc)
 
-migrate: migrate-identity migrate-photo migrate-usage migrate-cluster
+migrate: migrate-identity migrate-photo migrate-usage migrate-cluster migrate-publication
 
 migrate-identity:
 	$(DC) exec -T postgres psql -U "$${POSTGRES_SUPERUSER}" -d postgres < infra/postgres/init/001-create-databases.sql
@@ -141,6 +144,10 @@ migrate-usage:
 migrate-cluster:
 	$(DC) exec -T postgres psql -U "$${POSTGRES_SUPERUSER}" -d postgres < infra/postgres/init/001-create-databases.sql
 	$(DC) exec -T postgres psql "$${CLUSTER_DATABASE_URL}" < apps/cluster-service/migrations/0001_create_cluster_tables.sql
+
+migrate-publication:
+	$(DC) exec -T postgres psql -U "$${POSTGRES_SUPERUSER}" -d postgres < infra/postgres/init/001-create-databases.sql
+	$(DC) exec -T postgres psql "$${PUBLICATION_DATABASE_URL}" < apps/publication-service/migrations/0001_create_publication_tables.sql
 
 smoke-upload:
 	scripts/smoke-upload.sh
@@ -176,6 +183,11 @@ smoke-usage:
 # Do NOT add to `gate` or CI targets.
 smoke-cluster:
 	scripts/smoke-cluster.sh
+
+# Local-only — requires `make dev` + `make migrate` to be running.
+# Do NOT add to `gate` or CI targets.
+smoke-publication:
+	scripts/smoke-publication.sh
 
 # Local-only; regenerates coverage; do NOT add to `gate` or CI.
 smoke-coverage:
@@ -316,7 +328,8 @@ coverage-cluster: $(CL_STAMP)
 # relative paths (apps/api-gateway/src/cors.ts) for diff-cover.
 # apps/web has an extended coverage.exclude in vitest.config.ts that adds .next/
 # and Next.js config files to the default exclude list.
-# apps/publication-service and apps/connector-service are skipped (no-op tests).
+# apps/connector-service is skipped (no-op tests). apps/publication-service has
+# real tests (s017) and IS scored.
 # packages/proto-ts is skipped (generated code, no tests).
 # COVERAGE_ALLOW_FAIL=1: tolerate non-zero vitest exit and still normalize the
 # cobertura output. --coverage.reportOnFailure=true is required for this: vitest
@@ -333,7 +346,7 @@ coverage-ts: build-libs $(COV_STAMP)
 	  FAIL=0; \
 	  NO_XML_FAIL=0; \
 	  ALLOW_FAIL="$${COVERAGE_ALLOW_FAIL:-0}"; \
-	  for WS_DIR in apps/api-gateway apps/photo-service apps/identity-service apps/web packages/observability; do \
+	  for WS_DIR in apps/api-gateway apps/photo-service apps/publication-service apps/identity-service apps/web packages/observability; do \
 	    WS_SLUG=$$(basename $$WS_DIR); \
 	    TMP_DIR=.coverage/tmp-ts-$$WS_SLUG; \
 	    OUT_FILE=.coverage/ts-$$WS_SLUG.cobertura.xml; \

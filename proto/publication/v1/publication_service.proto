@@ -5,23 +5,129 @@ package photoops.publication.v1;
 import "common/v1/common.proto";
 import "google/api/annotations.proto";
 
+// A user's photo stories ("posts"). A post is drafted from a cluster NODE: at
+// creation the node's subtree photos are SNAPSHOTTED into post_photos (cluster
+// results are immutable — ADR-0005 — and the post is independently editable).
+// Owner scope only: user_id is caller-supplied from the validated session in
+// api-gateway; no cross-service FK; UUID v7. slug + Publish/Unpublish land in
+// session 019 (the columns exist but stay empty here).
 service PublicationService {
   rpc Health(photoops.common.v1.HealthCheckRequest) returns (photoops.common.v1.HealthCheckResponse) {
     option (google.api.http) = {get: "/v1/publication/health"};
   }
 
-  rpc CreateDraftFromCluster(CreateDraftFromClusterRequest) returns (CreateDraftFromClusterResponse) {
+  // Create a draft post from a cluster node. Reads the clustering result from
+  // cluster-service, snapshots the node's subtree photos (tree order) into
+  // post_photos, and seeds date_from/date_to from the node.
+  rpc CreatePostFromCluster(CreatePostFromClusterRequest) returns (Post) {
     option (google.api.http) = {
-      post: "/v1/posts/from-cluster"
+      post: "/v1/posts"
+      body: "*"
+    };
+  }
+
+  // One post (with its photos), owner-scoped.
+  rpc GetPost(GetPostRequest) returns (Post) {
+    option (google.api.http) = {get: "/v1/posts/{post_id}"};
+  }
+
+  // The caller's posts (summaries — no photos/body).
+  rpc ListPosts(ListPostsRequest) returns (ListPostsResponse) {
+    option (google.api.http) = {get: "/v1/posts"};
+  }
+
+  // Update a post's scalar fields (post_photos mutation lands in session 018).
+  rpc UpdatePost(UpdatePostRequest) returns (Post) {
+    option (google.api.http) = {
+      patch: "/v1/posts/{post_id}"
       body: "*"
     };
   }
 }
 
-message CreateDraftFromClusterRequest {
-  string cluster_id = 1;
+message CreatePostFromClusterRequest {
+  string user_id = 1;    // caller-supplied from the validated session in api-gateway
+  string result_id = 2;  // clustering result (owner scope + read key)
+  string node_id = 3;    // node whose subtree becomes the post
+  string title = 4;      // optional; "" -> default
 }
 
-message CreateDraftFromClusterResponse {
+message GetPostRequest {
   string post_id = 1;
+  string user_id = 2;  // owner scope
+}
+
+message ListPostsRequest {
+  string user_id = 1;  // owner scope
+}
+
+message ListPostsResponse {
+  repeated PostSummary posts = 1;
+}
+
+message UpdatePostRequest {
+  string post_id = 1;
+  string user_id = 2;  // owner scope
+  optional string title = 3;
+  optional string body = 4;
+  optional PostVisibility visibility = 5;
+  optional string location_label = 6;
+  optional bool map_enabled = 7;
+  optional string date_from = 8;  // ISO instant; "" clears
+  optional string date_to = 9;
+}
+
+// A photo story drafted from a cluster and eventually published.
+message Post {
+  string id = 1;
+  string user_id = 2;
+  string source_cluster_id = 3;  // cluster node id the post was drafted from
+  string source_result_id = 4;   // clustering result id (re-fetch / provenance)
+  string title = 5;
+  string body = 6;
+  PostStatus status = 7;
+  PostVisibility visibility = 8;
+  string slug = 9;            // "" until published (session 019)
+  string location_label = 10;
+  string date_from = 11;      // ISO instant; "" if unset
+  string date_to = 12;
+  bool map_enabled = 13;
+  string published_at = 14;   // "" until published (session 019)
+  string created_at = 15;
+  string updated_at = 16;
+  repeated PostPhoto photos = 17;
+}
+
+// One photo in a post, with its order and caption within the story.
+message PostPhoto {
+  string photo_id = 1;
+  int32 order = 2;
+  string caption = 3;
+}
+
+// A post without its photos/body, for list views.
+message PostSummary {
+  string id = 1;
+  string title = 2;
+  PostStatus status = 3;
+  PostVisibility visibility = 4;
+  string date_from = 5;
+  string date_to = 6;
+  int32 photo_count = 7;
+  string created_at = 8;
+  string updated_at = 9;
+}
+
+enum PostStatus {
+  POST_STATUS_UNSPECIFIED = 0;
+  POST_STATUS_DRAFT = 1;
+  POST_STATUS_PUBLISHED = 2;
+  POST_STATUS_UNPUBLISHED = 3;
+}
+
+enum PostVisibility {
+  POST_VISIBILITY_UNSPECIFIED = 0;
+  POST_VISIBILITY_PRIVATE = 1;
+  POST_VISIBILITY_UNLISTED = 2;
+  POST_VISIBILITY_PUBLIC = 3;
 }
