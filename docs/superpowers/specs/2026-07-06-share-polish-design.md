@@ -60,16 +60,26 @@ The canonical public URL of a post is `<web-origin>/posts/<slug>`. Two consumers
 need `<web-origin>`: the **client** copy-link (runs in the browser) and the
 **server** `generateMetadata` (`og:url` / `metadataBase` — SSR, no `window`).
 
-Introduce a single env `NEXT_PUBLIC_WEB_ORIGIN` (default `http://localhost:3000`),
-read by **both**. `NEXT_PUBLIC_`-prefixed so it is inlined into the client bundle
-and also readable server-side via `process.env`.
+Both read a single symbol `NEXT_PUBLIC_WEB_ORIGIN` with a **code default of
+`http://localhost:3000`** (`process.env.NEXT_PUBLIC_WEB_ORIGIN ?? 'http://localhost:3000'`).
 
-*Why one env, not `window.location.origin` on the client + request `host` on the
-server:* principle 4 (one canonical way). A deploy-time origin means the owner
-always copies the **canonical** link even when reached via an alias host, and both
-surfaces agree by construction. It is also deterministic in tests (set the env; no
-`window`/`host`-header mocking). Added to `.env.example` and the `web` service in
-docker-compose.
+**Build-time, not runtime — be honest about this.** `NEXT_PUBLIC_*` values are
+inlined by `next build`, and the `web` image is built at image-build time
+(`apps/web/Dockerfile`) with **no `build.args`** — so a bare `environment:` entry
+in docker-compose does **not** reach the client bundle (nor a statically-referenced
+`process.env.NEXT_PUBLIC_WEB_ORIGIN` in SSR). This is exactly how the existing
+`NEXT_PUBLIC_API_BASE_URL` already behaves: it "works" only because its code
+default equals the compose value. So for the demo the **code default is the
+effective source of truth**; the `.env.example` / compose entry is **parity +
+documentation** of the knob. Do **not** add build-args just for this var — that
+would create a second `NEXT_PUBLIC` wiring pattern against principle 4 (one
+canonical way); changing the origin for a real deploy is a separate follow-up.
+
+*Why a shared symbol, not `window.location.origin` (client) + request `host`
+(server):* deterministic in tests (no `window` / `next/headers` mocking) and one
+place for the value. It does **not** claim runtime/alias-host configurability — the
+default is the value. Note a *separate* pre-existing `WEB_ORIGIN` env already exists
+for gateway CORS (`.env.example`); do not conflate the two.
 
 ### D2 — copy-link UX: two buttons in the published panel
 
@@ -102,7 +112,8 @@ the truncation rule lives once.
 ### D4 — og-meta: text-only via `generateMetadata`
 
 `app/posts/[id]/page.tsx` gains a `generateMetadata({ params })` exporting:
-`title` (`<post.title> · PhotoOps`, fallback `Untitled story`), `og:title`,
+`title` (`<post.title> · Photo Ops`, fallback `Untitled story`; brand string
+matches the AppShell's `Photo Ops`), `og:title`,
 `og:description` = `shortDescription(post.body)`, `og:type='article'`, `og:url` =
 canonical, `twitter:card='summary'`, and `metadataBase = new URL(WEB_ORIGIN)`.
 
@@ -113,11 +124,14 @@ a follow-up, not shipped half-working.
 
 To avoid two gateway round-trips per request (`generateMetadata` **and** the page
 both need the post), wrap the fetch in React `cache()`
-(`getPublicPostCached(slug)`) so the two calls dedupe within one render. For a
-**404 slug** `getPublicPost` returns `null`: `generateMetadata` returns a minimal
-safe object (e.g. `{ title: 'Story not found' }`) and does **not** throw; the page
-component still calls `notFound()` (unchanged 019 behavior). The page stays
-`force-dynamic` / `no-store`.
+(`getPublicPostCached(slug)`) so the two calls dedupe within one render. `cache()`
+is new to this app (no repo precedent) and only dedupes inside a real render pass;
+called directly in vitest it simply passes through (no throw), so the unit tests
+must **not** assert a single call-count — the dedup is a live-smoke property (verify
+only that nothing throws). For a **404 slug** `getPublicPost` returns `null`:
+`generateMetadata` returns a minimal safe object (e.g. `{ title: 'Story not found' }`)
+and does **not** throw; the page component still calls `notFound()` (unchanged 019
+behavior). The page stays `force-dynamic` / `no-store`.
 
 ### D5 — visual polish of the public page
 
@@ -152,10 +166,11 @@ others).
 ### D7 — demo runbook (doc only)
 
 `docs/demo-runbook.md`: the reproducible manual steps to prepare the demo dataset
-(sign in as `demo@photoops.local` → ready cluster → Create post → edit
-title/body/captions → Publish → Copy link) and record the share flow (open the
-canonical URL logged-out; show the OG meta; find the post again via /posts). **No
-seed code** in 020; 021 turns this runbook into a script.
+(sign in — or **sign up if absent**, as no seed exists yet — as
+`demo@photoops.local` → ready cluster → Create post → edit title/body/captions →
+Publish → Copy link) and record the share flow (open the canonical URL in a fresh/
+incognito context; show the OG meta; find the post again via /posts). **No seed
+code** in 020; 021 turns this runbook into a script.
 
 ### D8 — opportunistic cleanup, conservative
 
@@ -206,32 +221,52 @@ confident **and** on-path) they are deferred.
 Per s008/s011/s018: jsdom guards behavior but misses render/integration bugs — a
 **live smoke is mandatory** (dqb).
 
+Coverage note: `make coverage-gate` runs diff-cover at `--fail-under 100`, so the
+enumeration below must cover **every branch** of the new/changed lines — not just
+the happy path (loading + error branches of new client components; the "Copied"
+revert timer callback).
+
 - **web (vitest/jsdom):**
   - `lib/share.spec.ts`: `canonicalPostUrl`; `shortDescription` (short pass-through,
     long → ellipsis, empty → `''`, newlines collapsed); `shareText` (with body,
     without body → desc line omitted, title fallback).
   - `PostEditor.spec`: Copy link + Copy share text render on **published**, absent
     on **draft**; the shown URL = `origin/posts/<slug>`; clicking Copy link writes
-    the URL, Copy share text writes the template (`navigator.clipboard.writeText`
-    mocked); "Copied" appears; publish/unpublish still work through
-    `runPublishAction`.
+    the URL, Copy share text writes the template; **the "Copied" confirmation
+    appears and then reverts** (fake timers — the `setTimeout` callback line needs
+    coverage); publish/unpublish still work through `runPublishAction` (its
+    success **and** catch branches). **Clipboard mocking:** jsdom has no
+    `navigator.clipboard`, so `vi.spyOn` throws — the test must *define* it:
+    `Object.defineProperty(navigator, 'clipboard', { value: { writeText: vi.fn() },
+    configurable: true })` with an `afterEach` restore.
   - `app/posts/[id]/page.spec.tsx` (extend): `generateMetadata` returns
     `og:title`/`og:description`/`og:url`/`og:type` + `twitter:card` for a found
     post, and a safe object (no throw) for a 404 slug; the render shows the new
-    polish elements; the 404 path still calls `notFound()`.
+    polish elements; the 404 path still calls `notFound()`. Do **not** assert
+    `getPublicPost` was called exactly once across the two invokers — `cache()`
+    dedup is a live-render property, not observable in these direct calls (D4).
   - `components/posts/PostsList.spec.tsx` + `app/(app)/posts/page.spec.tsx`: render
-    rows from a mocked `listPosts` (status badge, edit link), and the empty state.
+    rows from a mocked `listPosts` (status badge, edit link), the **empty state**,
+    **and the loading + load-error branches** (peers `PostEditor`/`ClusterView`
+    have both; 100% diff-cover requires them).
   - `lib/api.spec.ts`: `listPosts` GETs `/v1/posts` with credentials and parses
     `{posts}` (`?? []`).
-  - shell test: the **Posts** nav entry renders (covers the changed shell file for
-    diff-cover).
-- **dqb / live smoke-ui** — extend `apps/web/smoke/post-editor.smoke.ts`
-  (Playwright, live stack): publish a post → the published panel shows the
-  canonical URL + **both** Copy buttons; a draft hides them; **open
-  `<web-origin>/posts/<slug>` logged-out → 200**, the SSR HTML contains
-  `<meta property="og:title">`, and the page renders; `/posts` (as the owner)
-  lists the post; **unpublish → the public URL 404s**. This is the dqb boundary
-  (the shared URL opens for an anonymous visitor).
+  - shell test (`AppShell.spec.tsx`, existing jsdom): the **Posts** nav entry
+    renders (covers the changed shell file for diff-cover — the Playwright
+    `shell.smoke.ts` does NOT count toward diff-cover).
+- **dqb / live smoke — split across the two existing smokes, no re-implementation:**
+  - **`scripts/smoke-publication.sh` (curl, already owns publish→public→unpublish):**
+    it already publishes, captures the slug, curls the web SSR page
+    `GET :3000/posts/$SLUG` → 200 (line ~254) and asserts unpublish → 404 on both
+    surfaces. Add there: **grep the fetched SSR HTML for `<meta property="og:title"`**
+    (the cheapest home — the HTML is already in hand; D5 also changes this HTML, so
+    re-run it). This curl (no `-b` cookie) is the honest **logged-out** check — the
+    public SSR page fetches anonymously server-side regardless of any browser cookie.
+  - **`apps/web/smoke/post-editor.smoke.ts` (Playwright):** scope the extension to
+    the genuinely UI-render pieces the curl smoke can't reach — drive **Publish** in
+    the browser, then assert the published panel shows the canonical URL + **both**
+    Copy buttons, and that `/posts` (owner) lists the post. (Draft-hidden is covered
+    in jsdom; don't claim "logged-out" here — the public render is cookie-independent.)
 
   Then `make gate` + `make coverage-gate` + `make test-guard`; final `/code-review`.
 
@@ -240,7 +275,36 @@ Per s008/s011/s018: jsdom guards behavior but misses render/integration bugs —
 Branch `session-020-share-polish` from fresh `main`; claim `m71.5`. This design
 doc → **skeleton** commit (`NEXT_PUBLIC_WEB_ORIGIN` in `.env.example` + compose;
 `lib/share.ts` + `listPosts` stubs; new route/component stubs; the **Posts** nav
-stub; RED jsdom specs; smoke extension; `make skeleton-gate` green) → **GREEN** →
-`make gate` + `make coverage-gate` + `make test-guard` + live smoke-ui (publish →
-logged-out `/posts/<slug>` with OG meta → /posts listing → unpublish 404) →
-`/code-review`. No `make proto` (no proto delta this session).
+stub; RED jsdom specs; smoke extensions; `make skeleton-gate` green) → **GREEN** →
+`make gate` + `make coverage-gate` + `make test-guard` + the two live smokes
+(`smoke-publication.sh`: publish → logged-out `/posts/<slug>` 200 + `og:title`
+meta → unpublish 404; `smoke-ui` `post-editor`: Publish in-browser → copy buttons +
+canonical URL → /posts listing) → `/code-review`. No `make proto` (no proto delta
+this session).
+
+**Sequence the work within GREEN** to keep a large skeleton reviewable and mitigate
+the altitude concern (the honest review flagged that D5/D6 are orthogonal to the
+share vertical): land the coherent **share vertical first (D2/D3/D4 — copy-link +
+helpers + OG)**, then **D5 (public-page polish)**, then **D6 (My-posts + nav)**.
+Each is independently testable, so a stall in one does not block the others.
+
+## Review notes (2026-07-06 honest review)
+
+An adversarial subagent review of the accepted draft was run before planning.
+Changes folded in (no blockers were found; core claims — D6 no-proto-change, route
+layout, `generateMetadata` 404 path, nav diff-cover via `AppShell.spec.tsx`,
+og-in-SSR-HTML — were verified correct):
+- **D1** rewritten: `NEXT_PUBLIC_*` is build-time-inlined and the compose
+  `environment:` entry is inert for the client bundle (same latent behavior as the
+  existing `NEXT_PUBLIC_API_BASE_URL`); dropped the false "alias-host / agree by
+  construction" claim — the **code default is the effective source of truth**.
+- **Testing/dqb** split so the OG-meta assertion lands in `smoke-publication.sh`
+  (which already fetches the SSR HTML and owns publish→public→unpublish→404),
+  scoping the Playwright extension to real-browser UI render; the curl (no cookie)
+  is the honest logged-out check.
+- Coverage enumeration tightened for 100% diff-cover (PostsList loading/error
+  branches; the "Copied" revert timer; `runPublishAction` catch branch) and the
+  jsdom clipboard mock corrected (`Object.defineProperty`, not `vi.spyOn`).
+- `cache()` dedup marked as a live-smoke property (do not assert in unit tests).
+- Nits: brand `· Photo Ops` (matches AppShell); runbook says sign up if the demo
+  user is absent (no seed yet).
