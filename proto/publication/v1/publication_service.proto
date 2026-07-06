@@ -36,7 +36,8 @@ service PublicationService {
     option (google.api.http) = {get: "/v1/posts"};
   }
 
-  // Update a post's scalar fields (post_photos mutation lands in session 018).
+  // Update a post's scalar fields + post_photos replace-all via the photos
+  // field (session 018).
   rpc UpdatePost(UpdatePostRequest) returns (Post) {
     option (google.api.http) = {
       patch: "/v1/posts/{post_id}"
@@ -75,6 +76,21 @@ message UpdatePostRequest {
   optional bool map_enabled = 7;
   optional string date_from = 8;  // ISO instant; "" clears
   optional string date_to = 9;
+  // Replace-all post_photos. Present -> the post's photos become exactly this
+  // list (order = position); absent -> photos untouched (e.g. a title-only PATCH).
+  optional PostPhotoList photos = 10;
+}
+
+// A photo in a replace-all UpdatePost photos list. No order field — the list
+// position IS the order (canonicalized server-side). photo_id must already be a
+// member of the post (replace-all removes/reorders/re-captions; never adds).
+message PostPhotoInput {
+  string photo_id = 1;
+  string caption = 2;
+}
+
+message PostPhotoList {
+  repeated PostPhotoInput photos = 1;
 }
 
 // A photo story drafted from a cluster and eventually published.
