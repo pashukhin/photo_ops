@@ -1,4 +1,4 @@
-import { boolean, index, integer, pgTable, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { boolean, index, integer, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 
 export const posts = pgTable(
   'posts',
@@ -26,7 +26,9 @@ export const posts = pgTable(
   },
   (table) => ({
     // Matches the migration's (user_id, created_at DESC) — newest-first list scan.
-    userCreatedAtIdx: index('posts_user_created_at_idx').on(table.userId, table.createdAt.desc())
+    userCreatedAtIdx: index('posts_user_created_at_idx').on(table.userId, table.createdAt.desc()),
+    // Defensive: slug is a unique opaque token minted at publish (NULLs distinct).
+    slugUnique: uniqueIndex('posts_slug_unique').on(table.slug)
   })
 );
 
