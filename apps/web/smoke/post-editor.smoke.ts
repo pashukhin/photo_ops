@@ -96,5 +96,23 @@ test('create a post from a cluster node, edit it, and save (live)', async ({ pag
   await page.reload();
   await expect(page.getByLabel(/title/i)).toHaveValue('Buenos Aires morning');
 
+  // 7. Publish in-browser: the published panel shows the absolute canonical URL +
+  //    both Copy buttons (020 share — a real render, not jsdom).
+  await page.getByRole('button', { name: /^publish$/i }).click();
+  const link = page.getByRole('link', { name: /\/posts\// });
+  await expect(link).toBeVisible();
+  const href = await link.getAttribute('href');
+  expect(href).toMatch(/^https?:\/\/[^/]+\/posts\/.+/); // absolute, not relative
+  await expect(page.getByRole('button', { name: /copy link/i })).toBeVisible();
+  await expect(page.getByRole('button', { name: /copy share text/i })).toBeVisible();
+
+  // 8. The owner "My posts" listing lists the post (D6).
+  await page.goto('/posts');
+  await expect(page.getByText('Buenos Aires morning')).toBeVisible();
+
+  // 9. The public page renders (D5 live render — jsdom misses Tailwind-generation).
+  await page.goto(new URL(String(href)).pathname);
+  await expect(page.locator('img').first()).toBeVisible();
+
   writeFileSync(join(dir, 'ok'), 'ok'); // keep dir referenced; harness tmp is cleaned by the OS
 });

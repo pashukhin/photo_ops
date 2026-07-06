@@ -255,6 +255,15 @@ WEB_CODE="$(curl -s -o /dev/null -w '%{http_code}' "$WEB_BASE_URL/posts/$SLUG")"
 [ "$WEB_CODE" = "200" ] \
   || { echo "ASSERTION FAILED: web GET /posts/$SLUG returned $WEB_CODE (expected 200)" >&2; exit 1; }
 
+# 020: the shared link previews with text Open Graph meta (D4). The status check
+# above discards the body (-o /dev/null), so capture the SSR HTML and assert the
+# og:title meta is present (D5 also changes this HTML).
+HTML_PATH="$TMP/public.html"
+curl -fsS -o "$HTML_PATH" "$WEB_BASE_URL/posts/$SLUG"
+grep -q 'property="og:title"' "$HTML_PATH" \
+  || { echo "ASSERTION FAILED: public SSR HTML missing og:title meta" >&2; exit 1; }
+echo "[smoke-publication] og:title meta present" >&2
+
 # post_published usage event reaches the usage plane (async AMQP hop → poll).
 FOUND=0
 DEADLINE=$(( $(date +%s) + 30 ))
