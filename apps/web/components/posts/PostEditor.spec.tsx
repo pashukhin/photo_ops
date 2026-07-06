@@ -224,9 +224,9 @@ describe('PostEditor', () => {
 // Reuses the top-level imports + the post() fixture. jsdom has no
 // navigator.clipboard — DEFINE it (vi.spyOn on undefined throws).
 describe('PostEditor share (published)', () => {
-  const writeText = vi.fn();
+  const writeText = vi.fn().mockResolvedValue(undefined); // real writeText returns Promise<void>
   beforeEach(() => {
-    writeText.mockReset();
+    writeText.mockClear(); // clear calls, keep the resolved-value impl
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
     vi.mocked(api.getPost).mockResolvedValue({
       ...post(),
@@ -262,6 +262,8 @@ describe('PostEditor share (published)', () => {
         'New photo story: Summer Crimea\nThree days by the sea\nhttp://localhost:3000/posts/tok'
       )
     );
+    // both buttons surface the same shared "Copied" confirmation.
+    expect(await screen.findByText(/copied/i)).toBeTruthy();
   });
 
   it('shows a transient "Copied" confirmation that reverts', async () => {
@@ -275,6 +277,8 @@ describe('PostEditor share (published)', () => {
       fireEvent.click(btn);
       await act(async () => {}); // flush the awaited clipboard.writeText microtask
       expect(screen.getByText(/copied/i)).toBeTruthy();
+      // D2: the confirmation lives in an aria-live region (announced to SR users).
+      expect(screen.getByText(/copied/i).closest('[aria-live]')).not.toBeNull();
       await act(async () => {
         vi.advanceTimersByTime(2500); // fire the revert setTimeout
         await Promise.resolve(); // flush the state update it schedules

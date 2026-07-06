@@ -55,6 +55,9 @@ describe('PublicPostPage generateMetadata (session 020)', () => {
     expect((md.openGraph as { url?: string }).url).toBe('http://localhost:3000/posts/tok');
     expect((md.openGraph as { type?: string }).type).toBe('article');
     expect((md.twitter as { card?: string }).card).toBe('summary');
+    expect((md as { metadataBase?: URL }).metadataBase?.href).toBe('http://localhost:3000/');
+    // no og:image (deferred, photo_ops-278) — keeps the stable-link promise (D4).
+    expect((md.openGraph as { images?: unknown }).images).toBeUndefined();
   });
 
   it('returns a safe object (no throw) for a 404 slug', async () => {

@@ -25,6 +25,12 @@ describe('share helpers', () => {
     expect(out.endsWith('…')).toBe(true);
   });
 
+  it('shortDescription does not truncate a body exactly at max', () => {
+    // why: off-by-one guard on the truncation boundary.
+    const exact = 'x'.repeat(140);
+    expect(shortDescription(exact, 140)).toBe(exact);
+  });
+
   it('shortDescription returns empty string for an empty body', () => {
     expect(shortDescription('')).toBe('');
     expect(shortDescription('   ')).toBe('');
