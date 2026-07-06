@@ -106,6 +106,7 @@ export class PublicationGrpcController {
     mapEnabled?: boolean;
     dateFrom?: string;
     dateTo?: string;
+    photos?: { photos: { photoId: string; caption: string }[] }; // replace-all wrapper (proto3 optional message)
   }): Promise<ProtoPost> {
     try {
       const record = await this.postService.updatePost(request.userId, request.postId, this.toPatch(request));
@@ -125,6 +126,7 @@ export class PublicationGrpcController {
     mapEnabled?: boolean;
     dateFrom?: string;
     dateTo?: string;
+    photos?: { photos: { photoId: string; caption: string }[] };
   }): PostPatch {
     const patch: PostPatch = {};
     if (request.title !== undefined) patch.title = request.title;

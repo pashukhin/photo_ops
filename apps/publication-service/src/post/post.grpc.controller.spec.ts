@@ -179,6 +179,68 @@ describe('PublicationGrpcController', () => {
     ).rejects.toBeInstanceOf(RpcException);
   });
 
+  it('updatePost: maps a present photos wrapper into PostPatch.photos', async () => {
+    // why: proto3 optional message → the domain receives a flat {photoId,caption}[]
+    // (order is list position); title stays a normal scalar field.
+    const { controller, postService } = createController({
+      updatePost: vi.fn().mockResolvedValue(makePostRecord())
+    });
+
+    await controller.updatePost({
+      postId: 'post-1',
+      userId: 'user-1',
+      title: 'T',
+      photos: {
+        photos: [
+          { photoId: 'p2', caption: 'hi' },
+          { photoId: 'p1', caption: '' }
+        ]
+      }
+    });
+
+    expect(postService.updatePost).toHaveBeenCalledWith('user-1', 'post-1', {
+      title: 'T',
+      photos: [
+        { photoId: 'p2', caption: 'hi' },
+        { photoId: 'p1', caption: '' }
+      ]
+    });
+  });
+
+  it('updatePost: with no photos wrapper does not set patch.photos', async () => {
+    // why: a title-only PATCH must leave photos untouched (no empty replace).
+    const { controller, postService } = createController({
+      updatePost: vi.fn().mockResolvedValue(makePostRecord())
+    });
+
+    await controller.updatePost({ postId: 'post-1', userId: 'user-1', title: 'T' });
+
+    expect(postService.updatePost).toHaveBeenCalledWith('user-1', 'post-1', { title: 'T' });
+  });
+
+  it.each(['invalid photo membership', 'node not selectable', 'empty node'])(
+    'maps domain error "%s" to INVALID_ARGUMENT',
+    async (message) => {
+      // why: bad-input domain errors must surface as 400, not 500.
+      const { controller } = createController({
+        updatePost: vi.fn().mockRejectedValue(new Error(message))
+      });
+
+      await expect(
+        controller.updatePost({
+          postId: 'p',
+          userId: 'u',
+          photos: { photos: [{ photoId: 'p1', caption: '' }] }
+        })
+      ).rejects.toBeInstanceOf(RpcException);
+      await controller
+        .updatePost({ postId: 'p', userId: 'u', photos: { photos: [{ photoId: 'p1', caption: '' }] } })
+        .catch((err: RpcException) => {
+          expect((err.getError() as { code: number }).code).toBe(status.INVALID_ARGUMENT);
+        });
+    }
+  );
+
   it('rethrows a non-not-found domain error unchanged (not wrapped as NOT_FOUND)', async () => {
     // why: only 'post not found' is a 404; other failures must propagate as-is.
     const boom = new Error('boom');
