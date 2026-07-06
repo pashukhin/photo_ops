@@ -41,6 +41,10 @@ export interface PhotoRepositoryPort {
   setStatus(photoId: string, status: 'ready' | 'failed' | 'processing'): Promise<void>;
   findByIdWithVariantsForUser(userId: string, photoId: string): Promise<{ photo: PhotoAssetRecord; variants: PhotoVariantRecord[] } | null>;
   listVariantsForPhotos(photoIds: string[]): Promise<PhotoVariantRecord[]>;
+  // Owner-scoped batched variant lookup (session 019): variants of the owner's
+  // photos among the requested ids, grouped by photo. Non-owned / unknown /
+  // no-variant ids are simply absent.
+  findVariantsByIdsForUser(userId: string, photoIds: string[]): Promise<{ photoId: string; variants: PhotoVariantRecord[] }[]>;
 }
 
 export interface ObjectStoragePort {
@@ -178,6 +182,23 @@ export class PhotoDomainService {
   // internal ListPhotoSpacetime read-RPC consumed by cluster-worker.
   async listSpacetime(userId: string): Promise<PhotoAssetRecord[]> {
     return this.repository.listReadyForUser(userId);
+  }
+
+  // Batched owner-scoped variant resolution (session 019): each owned photo's
+  // variant VIEWS (short-lived presigned GET urls — variants only, never
+  // originals). Consumed by api-gateway's public post route to render a published
+  // post's photos without a session. Non-owned / unknown ids are absent.
+  async getVariantsByIds(
+    userId: string,
+    photoIds: string[]
+  ): Promise<{ photoId: string; variants: PhotoVariantView[] }[]> {
+    const grouped = await this.repository.findVariantsByIdsForUser(userId, photoIds);
+    return Promise.all(
+      grouped.map(async (g) => ({
+        photoId: g.photoId,
+        variants: await Promise.all(g.variants.map((v) => this.toVariantView(v)))
+      }))
+    );
   }
 
   private async toVariantView(v: PhotoVariantRecord): Promise<PhotoVariantView> {
