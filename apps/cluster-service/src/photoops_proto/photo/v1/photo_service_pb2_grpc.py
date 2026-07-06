@@ -45,6 +45,11 @@ class PhotoServiceStub:
                 request_serializer=photo_dot_v1_dot_photo__service__pb2.ListPhotoSpacetimeRequest.SerializeToString,
                 response_deserializer=photo_dot_v1_dot_photo__service__pb2.ListPhotoSpacetimeResponse.FromString,
                 _registered_method=True)
+        self.GetVariantsByIds = channel.unary_unary(
+                '/photoops.photo.v1.PhotoService/GetVariantsByIds',
+                request_serializer=photo_dot_v1_dot_photo__service__pb2.GetVariantsByIdsRequest.SerializeToString,
+                response_deserializer=photo_dot_v1_dot_photo__service__pb2.GetVariantsByIdsResponse.FromString,
+                _registered_method=True)
 
 
 class PhotoServiceServicer:
@@ -90,6 +95,17 @@ class PhotoServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetVariantsByIds(self, request, context):
+        """Internal batched owner-scoped variant resolution (session 019): given a set
+        of photo ids, return each owned photo's variant views (short-lived presigned
+        GET urls — variants only, NEVER originals). Non-owned / unknown ids are
+        simply absent from the result. Consumed by api-gateway's public post route.
+        Deliberately NOT gateway-exposed (no http annotation).
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_PhotoServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -122,6 +138,11 @@ def add_PhotoServiceServicer_to_server(servicer, server):
                     servicer.ListPhotoSpacetime,
                     request_deserializer=photo_dot_v1_dot_photo__service__pb2.ListPhotoSpacetimeRequest.FromString,
                     response_serializer=photo_dot_v1_dot_photo__service__pb2.ListPhotoSpacetimeResponse.SerializeToString,
+            ),
+            'GetVariantsByIds': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetVariantsByIds,
+                    request_deserializer=photo_dot_v1_dot_photo__service__pb2.GetVariantsByIdsRequest.FromString,
+                    response_serializer=photo_dot_v1_dot_photo__service__pb2.GetVariantsByIdsResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -286,6 +307,33 @@ class PhotoService:
             '/photoops.photo.v1.PhotoService/ListPhotoSpacetime',
             photo_dot_v1_dot_photo__service__pb2.ListPhotoSpacetimeRequest.SerializeToString,
             photo_dot_v1_dot_photo__service__pb2.ListPhotoSpacetimeResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetVariantsByIds(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/photoops.photo.v1.PhotoService/GetVariantsByIds',
+            photo_dot_v1_dot_photo__service__pb2.GetVariantsByIdsRequest.SerializeToString,
+            photo_dot_v1_dot_photo__service__pb2.GetVariantsByIdsResponse.FromString,
             options,
             channel_credentials,
             insecure,

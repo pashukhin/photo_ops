@@ -128,6 +128,8 @@ services:
       dockerfile: apps/web/Dockerfile
     environment:
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
+      # Server-side (SSR) gateway URL for the public /posts/[slug] page (019).
+      API_BASE_URL_INTERNAL: ${API_BASE_URL_INTERNAL:-http://api-gateway:3001}
     depends_on:
       - api-gateway
     ports:
@@ -199,11 +201,18 @@ services:
       PUBLICATION_DATABASE_URL: ${PUBLICATION_DATABASE_URL}
       PUBLICATION_SERVICE_GRPC_PORT: ${PUBLICATION_SERVICE_GRPC_PORT}
       CLUSTER_SERVICE_GRPC_URL: cluster-service:${CLUSTER_SERVICE_GRPC_PORT}
+      # post_published usage emit (session 019). The publisher connects lazily and
+      # is non-throwing at boot — the broker is NOT a boot dependency; depends_on
+      # only orders startup.
+      RABBITMQ_URL: ${RABBITMQ_URL}
+      USAGE_PROVIDER: ${USAGE_PROVIDER:-local-demo}
     depends_on:
       postgres:
         condition: service_healthy
       cluster-service:
         condition: service_started
+      rabbitmq:
+        condition: service_healthy
     ports:
       - "${PUBLICATION_SERVICE_GRPC_PORT}:${PUBLICATION_SERVICE_GRPC_PORT}"
 

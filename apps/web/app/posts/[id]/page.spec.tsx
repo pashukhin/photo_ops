@@ -28,7 +28,7 @@ describe('PublicPostPage', () => {
     // why: anonymous SSR resolves the slug to the public DTO and renders variant
     // images (never originals).
     vi.mocked(api.getPublicPost).mockResolvedValue(dto as never);
-    render(await PublicPostPage({ params: Promise.resolve({ slug: 'tok' }) }));
+    render(await PublicPostPage({ params: Promise.resolve({ id: 'tok' }) }));
     expect(api.getPublicPost).toHaveBeenCalledWith('tok');
     expect(screen.getByText('Trip')).toBeTruthy();
     expect(screen.getByText('day one')).toBeTruthy();
@@ -37,6 +37,6 @@ describe('PublicPostPage', () => {
 
   it('calls notFound() (→404, not 500) when the slug has no published post', async () => {
     vi.mocked(api.getPublicPost).mockResolvedValue(null as never);
-    await expect(PublicPostPage({ params: Promise.resolve({ slug: 'ghost' }) })).rejects.toThrow('NEXT_NOT_FOUND');
+    await expect(PublicPostPage({ params: Promise.resolve({ id: 'ghost' }) })).rejects.toThrow('NEXT_NOT_FOUND');
   });
 });

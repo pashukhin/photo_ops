@@ -23,8 +23,11 @@ function dateRange(from: string, to: string): string | null {
   return a || b;
 }
 
-export default async function PublicPostPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
+// NOTE: the dynamic segment is named `[id]` (not `[slug]`) to stay consistent
+// with the sibling editor route `/(app)/posts/[id]/edit` — Next.js forbids two
+// different param names at the same path position. The value IS the opaque slug.
+export default async function PublicPostPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id: slug } = await params;
   const post = await getPublicPost(slug);
   if (!post) {
     // A missing/unpublished/private slug is a 404 — NOT a 500. A backend failure
