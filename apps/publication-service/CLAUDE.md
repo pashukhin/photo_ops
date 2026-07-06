@@ -31,5 +31,12 @@
 - Posts/photos are scoped by authenticated `user_id`; cross-service references use
   UUID v7 with no cross-service FK.
 - Public delivery (later) uses prepared photo variants, never originals.
+- `UpdatePost` mutates `post_photos` **replace-all** (session 018): a present
+  `photos` wrapper replaces the whole list (order = list position, canonicalized
+  in the repository); the domain guards it to a non-empty, duplicate-free subset
+  of the post's current membership (no add via replace-all — `'invalid photo
+  membership'` → INVALID_ARGUMENT). An absent wrapper leaves photos untouched.
+  `CreatePostFromCluster` rejects ROOT/NOT_CLUSTERABLE/empty nodes
+  (`'node not selectable'` / `'empty node'` → INVALID_ARGUMENT).
 - slug + `published_at` + Publish/Unpublish are session 019 (columns exist, empty
-  here); `post_photos` mutation is session 018.
+  here).

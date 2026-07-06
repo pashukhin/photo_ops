@@ -97,11 +97,14 @@ while true; do
   sleep 2
 done
 
-# Pick the root node — its subtree is all the clustered photos — and record the
-# expected photo count for the assertion below.
-NODE_ID="$(jq -r '.root.id' "$RESULT_PATH")"
-EXPECTED_COUNT="$(jq -r '.root.photoCount' "$RESULT_PATH")"
-echo "[smoke-publication] node_id=$NODE_ID expected_photos=$EXPECTED_COUNT" >&2
+# Pick a SELECTABLE child node (session 018 node-selection guard rejects ROOT,
+# which would snapshot the whole tree incl. the not_clusterable bucket). The
+# Canon-burst fixture yields a root with one segment/leaf child holding both
+# photos. Keep the root id to assert it is rejected below.
+ROOT_ID="$(jq -r '.root.id' "$RESULT_PATH")"
+NODE_ID="$(jq -r '.root.children[0].id' "$RESULT_PATH")"
+EXPECTED_COUNT="$(jq -r '.root.children[0].photoCount' "$RESULT_PATH")"
+echo "[smoke-publication] root_id=$ROOT_ID node_id=$NODE_ID expected_photos=$EXPECTED_COUNT" >&2
 
 # ---------------------------------------------------------------------------
 # 4. Create a draft post from the cluster node
@@ -122,6 +125,13 @@ jq -e --argjson n "$EXPECTED_COUNT" '
 ' "$POST_PATH" >/dev/null \
   || { echo "ASSERTION FAILED: created post is not a seeded private draft" >&2; cat "$POST_PATH" >&2; exit 1; }
 
+# Node-selection guard (session 018 / 4o2 #3): posting the ROOT node is rejected
+# with 400 (it would snapshot the whole tree incl. the not_clusterable bucket).
+ROOT_CODE="$(curl -s -o /dev/null -w '%{http_code}' -b "$COOKIE_PATH" -H 'content-type: application/json' \
+  -d "{\"resultId\":\"$RESULT_ID\",\"nodeId\":\"$ROOT_ID\"}" "$API_BASE_URL/v1/posts")"
+[ "$ROOT_CODE" = "400" ] \
+  || { echo "ASSERTION FAILED: ROOT create returned $ROOT_CODE (expected 400)" >&2; exit 1; }
+
 # ---------------------------------------------------------------------------
 # 5. GetPost + ListPosts are owner-scoped and include the new post
 # ---------------------------------------------------------------------------
@@ -138,9 +148,48 @@ curl -fsS -b "$COOKIE_PATH" "$API_BASE_URL/v1/posts" \
 # ---------------------------------------------------------------------------
 curl -fsS -b "$COOKIE_PATH" -X PATCH -H 'content-type: application/json' \
   -d '{"title":"Buenos Aires morning"}' \
-  "$API_BASE_URL/v1/posts/$POST_ID" \
-  | jq -e '.title == "Buenos Aires morning"' >/dev/null \
+  "$API_BASE_URL/v1/posts/$POST_ID" > "$POST_PATH"
+jq -e '.title == "Buenos Aires morning"' "$POST_PATH" >/dev/null \
   || { echo "ASSERTION FAILED: PATCH title did not persist" >&2; exit 1; }
+
+# 4o2 #6: a title-only PATCH must NOT touch post_photos or the seeded dates
+# (guards partial-update regressions). Compare against the pre-PATCH snapshot.
+jq -e --argjson n "$EXPECTED_COUNT" '(.photos | length) == $n and (.dateFrom != "" and .dateFrom != null)' \
+  "$POST_PATH" >/dev/null \
+  || { echo "ASSERTION FAILED: title-only PATCH dropped photos or dates (4o2 #6)" >&2; cat "$POST_PATH" >&2; exit 1; }
+
+# ---------------------------------------------------------------------------
+# 6b. UpdatePost replace-all photos: reorder + caption, then remove (session 018)
+# ---------------------------------------------------------------------------
+# Read the current (tree-order) photo ids, build a REVERSED list with a caption on
+# the first, PATCH it, and assert the returned photos carry the new order (0..n-1)
+# and caption.
+REV_PHOTOS="$(jq -c '[.photos | reverse | to_entries[] | {photoId: .value.photoId, caption: (if .key == 0 then "sunrise" else "" end)}]' "$POST_PATH")"
+EXPECTED_ORDER="$(jq -c '[.photos | reverse | .[].photoId]' "$POST_PATH")"
+
+curl -fsS -b "$COOKIE_PATH" -X PATCH -H 'content-type: application/json' \
+  -d "{\"photos\":$REV_PHOTOS}" "$API_BASE_URL/v1/posts/$POST_ID" > "$POST_PATH"
+jq -e --argjson order "$EXPECTED_ORDER" '
+  ([.photos | sort_by(.order) | .[].photoId] == $order)
+  and ([.photos[].order] == [range(0; (.photos | length))])
+  and ((.photos | sort_by(.order) | .[0].caption) == "sunrise")
+' "$POST_PATH" >/dev/null \
+  || { echo "ASSERTION FAILED: replace-all reorder/caption did not persist" >&2; cat "$POST_PATH" >&2; exit 1; }
+
+# Remove: PATCH a single-photo subset and assert the post now has exactly one photo.
+KEEP="$(jq -c '[.photos | sort_by(.order) | .[0] | {photoId, caption}]' "$POST_PATH")"
+curl -fsS -b "$COOKIE_PATH" -X PATCH -H 'content-type: application/json' \
+  -d "{\"photos\":$KEEP}" "$API_BASE_URL/v1/posts/$POST_ID" \
+  | jq -e '(.photos | length) == 1' >/dev/null \
+  || { echo "ASSERTION FAILED: replace-all remove did not shrink the post" >&2; exit 1; }
+
+# Empty replace-all is rejected with 400 (not a 500): proto-loader drops the
+# empty repeated, so the edge must default it to [] and the domain must reject a
+# zero-photo post (s018 review — a post cannot be emptied).
+EMPTY_CODE="$(curl -s -o /dev/null -w '%{http_code}' -b "$COOKIE_PATH" -X PATCH \
+  -H 'content-type: application/json' -d '{"photos":[]}' "$API_BASE_URL/v1/posts/$POST_ID")"
+[ "$EMPTY_CODE" = "400" ] \
+  || { echo "ASSERTION FAILED: empty photos PATCH returned $EMPTY_CODE (expected 400)" >&2; exit 1; }
 
 # ---------------------------------------------------------------------------
 # 7. Owner scoping: a different user can neither read nor list this post

@@ -7,8 +7,12 @@ vi.mock('@/lib/api', () => ({
   listClusteringResults: vi.fn().mockResolvedValue({ results: [] }),
   getClusteringResult: vi.fn(),
   generateClusters: vi.fn(),
+  createPost: vi.fn(),
   listPhotos: vi.fn().mockResolvedValue({ photos: [], totalCount: 0 })
 }));
+
+// ClusterView uses useRouter for the create-post affordance (session 018).
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
 describe('ClustersPage', () => {
   it('renders the ClusterView', async () => {

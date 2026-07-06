@@ -68,7 +68,28 @@ export interface UpdatePostRequest {
     | undefined;
   /** ISO instant; "" clears */
   dateFrom?: string | undefined;
-  dateTo?: string | undefined;
+  dateTo?:
+    | string
+    | undefined;
+  /**
+   * Replace-all post_photos. Present -> the post's photos become exactly this
+   * list (order = position); absent -> photos untouched (e.g. a title-only PATCH).
+   */
+  photos?: PostPhotoList | undefined;
+}
+
+/**
+ * A photo in a replace-all UpdatePost photos list. No order field — the list
+ * position IS the order (canonicalized server-side). photo_id must already be a
+ * member of the post (replace-all removes/reorders/re-captions; never adds).
+ */
+export interface PostPhotoInput {
+  photoId: string;
+  caption: string;
+}
+
+export interface PostPhotoList {
+  photos: PostPhotoInput[];
 }
 
 /** A photo story drafted from a cluster and eventually published. */
@@ -344,6 +365,9 @@ export const UpdatePostRequest: MessageFns<UpdatePostRequest> = {
     if (message.dateTo !== undefined) {
       writer.uint32(74).string(message.dateTo);
     }
+    if (message.photos !== undefined) {
+      PostPhotoList.encode(message.photos, writer.uint32(82).fork()).join();
+    }
     return writer;
   },
 
@@ -424,6 +448,99 @@ export const UpdatePostRequest: MessageFns<UpdatePostRequest> = {
           }
 
           message.dateTo = reader.string();
+          continue;
+        }
+        case 10: {
+          if (tag !== 82) {
+            break;
+          }
+
+          message.photos = PostPhotoList.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBasePostPhotoInput(): PostPhotoInput {
+  return { photoId: "", caption: "" };
+}
+
+export const PostPhotoInput: MessageFns<PostPhotoInput> = {
+  encode(message: PostPhotoInput, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.photoId !== "") {
+      writer.uint32(10).string(message.photoId);
+    }
+    if (message.caption !== "") {
+      writer.uint32(18).string(message.caption);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PostPhotoInput {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBasePostPhotoInput();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.photoId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.caption = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBasePostPhotoList(): PostPhotoList {
+  return { photos: [] };
+}
+
+export const PostPhotoList: MessageFns<PostPhotoList> = {
+  encode(message: PostPhotoList, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.photos) {
+      PostPhotoInput.encode(v!, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PostPhotoList {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBasePostPhotoList();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.photos.push(PostPhotoInput.decode(reader, reader.uint32()));
           continue;
         }
       }
@@ -889,7 +1006,10 @@ export interface PublicationServiceClient {
 
   listPosts(request: ListPostsRequest): Observable<ListPostsResponse>;
 
-  /** Update a post's scalar fields (post_photos mutation lands in session 018). */
+  /**
+   * Update a post's scalar fields + post_photos replace-all via the photos
+   * field (session 018).
+   */
 
   updatePost(request: UpdatePostRequest): Observable<Post>;
 }
@@ -924,7 +1044,10 @@ export interface PublicationServiceController {
 
   listPosts(request: ListPostsRequest): Promise<ListPostsResponse> | Observable<ListPostsResponse> | ListPostsResponse;
 
-  /** Update a post's scalar fields (post_photos mutation lands in session 018). */
+  /**
+   * Update a post's scalar fields + post_photos replace-all via the photos
+   * field (session 018).
+   */
 
   updatePost(request: UpdatePostRequest): Promise<Post> | Observable<Post> | Post;
 }
@@ -1000,7 +1123,10 @@ export const PublicationServiceService = {
     responseSerialize: (value: ListPostsResponse): Buffer => Buffer.from(ListPostsResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer): ListPostsResponse => ListPostsResponse.decode(value),
   },
-  /** Update a post's scalar fields (post_photos mutation lands in session 018). */
+  /**
+   * Update a post's scalar fields + post_photos replace-all via the photos
+   * field (session 018).
+   */
   updatePost: {
     path: "/photoops.publication.v1.PublicationService/UpdatePost" as const,
     requestStream: false as const,
@@ -1024,7 +1150,10 @@ export interface PublicationServiceServer extends UntypedServiceImplementation {
   getPost: handleUnaryCall<GetPostRequest, Post>;
   /** The caller's posts (summaries — no photos/body). */
   listPosts: handleUnaryCall<ListPostsRequest, ListPostsResponse>;
-  /** Update a post's scalar fields (post_photos mutation lands in session 018). */
+  /**
+   * Update a post's scalar fields + post_photos replace-all via the photos
+   * field (session 018).
+   */
   updatePost: handleUnaryCall<UpdatePostRequest, Post>;
 }
 

@@ -107,15 +107,41 @@ export class PostRepository implements PostRepositoryPort {
     if (patch.dateFrom !== undefined) set.dateFrom = patch.dateFrom;
     if (patch.dateTo !== undefined) set.dateTo = patch.dateTo;
 
-    const [updated] = await this.db
-      .update(posts)
-      .set(set)
-      .where(and(eq(posts.id, postId), eq(posts.userId, userId)))
-      .returning();
-    if (!updated) {
-      return null;
-    }
-    return this.toRecord(updated, await this.photosFor(postId));
+    // The scalar update and the (optional) post_photos replace-all are one unit.
+    return this.db.transaction(async (tx) => {
+      const [updated] = await tx
+        .update(posts)
+        .set(set)
+        .where(and(eq(posts.id, postId), eq(posts.userId, userId)))
+        .returning();
+      if (!updated) {
+        return null;
+      }
+      // Replace-all: the post's photos become exactly patch.photos, order =
+      // list position (canonicalized here — the domain guards membership).
+      if (patch.photos !== undefined) {
+        await tx.delete(postPhotos).where(eq(postPhotos.postId, postId));
+        if (patch.photos.length > 0) {
+          await tx.insert(postPhotos).values(
+            patch.photos.map((photo, order) => ({
+              postId,
+              photoId: photo.photoId,
+              order,
+              caption: photo.caption
+            }))
+          );
+        }
+      }
+      const photoRows = await tx
+        .select()
+        .from(postPhotos)
+        .where(eq(postPhotos.postId, postId))
+        .orderBy(asc(postPhotos.order));
+      return this.toRecord(
+        updated,
+        photoRows.map((row) => ({ photoId: row.photoId, order: row.order, caption: row.caption }))
+      );
+    });
   }
 
   private async photosFor(postId: string): Promise<PostPhotoRecord[]> {

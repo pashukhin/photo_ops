@@ -8,8 +8,14 @@ vi.mock('../../lib/api', () => ({
   listClusteringResults: vi.fn(),
   getClusteringResult: vi.fn(),
   generateClusters: vi.fn(),
-  listPhotos: vi.fn()
+  listPhotos: vi.fn(),
+  createPost: vi.fn()
 }));
+
+// Router push for the create-post affordance (session 018). Referenced lazily
+// inside the factory (call-time), matching the AppShell.spec usePathname pattern.
+const push = vi.fn();
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
 
 // Minimal PhotoAsset for the id→photo map ClusterView builds to render item
 // thumbnails; only id/filename/variants are consumed by the tree.
@@ -195,6 +201,54 @@ describe('ClusterView', () => {
     await screen.findByText('Canon EOS R5');
     expect(screen.getByText('p1')).toBeTruthy();
     expect(screen.getByText('p2')).toBeTruthy();
+  });
+
+  it('shows "Create post" on a selectable node and routes to the editor on click', async () => {
+    // why: the bridge — a real (non-root, non-empty) cluster node becomes a draft.
+    push.mockClear();
+    vi.mocked(api.createPost).mockResolvedValue({ id: 'post-9', photos: [] } as never);
+    render(<ClusterView />);
+    fireEvent.click(await screen.findByTestId('result-row'));
+    const btn = await screen.findByRole('button', { name: /create post/i });
+    fireEvent.click(btn);
+    await waitFor(() => expect(api.createPost).toHaveBeenCalledWith({ resultId: 'r1', nodeId: 'seg' }));
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/posts/post-9/edit'));
+  });
+
+  it('surfaces a create-post failure in the error banner', async () => {
+    // why: a failed create must not be lost — it shows in the shared error state.
+    vi.mocked(api.createPost).mockRejectedValue(new Error('create boom'));
+    render(<ClusterView />);
+    fireEvent.click(await screen.findByTestId('result-row'));
+    fireEvent.click(await screen.findByRole('button', { name: /create post/i }));
+    await screen.findByText(/create boom/);
+  });
+
+  it('does not show "Create post" on the root node', async () => {
+    // why: 4o2 #3 — root would snapshot the whole tree incl. not_clusterable.
+    render(<ClusterView />);
+    fireEvent.click(await screen.findByTestId('result-row'));
+    await screen.findByText('Canon EOS R5'); // tree rendered
+    // the only Create-post button belongs to the selectable 'seg' child, not root
+    expect(screen.queryAllByRole('button', { name: /create post/i })).toHaveLength(1);
+  });
+
+  it('does not show "Create post" on a not_clusterable or empty node', async () => {
+    // why: 4o2 #3 — the excluded-photos bucket and a photo-less node are not posts.
+    vi.mocked(api.getClusteringResult).mockResolvedValue({
+      ...TREE,
+      root: {
+        ...TREE.root,
+        children: [
+          { ...TREE.root.children[0], id: 'nc', kind: 'not_clusterable', segmentLabel: '', items: [] },
+          { ...TREE.root.children[0], id: 'mt', kind: 'leaf', segmentLabel: 'Empty leaf', photoCount: 0, items: [] }
+        ]
+      }
+    });
+    render(<ClusterView />);
+    fireEvent.click(await screen.findByTestId('result-row'));
+    await screen.findByText('Empty leaf');
+    expect(screen.queryAllByRole('button', { name: /create post/i })).toHaveLength(0);
   });
 
   it('stops polling and surfaces a timeout when a run never leaves pending', async () => {

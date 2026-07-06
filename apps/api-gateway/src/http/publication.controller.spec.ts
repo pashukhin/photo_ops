@@ -1,4 +1,4 @@
-import { UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import { PostRaw, PublicationClient } from '../grpc/publication.client';
 import { PublicationController } from './publication.controller';
@@ -127,5 +127,68 @@ describe('PublicationController', () => {
       title: 'New',
       visibility: 2
     });
+  });
+
+  it('updatePost: rejects an unknown visibility with 400', async () => {
+    // why: 4o2 #1 — a typo'd visibility must not be a silent 200 no-op (privacy).
+    const { controller } = createController();
+    await expect(
+      controller.updatePost('photoops_session=s', 'post-1', { visibility: 'pubic' })
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('updatePost: rejects a non-ISO date with 400', async () => {
+    // why: 4o2 #2 — an invalid date must not reach Drizzle (500 / corrupt row).
+    const { controller } = createController();
+    await expect(
+      controller.updatePost('photoops_session=s', 'post-1', { dateFrom: 'last summer' })
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('updatePost: forwards a valid ISO date unchanged', async () => {
+    // why: a well-formed instant passes edge validation and reaches the domain.
+    const { controller, publicationClient } = createController();
+    vi.mocked(publicationClient.updatePost).mockResolvedValue(makePostRaw());
+    await controller.updatePost('photoops_session=s', 'post-1', { dateFrom: '2024-06-15T10:00:00.000Z' });
+    expect(publicationClient.updatePost).toHaveBeenCalledWith({
+      userId: 'user-1',
+      postId: 'post-1',
+      dateFrom: '2024-06-15T10:00:00.000Z'
+    });
+  });
+
+  it('updatePost: forwards a photos replace-all list to the client input', async () => {
+    // why: the editor's Save carries the reordered/re-captioned list.
+    const { controller, publicationClient } = createController();
+    vi.mocked(publicationClient.updatePost).mockResolvedValue(makePostRaw());
+    await controller.updatePost('photoops_session=s', 'post-1', {
+      photos: [
+        { photoId: 'p2', caption: 'hi' },
+        { photoId: 'p1', caption: '' }
+      ]
+    });
+    expect(publicationClient.updatePost).toHaveBeenCalledWith({
+      userId: 'user-1',
+      postId: 'post-1',
+      photos: [
+        { photoId: 'p2', caption: 'hi' },
+        { photoId: 'p1', caption: '' }
+      ]
+    });
+  });
+
+  it('mapPost: returns an explicit DTO without leaking unmapped raw fields', async () => {
+    // why: 4o2 #4 — shape a browser DTO, do not spread ...raw. sourceCluster/Result
+    // stay (intentional provenance); a stray proto field must not auto-appear.
+    const { controller, publicationClient } = createController();
+    vi.mocked(publicationClient.getPost).mockResolvedValue({
+      ...makePostRaw(),
+      ...({ leakedField: 'x' } as object)
+    } as PostRaw);
+    const result = (await controller.getPost('photoops_session=s', 'post-1')) as Record<string, unknown>;
+    expect(result).not.toHaveProperty('leakedField');
+    expect(result.sourceClusterId).toBe('node-A');
+    expect(result.status).toBe('draft');
+    expect(result.photos).toEqual([{ photoId: 'p1', order: 0, caption: '' }]);
   });
 });

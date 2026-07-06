@@ -221,3 +221,135 @@ describe('PostDomainService owner-scoped reads/updates', () => {
     await expect(service.updatePost('user-1', 'other-post', { title: 'x' })).rejects.toThrow('post not found');
   });
 });
+
+describe('PostDomainService.updatePost replace-all photos', () => {
+  it('applies a valid subset: reads current membership, then updates', async () => {
+    // why: replace-all must validate against the post's snapshot before writing —
+    // so it reads the current post first, then delegates the write.
+    const current = makePostRecord(); // photos p1,p2,p3
+    const updated = makePostRecord({ photos: [{ photoId: 'p2', order: 0, caption: 'hi' }] });
+    const findByIdForUser = vi.fn().mockResolvedValue(current);
+    const updateForUser = vi.fn().mockResolvedValue(updated);
+    const { service } = createService({ repository: { findByIdForUser, updateForUser } });
+
+    const result = await service.updatePost('user-1', 'post-1', {
+      photos: [{ photoId: 'p2', caption: 'hi' }]
+    });
+
+    expect(findByIdForUser).toHaveBeenCalledWith('user-1', 'post-1');
+    expect(updateForUser).toHaveBeenCalledWith('user-1', 'post-1', {
+      photos: [{ photoId: 'p2', caption: 'hi' }]
+    });
+    expect(result).toBe(updated);
+  });
+
+  it('rejects an empty photos list', async () => {
+    // why: a post with zero photos is meaningless (matches the create guard).
+    const { service } = createService({
+      repository: { findByIdForUser: vi.fn().mockResolvedValue(makePostRecord()) }
+    });
+    await expect(service.updatePost('user-1', 'post-1', { photos: [] })).rejects.toThrow(
+      'invalid photo membership'
+    );
+  });
+
+  it('rejects a photo not in the post (no add via replace-all)', async () => {
+    // why: replace-all removes/reorders/re-captions only — it cannot attach a
+    // photo the post never snapshotted (which the caller may not even own).
+    const { service } = createService({
+      repository: { findByIdForUser: vi.fn().mockResolvedValue(makePostRecord()) }
+    });
+    await expect(
+      service.updatePost('user-1', 'post-1', {
+        photos: [
+          { photoId: 'p1', caption: '' },
+          { photoId: 'p9', caption: '' }
+        ]
+      })
+    ).rejects.toThrow('invalid photo membership');
+  });
+
+  it('rejects a duplicate photo id', async () => {
+    // why: post_photos PK is (post_id, photo_id) — a dup would corrupt the write.
+    const { service } = createService({
+      repository: { findByIdForUser: vi.fn().mockResolvedValue(makePostRecord()) }
+    });
+    await expect(
+      service.updatePost('user-1', 'post-1', {
+        photos: [
+          { photoId: 'p1', caption: '' },
+          { photoId: 'p1', caption: 'x' }
+        ]
+      })
+    ).rejects.toThrow('invalid photo membership');
+  });
+
+  it('rejects when the post is absent or not owned', async () => {
+    // why: the membership read is owner-scoped; a foreign/missing post → not found.
+    const { service } = createService({
+      repository: { findByIdForUser: vi.fn().mockResolvedValue(null) }
+    });
+    await expect(
+      service.updatePost('user-1', 'ghost', { photos: [{ photoId: 'p1', caption: '' }] })
+    ).rejects.toThrow('post not found');
+  });
+
+  it('title-only patch does not read membership and leaves photos untouched', async () => {
+    // why: 4o2 #6 — a scalar-only PATCH must not touch post_photos, so it must
+    // not even do the membership read.
+    const findByIdForUser = vi.fn();
+    const updateForUser = vi.fn().mockResolvedValue(makePostRecord({ title: 'New' }));
+    const { service } = createService({ repository: { findByIdForUser, updateForUser } });
+
+    await service.updatePost('user-1', 'post-1', { title: 'New' });
+
+    expect(findByIdForUser).not.toHaveBeenCalled();
+    expect(updateForUser).toHaveBeenCalledWith('user-1', 'post-1', { title: 'New' });
+  });
+});
+
+describe('PostDomainService.createPostFromCluster node-selection guard', () => {
+  it('rejects the ROOT node (would snapshot the whole tree incl. not_clusterable)', async () => {
+    // why: 4o2 #3 — posting root publishes the entire library, not an episode.
+    const { service } = createService({
+      clusters: { getResult: vi.fn().mockResolvedValue(makeTree()) } // root id='root', kind 1
+    });
+    await expect(
+      service.createPostFromCluster({ userId: 'user-1', resultId: 'result-1', nodeId: 'root', title: '' })
+    ).rejects.toThrow('node not selectable');
+  });
+
+  it('rejects a NOT_CLUSTERABLE node', async () => {
+    // why: the excluded-photos bucket is not a story.
+    const tree = makeTree();
+    tree.root!.children.push({
+      id: 'nc',
+      kind: 4,
+      dateFrom: '',
+      dateTo: '',
+      items: [{ photoId: 'x' }],
+      children: []
+    });
+    const { service } = createService({ clusters: { getResult: vi.fn().mockResolvedValue(tree) } });
+    await expect(
+      service.createPostFromCluster({ userId: 'user-1', resultId: 'result-1', nodeId: 'nc', title: '' })
+    ).rejects.toThrow('node not selectable');
+  });
+
+  it('rejects a selectable node whose subtree has no photos', async () => {
+    // why: 4o2 #3 — an empty node yields a silently-empty 0-photo post.
+    const tree = makeTree();
+    tree.root!.children.push({
+      id: 'empty',
+      kind: 3,
+      dateFrom: '',
+      dateTo: '',
+      items: [],
+      children: []
+    });
+    const { service } = createService({ clusters: { getResult: vi.fn().mockResolvedValue(tree) } });
+    await expect(
+      service.createPostFromCluster({ userId: 'user-1', resultId: 'result-1', nodeId: 'empty', title: '' })
+    ).rejects.toThrow('empty node');
+  });
+});

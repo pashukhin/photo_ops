@@ -335,6 +335,76 @@ export async function generateClusters(input: {
   return response.json() as Promise<{ resultId: string; status: string }>;
 }
 
+// --- Publication (session 018) ----------------------------------------------
+
+export interface PostPhoto {
+  photoId: string;
+  order: number;
+  caption: string;
+}
+
+export interface Post {
+  id: string;
+  userId: string;
+  sourceClusterId: string;
+  sourceResultId: string;
+  title: string;
+  body: string;
+  status: string;
+  visibility: string;
+  slug: string;
+  locationLabel: string;
+  dateFrom: string;
+  dateTo: string;
+  mapEnabled: boolean;
+  publishedAt: string;
+  createdAt: string;
+  updatedAt: string;
+  photos: PostPhoto[];
+}
+
+// Replace-all photos: the post's photos become exactly this list (order =
+// position). Omit `photos` for a scalar-only PATCH (leaves photos untouched).
+export interface UpdatePostPatch {
+  title?: string;
+  body?: string;
+  photos?: { photoId: string; caption: string }[];
+}
+
+export async function createPost(input: { resultId: string; nodeId: string; title?: string }): Promise<Post> {
+  const response = await fetch(`${API_BASE_URL}/v1/posts`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input)
+  });
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, `CreatePost failed: ${response.status}`));
+  }
+  return response.json() as Promise<Post>;
+}
+
+export async function getPost(postId: string): Promise<Post> {
+  const response = await fetch(`${API_BASE_URL}/v1/posts/${postId}`, { credentials: 'include', cache: 'no-store' });
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, `GetPost failed: ${response.status}`));
+  }
+  return response.json() as Promise<Post>;
+}
+
+export async function updatePost(postId: string, patch: UpdatePostPatch): Promise<Post> {
+  const response = await fetch(`${API_BASE_URL}/v1/posts/${postId}`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(patch)
+  });
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, `UpdatePost failed: ${response.status}`));
+  }
+  return response.json() as Promise<Post>;
+}
+
 export async function uploadFileToPresignedUrl(uploadUrl: string, file: File) {
   const response = await fetch(uploadUrl, {
     method: 'PUT',
