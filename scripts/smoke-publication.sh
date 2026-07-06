@@ -183,6 +183,14 @@ curl -fsS -b "$COOKIE_PATH" -X PATCH -H 'content-type: application/json' \
   | jq -e '(.photos | length) == 1' >/dev/null \
   || { echo "ASSERTION FAILED: replace-all remove did not shrink the post" >&2; exit 1; }
 
+# Empty replace-all is rejected with 400 (not a 500): proto-loader drops the
+# empty repeated, so the edge must default it to [] and the domain must reject a
+# zero-photo post (s018 review — a post cannot be emptied).
+EMPTY_CODE="$(curl -s -o /dev/null -w '%{http_code}' -b "$COOKIE_PATH" -X PATCH \
+  -H 'content-type: application/json' -d '{"photos":[]}' "$API_BASE_URL/v1/posts/$POST_ID")"
+[ "$EMPTY_CODE" = "400" ] \
+  || { echo "ASSERTION FAILED: empty photos PATCH returned $EMPTY_CODE (expected 400)" >&2; exit 1; }
+
 # ---------------------------------------------------------------------------
 # 7. Owner scoping: a different user can neither read nor list this post
 # ---------------------------------------------------------------------------

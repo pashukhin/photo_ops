@@ -115,7 +115,7 @@ export class PublicationGrpcController {
     mapEnabled?: boolean;
     dateFrom?: string;
     dateTo?: string;
-    photos?: { photos: { photoId: string; caption: string }[] }; // replace-all wrapper (proto3 optional message)
+    photos?: { photos?: { photoId: string; caption: string }[] }; // replace-all wrapper; photos[] is absent when the list is empty (proto-loader drops empty repeateds)
   }): Promise<ProtoPost> {
     try {
       const record = await this.postService.updatePost(request.userId, request.postId, this.toPatch(request));
@@ -135,7 +135,7 @@ export class PublicationGrpcController {
     mapEnabled?: boolean;
     dateFrom?: string;
     dateTo?: string;
-    photos?: { photos: { photoId: string; caption: string }[] };
+    photos?: { photos?: { photoId: string; caption: string }[] };
   }): PostPatch {
     const patch: PostPatch = {};
     if (request.title !== undefined) patch.title = request.title;
@@ -146,9 +146,11 @@ export class PublicationGrpcController {
     if (request.dateFrom !== undefined) patch.dateFrom = request.dateFrom ? new Date(request.dateFrom) : null;
     if (request.dateTo !== undefined) patch.dateTo = request.dateTo ? new Date(request.dateTo) : null;
     // Replace-all wrapper (proto3 optional message) → flat {photoId,caption}[];
-    // order is the list position, canonicalized by the repository.
+    // order is the list position, canonicalized by the repository. An empty list
+    // arrives with photos[] absent (proto-loader drops empty repeateds) → [], so
+    // the domain rejects it (invalid membership → 400) instead of a TypeError.
     if (request.photos !== undefined) {
-      patch.photos = request.photos.photos.map((p) => ({ photoId: p.photoId, caption: p.caption }));
+      patch.photos = (request.photos.photos ?? []).map((p) => ({ photoId: p.photoId, caption: p.caption }));
     }
     return patch;
   }

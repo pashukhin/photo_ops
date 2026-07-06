@@ -148,7 +148,8 @@ export function PostEditor({ postId }: { postId: string }) {
                 type="button"
                 aria-label="Remove"
                 onClick={() => remove(index)}
-                className="border rounded-md px-2 py-1 text-xs"
+                disabled={photos.length <= 1}
+                className="border rounded-md px-2 py-1 text-xs disabled:opacity-40"
               >
                 ✕
               </button>
@@ -162,8 +163,8 @@ export function PostEditor({ postId }: { postId: string }) {
       <button
         type="button"
         onClick={() => void save()}
-        disabled={saving}
-        className="border rounded-md px-3 py-1"
+        disabled={saving || photos.length === 0}
+        className="border rounded-md px-3 py-1 disabled:opacity-40"
       >
         {saving ? 'Saving…' : 'Save'}
       </button>

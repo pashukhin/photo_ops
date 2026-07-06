@@ -114,6 +114,19 @@ describe('PostEditor', () => {
     });
   });
 
+  it('does not allow removing the last photo (a post cannot be emptied)', async () => {
+    // why: an empty replace-all is rejected by the backend (400) — the editor
+    // enforces the non-empty invariant so the user cannot reach that dead end.
+    vi.mocked(api.getPost).mockResolvedValue({
+      ...post(),
+      photos: [{ photoId: 'p1', order: 0, caption: 'only' }]
+    } as never);
+    render(<PostEditor postId="post-1" />);
+    await screen.findByAltText('p1.jpg');
+    expect(screen.getByRole('button', { name: /remove/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /save/i })).toBeEnabled(); // 1 photo is still saveable
+  });
+
   it('surfaces a save failure without losing the editor', async () => {
     // why: a failed Save shows a banner but keeps the edits (not a fatal page).
     vi.mocked(api.updatePost).mockRejectedValue(new Error('save boom'));

@@ -207,6 +207,18 @@ describe('PublicationGrpcController', () => {
     });
   });
 
+  it('updatePost: an empty photos wrapper decodes to [] (guarded 400), not a crash', async () => {
+    // why: proto-loader drops an empty repeated, so a "remove all photos" PATCH
+    // arrives as request.photos = {} (photos undefined). It must become [] so the
+    // domain rejects it (invalid membership → 400), not throw a TypeError → 500.
+    const updatePost = vi.fn().mockResolvedValue(makePostRecord());
+    const { controller, postService } = createController({ updatePost });
+
+    await controller.updatePost({ postId: 'p', userId: 'u', photos: {} });
+
+    expect(postService.updatePost).toHaveBeenCalledWith('u', 'p', { photos: [] });
+  });
+
   it('updatePost: with no photos wrapper does not set patch.photos', async () => {
     // why: a title-only PATCH must leave photos untouched (no empty replace).
     const { controller, postService } = createController({
