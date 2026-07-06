@@ -19,7 +19,8 @@ const INVALID_ARGUMENT_MESSAGES = new Set([
   'cluster result not ready',
   'node not selectable',
   'empty node',
-  'invalid photo membership'
+  'invalid photo membership',
+  'cannot publish private'
 ]);
 
 export interface ProtoPostPhoto {
@@ -120,6 +121,41 @@ export class PublicationGrpcController {
     try {
       const record = await this.postService.updatePost(request.userId, request.postId, this.toPatch(request));
       return this.toProtoPost(record);
+    } catch (error) {
+      throw this.mapDomainError(error);
+    }
+  }
+
+  @GrpcMethod('PublicationService', 'PublishPost')
+  async publishPost(request: { postId: string; userId: string; visibility: number }): Promise<ProtoPost> {
+    try {
+      // PROTO_TO_VISIBILITY maps 1/2/3 → private/unlisted/public; 0/unknown →
+      // undefined. The domain rejects anything but public|unlisted as
+      // 'cannot publish private' (→ INVALID_ARGUMENT), so no edge validation here.
+      const record = await this.postService.publishPost(
+        request.userId,
+        request.postId,
+        PROTO_TO_VISIBILITY[request.visibility] as PostVisibility
+      );
+      return this.toProtoPost(record);
+    } catch (error) {
+      throw this.mapDomainError(error);
+    }
+  }
+
+  @GrpcMethod('PublicationService', 'UnpublishPost')
+  async unpublishPost(request: { postId: string; userId: string }): Promise<ProtoPost> {
+    try {
+      return this.toProtoPost(await this.postService.unpublishPost(request.userId, request.postId));
+    } catch (error) {
+      throw this.mapDomainError(error);
+    }
+  }
+
+  @GrpcMethod('PublicationService', 'GetPublicPostBySlug')
+  async getPublicPostBySlug(request: { slug: string }): Promise<ProtoPost> {
+    try {
+      return this.toProtoPost(await this.postService.getPublicPostBySlug(request.slug));
     } catch (error) {
       throw this.mapDomainError(error);
     }

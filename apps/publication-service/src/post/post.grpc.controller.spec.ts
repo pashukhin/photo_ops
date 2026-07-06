@@ -262,4 +262,60 @@ describe('PublicationGrpcController', () => {
 
     await expect(controller.getPost({ postId: 'post-1', userId: 'user-1' })).rejects.toBe(boom);
   });
+
+  it('PublishPost: maps the visibility enum to a string and returns a proto post', async () => {
+    // why: the publish boundary — visibility enum number → domain string, and the
+    // published record maps back to proto enums.
+    const publishPost = vi.fn().mockResolvedValue(
+      makePostRecord({ status: 'published', visibility: 'public', slug: 'tok', publishedAt: new Date('2026-07-06T00:00:00.000Z') })
+    );
+    const { controller } = createController({ publishPost });
+
+    const res = await controller.publishPost({ postId: 'post-1', userId: 'user-1', visibility: 3 });
+
+    expect(publishPost).toHaveBeenCalledWith('user-1', 'post-1', 'public');
+    expect(res.status).toBe(2); // PUBLISHED
+    expect(res.slug).toBe('tok');
+    expect(res.publishedAt).toBe('2026-07-06T00:00:00.000Z');
+  });
+
+  it('PublishPost: surfaces "cannot publish private" as INVALID_ARGUMENT', async () => {
+    // why: publishing a private/unspecified visibility is a 400, not a 500.
+    const publishPost = vi.fn().mockRejectedValue(new Error('cannot publish private'));
+    const { controller } = createController({ publishPost });
+
+    await expect(controller.publishPost({ postId: 'post-1', userId: 'user-1', visibility: 1 })).rejects.toBeInstanceOf(
+      RpcException
+    );
+    await controller.publishPost({ postId: 'post-1', userId: 'user-1', visibility: 1 }).catch((err: RpcException) => {
+      expect((err.getError() as { code: number }).code).toBe(status.INVALID_ARGUMENT);
+    });
+  });
+
+  it('UnpublishPost: calls the domain owner-scoped and returns the proto post', async () => {
+    const unpublishPost = vi.fn().mockResolvedValue(makePostRecord({ status: 'unpublished' }));
+    const { controller } = createController({ unpublishPost });
+
+    const res = await controller.unpublishPost({ postId: 'post-1', userId: 'user-1' });
+
+    expect(unpublishPost).toHaveBeenCalledWith('user-1', 'post-1');
+    expect(res.status).toBe(3); // UNPUBLISHED
+  });
+
+  it('GetPublicPostBySlug: returns the proto post; a miss is NOT_FOUND', async () => {
+    // why: the public read gate — a hit maps to proto; a miss (draft/unpublished/
+    // private/unknown) is NOT_FOUND → the gateway 404.
+    const hit = createController({
+      getPublicPostBySlug: vi.fn().mockResolvedValue(makePostRecord({ status: 'published', visibility: 'public', slug: 'tok' }))
+    });
+    expect((await hit.controller.getPublicPostBySlug({ slug: 'tok' })).slug).toBe('tok');
+
+    const miss = createController({
+      getPublicPostBySlug: vi.fn().mockRejectedValue(new Error('post not found'))
+    });
+    await expect(miss.controller.getPublicPostBySlug({ slug: 'ghost' })).rejects.toBeInstanceOf(RpcException);
+    await miss.controller.getPublicPostBySlug({ slug: 'ghost' }).catch((err: RpcException) => {
+      expect((err.getError() as { code: number }).code).toBe(status.NOT_FOUND);
+    });
+  });
 });
