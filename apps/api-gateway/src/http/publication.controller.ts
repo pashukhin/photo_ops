@@ -21,6 +21,7 @@ export interface UpdatePostBody {
   mapEnabled?: boolean;
   dateFrom?: string;
   dateTo?: string;
+  photos?: { photoId: string; caption: string }[]; // replace-all; order = position
 }
 
 // Session-authed Post edge. userId comes from the validated session, never the

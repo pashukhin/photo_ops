@@ -60,6 +60,7 @@ export interface UpdatePostInput {
   mapEnabled?: boolean;
   dateFrom?: string;
   dateTo?: string;
+  photos?: { photoId: string; caption: string }[]; // replace-all; client wraps into the gRPC photos message
 }
 
 export interface PublicationGatewayClient {
