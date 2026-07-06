@@ -78,6 +78,25 @@ export interface UpdatePostRequest {
   photos?: PostPhotoList | undefined;
 }
 
+export interface PublishPostRequest {
+  postId: string;
+  /** owner scope */
+  userId: string;
+  /** must be PUBLIC or UNLISTED (private/unspecified rejected) */
+  visibility: PostVisibility;
+}
+
+export interface UnpublishPostRequest {
+  postId: string;
+  /** owner scope */
+  userId: string;
+}
+
+export interface GetPublicPostBySlugRequest {
+  /** no user_id — public read gated by published + public|unlisted */
+  slug: string;
+}
+
 /**
  * A photo in a replace-all UpdatePost photos list. No order field — the list
  * position IS the order (canonicalized server-side). photo_id must already be a
@@ -456,6 +475,150 @@ export const UpdatePostRequest: MessageFns<UpdatePostRequest> = {
           }
 
           message.photos = PostPhotoList.decode(reader, reader.uint32());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBasePublishPostRequest(): PublishPostRequest {
+  return { postId: "", userId: "", visibility: 0 };
+}
+
+export const PublishPostRequest: MessageFns<PublishPostRequest> = {
+  encode(message: PublishPostRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.postId !== "") {
+      writer.uint32(10).string(message.postId);
+    }
+    if (message.userId !== "") {
+      writer.uint32(18).string(message.userId);
+    }
+    if (message.visibility !== 0) {
+      writer.uint32(24).int32(message.visibility);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PublishPostRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBasePublishPostRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.postId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.userId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.visibility = reader.int32() as any;
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBaseUnpublishPostRequest(): UnpublishPostRequest {
+  return { postId: "", userId: "" };
+}
+
+export const UnpublishPostRequest: MessageFns<UnpublishPostRequest> = {
+  encode(message: UnpublishPostRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.postId !== "") {
+      writer.uint32(10).string(message.postId);
+    }
+    if (message.userId !== "") {
+      writer.uint32(18).string(message.userId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): UnpublishPostRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUnpublishPostRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.postId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.userId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBaseGetPublicPostBySlugRequest(): GetPublicPostBySlugRequest {
+  return { slug: "" };
+}
+
+export const GetPublicPostBySlugRequest: MessageFns<GetPublicPostBySlugRequest> = {
+  encode(message: GetPublicPostBySlugRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.slug !== "") {
+      writer.uint32(10).string(message.slug);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetPublicPostBySlugRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetPublicPostBySlugRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.slug = reader.string();
           continue;
         }
       }
@@ -1012,6 +1175,31 @@ export interface PublicationServiceClient {
    */
 
   updatePost(request: UpdatePostRequest): Observable<Post>;
+
+  /**
+   * Publish a draft/unpublished post as public|unlisted (session 019): sets
+   * status=published, mints an opaque slug (once) + published_at (once), and
+   * requires a public|unlisted visibility. Owner-scoped.
+   */
+
+  publishPost(request: PublishPostRequest): Observable<Post>;
+
+  /**
+   * Unpublish a published post (session 019): status=unpublished; slug +
+   * published_at + visibility are left untouched. Owner-scoped.
+   */
+
+  unpublishPost(request: UnpublishPostRequest): Observable<Post>;
+
+  /**
+   * Public, UNAUTHENTICATED read gate (session 019): returns a post ONLY when it
+   * is published AND visibility is public|unlisted, else NOT_FOUND (draft /
+   * unpublished / private / unknown slug all collapse to NOT_FOUND). Not
+   * owner-scoped (no user_id); the returned Post carries the owner user_id
+   * internally so api-gateway can resolve variant urls.
+   */
+
+  getPublicPostBySlug(request: GetPublicPostBySlugRequest): Observable<Post>;
 }
 
 /**
@@ -1050,11 +1238,45 @@ export interface PublicationServiceController {
    */
 
   updatePost(request: UpdatePostRequest): Promise<Post> | Observable<Post> | Post;
+
+  /**
+   * Publish a draft/unpublished post as public|unlisted (session 019): sets
+   * status=published, mints an opaque slug (once) + published_at (once), and
+   * requires a public|unlisted visibility. Owner-scoped.
+   */
+
+  publishPost(request: PublishPostRequest): Promise<Post> | Observable<Post> | Post;
+
+  /**
+   * Unpublish a published post (session 019): status=unpublished; slug +
+   * published_at + visibility are left untouched. Owner-scoped.
+   */
+
+  unpublishPost(request: UnpublishPostRequest): Promise<Post> | Observable<Post> | Post;
+
+  /**
+   * Public, UNAUTHENTICATED read gate (session 019): returns a post ONLY when it
+   * is published AND visibility is public|unlisted, else NOT_FOUND (draft /
+   * unpublished / private / unknown slug all collapse to NOT_FOUND). Not
+   * owner-scoped (no user_id); the returned Post carries the owner user_id
+   * internally so api-gateway can resolve variant urls.
+   */
+
+  getPublicPostBySlug(request: GetPublicPostBySlugRequest): Promise<Post> | Observable<Post> | Post;
 }
 
 export function PublicationServiceControllerMethods() {
   return function (constructor: Function) {
-    const grpcMethods: string[] = ["health", "createPostFromCluster", "getPost", "listPosts", "updatePost"];
+    const grpcMethods: string[] = [
+      "health",
+      "createPostFromCluster",
+      "getPost",
+      "listPosts",
+      "updatePost",
+      "publishPost",
+      "unpublishPost",
+      "getPublicPostBySlug",
+    ];
     for (const method of grpcMethods) {
       const descriptor: any = Reflect.getOwnPropertyDescriptor(constructor.prototype, method);
       GrpcMethod("PublicationService", method)(constructor.prototype[method], method, descriptor);
@@ -1136,6 +1358,50 @@ export const PublicationServiceService = {
     responseSerialize: (value: Post): Buffer => Buffer.from(Post.encode(value).finish()),
     responseDeserialize: (value: Buffer): Post => Post.decode(value),
   },
+  /**
+   * Publish a draft/unpublished post as public|unlisted (session 019): sets
+   * status=published, mints an opaque slug (once) + published_at (once), and
+   * requires a public|unlisted visibility. Owner-scoped.
+   */
+  publishPost: {
+    path: "/photoops.publication.v1.PublicationService/PublishPost" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: PublishPostRequest): Buffer => Buffer.from(PublishPostRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): PublishPostRequest => PublishPostRequest.decode(value),
+    responseSerialize: (value: Post): Buffer => Buffer.from(Post.encode(value).finish()),
+    responseDeserialize: (value: Buffer): Post => Post.decode(value),
+  },
+  /**
+   * Unpublish a published post (session 019): status=unpublished; slug +
+   * published_at + visibility are left untouched. Owner-scoped.
+   */
+  unpublishPost: {
+    path: "/photoops.publication.v1.PublicationService/UnpublishPost" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: UnpublishPostRequest): Buffer => Buffer.from(UnpublishPostRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): UnpublishPostRequest => UnpublishPostRequest.decode(value),
+    responseSerialize: (value: Post): Buffer => Buffer.from(Post.encode(value).finish()),
+    responseDeserialize: (value: Buffer): Post => Post.decode(value),
+  },
+  /**
+   * Public, UNAUTHENTICATED read gate (session 019): returns a post ONLY when it
+   * is published AND visibility is public|unlisted, else NOT_FOUND (draft /
+   * unpublished / private / unknown slug all collapse to NOT_FOUND). Not
+   * owner-scoped (no user_id); the returned Post carries the owner user_id
+   * internally so api-gateway can resolve variant urls.
+   */
+  getPublicPostBySlug: {
+    path: "/photoops.publication.v1.PublicationService/GetPublicPostBySlug" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: GetPublicPostBySlugRequest): Buffer =>
+      Buffer.from(GetPublicPostBySlugRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): GetPublicPostBySlugRequest => GetPublicPostBySlugRequest.decode(value),
+    responseSerialize: (value: Post): Buffer => Buffer.from(Post.encode(value).finish()),
+    responseDeserialize: (value: Buffer): Post => Post.decode(value),
+  },
 } as const;
 
 export interface PublicationServiceServer extends UntypedServiceImplementation {
@@ -1155,6 +1421,25 @@ export interface PublicationServiceServer extends UntypedServiceImplementation {
    * field (session 018).
    */
   updatePost: handleUnaryCall<UpdatePostRequest, Post>;
+  /**
+   * Publish a draft/unpublished post as public|unlisted (session 019): sets
+   * status=published, mints an opaque slug (once) + published_at (once), and
+   * requires a public|unlisted visibility. Owner-scoped.
+   */
+  publishPost: handleUnaryCall<PublishPostRequest, Post>;
+  /**
+   * Unpublish a published post (session 019): status=unpublished; slug +
+   * published_at + visibility are left untouched. Owner-scoped.
+   */
+  unpublishPost: handleUnaryCall<UnpublishPostRequest, Post>;
+  /**
+   * Public, UNAUTHENTICATED read gate (session 019): returns a post ONLY when it
+   * is published AND visibility is public|unlisted, else NOT_FOUND (draft /
+   * unpublished / private / unknown slug all collapse to NOT_FOUND). Not
+   * owner-scoped (no user_id); the returned Post carries the owner user_id
+   * internally so api-gateway can resolve variant urls.
+   */
+  getPublicPostBySlug: handleUnaryCall<GetPublicPostBySlugRequest, Post>;
 }
 
 export interface MessageFns<T> {

@@ -37,6 +37,27 @@ service PhotoService {
   // (no http annotation) and lean — it must not carry the gallery ListPhotos
   // payload (variants, presigned urls). Consumed by cluster-worker.
   rpc ListPhotoSpacetime(ListPhotoSpacetimeRequest) returns (ListPhotoSpacetimeResponse);
+
+  // Internal batched owner-scoped variant resolution (session 019): given a set
+  // of photo ids, return each owned photo's variant views (short-lived presigned
+  // GET urls — variants only, NEVER originals). Non-owned / unknown ids are
+  // simply absent from the result. Consumed by api-gateway's public post route.
+  // Deliberately NOT gateway-exposed (no http annotation).
+  rpc GetVariantsByIds(GetVariantsByIdsRequest) returns (GetVariantsByIdsResponse);
+}
+
+message GetVariantsByIdsRequest {
+  string user_id = 1;         // owner scope
+  repeated string photo_id = 2;
+}
+
+message PhotoVariantsForId {
+  string photo_id = 1;
+  repeated PhotoVariantView variants = 2;
+}
+
+message GetVariantsByIdsResponse {
+  repeated PhotoVariantsForId results = 1;
 }
 
 message ListPhotoSpacetimeRequest {
