@@ -405,6 +405,66 @@ export async function updatePost(postId: string, patch: UpdatePostPatch): Promis
   return response.json() as Promise<Post>;
 }
 
+// Publish a draft/unpublished post as public|unlisted (session 019). Client call
+// (cookie-authed); the server mints slug + published_at on first publish.
+export async function publishPost(postId: string, visibility: 'public' | 'unlisted'): Promise<Post> {
+  const response = await fetch(`${API_BASE_URL}/v1/posts/${postId}/publish`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ visibility })
+  });
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, `PublishPost failed: ${response.status}`));
+  }
+  return response.json() as Promise<Post>;
+}
+
+export async function unpublishPost(postId: string): Promise<Post> {
+  const response = await fetch(`${API_BASE_URL}/v1/posts/${postId}/unpublish`, {
+    method: 'POST',
+    credentials: 'include'
+  });
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, `UnpublishPost failed: ${response.status}`));
+  }
+  return response.json() as Promise<Post>;
+}
+
+// A published post as seen by an anonymous visitor — no owner/status/visibility
+// fields; photos carry only order/caption + resolved variant urls.
+export interface PublicPostPhoto {
+  order: number;
+  caption: string;
+  variants: { variantType: string; url: string; width: number; height: number }[];
+}
+export interface PublicPost {
+  slug: string;
+  title: string;
+  body: string;
+  locationLabel: string;
+  dateFrom: string;
+  dateTo: string;
+  publishedAt: string;
+  photos: PublicPostPhoto[];
+}
+
+// SERVER-ONLY (session 019): the public SSR page fetches this with NO session
+// cookie against the internal gateway URL (inside docker the web container reaches
+// the gateway by service name, not localhost). 404 → null (→ notFound()); any
+// other non-OK throws (→ Next error boundary / 500, never a fake 404).
+export async function getPublicPost(slug: string): Promise<PublicPost | null> {
+  const base = process.env.API_BASE_URL_INTERNAL ?? API_BASE_URL;
+  const response = await fetch(`${base}/v1/public/posts/${slug}`, { cache: 'no-store' });
+  if (response.status === 404) {
+    return null;
+  }
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, `GetPublicPost failed: ${response.status}`));
+  }
+  return response.json() as Promise<PublicPost>;
+}
+
 export async function uploadFileToPresignedUrl(uploadUrl: string, file: File) {
   const response = await fetch(uploadUrl, {
     method: 'PUT',

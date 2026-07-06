@@ -3,7 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as api from '../../lib/api';
 import { PostEditor } from './PostEditor';
 
-vi.mock('../../lib/api', () => ({ getPost: vi.fn(), updatePost: vi.fn(), listPhotos: vi.fn() }));
+vi.mock('../../lib/api', () => ({
+  getPost: vi.fn(),
+  updatePost: vi.fn(),
+  listPhotos: vi.fn(),
+  publishPost: vi.fn(),
+  unpublishPost: vi.fn()
+}));
 
 function post() {
   return {
@@ -149,5 +155,50 @@ describe('PostEditor', () => {
     vi.mocked(api.getPost).mockRejectedValue(new Error('GetPost failed: 404'));
     render(<PostEditor postId="ghost" />);
     await screen.findByText(/404|could not|not found/i);
+  });
+
+  it('publishes a draft as the selected visibility', async () => {
+    // why: Publish is the atomic transition; the editor sends the chosen visibility.
+    vi.mocked(api.publishPost).mockResolvedValue({
+      ...post(),
+      status: 'published',
+      visibility: 'unlisted',
+      slug: 'tok',
+      publishedAt: 'x'
+    } as never);
+    render(<PostEditor postId="post-1" />);
+    await screen.findByDisplayValue('Trip');
+    fireEvent.change(screen.getByLabelText(/visibility/i), { target: { value: 'unlisted' } });
+    fireEvent.click(screen.getByRole('button', { name: /^publish$/i }));
+    await waitFor(() => expect(api.publishPost).toHaveBeenCalledWith('post-1', 'unlisted'));
+  });
+
+  it('shows the public link + Unpublish and hides Publish once published', async () => {
+    // why: once published the editor surfaces the canonical /posts/<slug> link (share is 020).
+    vi.mocked(api.getPost).mockResolvedValue({
+      ...post(),
+      status: 'published',
+      visibility: 'public',
+      slug: 'tok',
+      publishedAt: 'x'
+    } as never);
+    render(<PostEditor postId="post-1" />);
+    const link = await screen.findByRole('link', { name: /\/posts\/tok|view|public/i });
+    expect(link.getAttribute('href')).toBe('/posts/tok');
+    expect(screen.getByRole('button', { name: /unpublish/i })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /^publish$/i })).toBeNull();
+  });
+
+  it('unpublishes a published post', async () => {
+    vi.mocked(api.getPost).mockResolvedValue({
+      ...post(),
+      status: 'published',
+      slug: 'tok',
+      publishedAt: 'x'
+    } as never);
+    vi.mocked(api.unpublishPost).mockResolvedValue({ ...post(), status: 'unpublished', slug: 'tok' } as never);
+    render(<PostEditor postId="post-1" />);
+    fireEvent.click(await screen.findByRole('button', { name: /unpublish/i }));
+    await waitFor(() => expect(api.unpublishPost).toHaveBeenCalledWith('post-1'));
   });
 });

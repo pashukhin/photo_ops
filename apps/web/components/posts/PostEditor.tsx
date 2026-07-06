@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { getPost, listPhotos, updatePost } from '../../lib/api';
+import { getPost, listPhotos, publishPost, unpublishPost, updatePost } from '../../lib/api';
 import type { PhotoAsset } from '../../lib/api';
 
 // One editable photo row: photo_id is fixed (a member of the post's snapshot),
@@ -24,6 +24,12 @@ export function PostEditor({ postId }: { postId: string }) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // Publish state (session 019).
+  const [status, setStatus] = useState('');
+  const [slug, setSlug] = useState('');
+  const [visibility, setVisibility] = useState<'public' | 'unlisted'>('public');
+  const [publishing, setPublishing] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
 
   useEffect(() => {
     getPost(postId)
@@ -31,6 +37,11 @@ export function PostEditor({ postId }: { postId: string }) {
         setTitle(post.title);
         setBody(post.body);
         setPhotos(post.photos.map((p) => ({ photoId: p.photoId, caption: p.caption })));
+        setStatus(post.status);
+        setSlug(post.slug);
+        if (post.visibility === 'public' || post.visibility === 'unlisted') {
+          setVisibility(post.visibility);
+        }
       })
       .catch((e: unknown) => setLoadError(String(e)));
     // Resolve photo_id → thumbnail like ClusterView; non-fatal on failure.
@@ -75,6 +86,34 @@ export function PostEditor({ postId }: { postId: string }) {
       setSaving(false);
     }
   }, [postId, title, body, photos]);
+
+  const publish = useCallback(async () => {
+    setPublishing(true);
+    setPublishError(null);
+    try {
+      const updated = await publishPost(postId, visibility);
+      setStatus(updated.status);
+      setSlug(updated.slug);
+    } catch (e: unknown) {
+      setPublishError(String(e));
+    } finally {
+      setPublishing(false);
+    }
+  }, [postId, visibility]);
+
+  const unpublish = useCallback(async () => {
+    setPublishing(true);
+    setPublishError(null);
+    try {
+      const updated = await unpublishPost(postId);
+      setStatus(updated.status);
+      setSlug(updated.slug);
+    } catch (e: unknown) {
+      setPublishError(String(e));
+    } finally {
+      setPublishing(false);
+    }
+  }, [postId]);
 
   if (loadError) {
     return (
@@ -168,6 +207,51 @@ export function PostEditor({ postId }: { postId: string }) {
       >
         {saving ? 'Saving…' : 'Save'}
       </button>
+
+      <div className="space-y-2 border-t pt-4">
+        {status === 'published' ? (
+          <>
+            <p className="text-sm">
+              Published ·{' '}
+              <a href={`/posts/${slug}`} className="underline">
+                /posts/{slug}
+              </a>
+            </p>
+            <button
+              type="button"
+              onClick={() => void unpublish()}
+              disabled={publishing}
+              className="border rounded-md px-3 py-1 disabled:opacity-40"
+            >
+              {publishing ? 'Working…' : 'Unpublish'}
+            </button>
+          </>
+        ) : (
+          <>
+            <label className="block">
+              <span className="text-sm font-medium">Visibility</span>
+              <select
+                aria-label="Visibility"
+                value={visibility}
+                onChange={(e) => setVisibility(e.target.value as 'public' | 'unlisted')}
+                className="mt-1 block border rounded-md px-2 py-1"
+              >
+                <option value="public">Public</option>
+                <option value="unlisted">Unlisted</option>
+              </select>
+            </label>
+            <button
+              type="button"
+              onClick={() => void publish()}
+              disabled={publishing}
+              className="border rounded-md px-3 py-1 disabled:opacity-40"
+            >
+              {publishing ? 'Working…' : 'Publish'}
+            </button>
+          </>
+        )}
+        {publishError ? <p className="text-sm text-destructive">{publishError}</p> : null}
+      </div>
     </div>
   );
 }
