@@ -75,4 +75,13 @@ describe('PublicPostPage polish (session 020)', () => {
     render(await PublicPostPage({ params: Promise.resolve({ id: 'tok' }) }));
     expect(screen.getByRole('contentinfo')).toBeTruthy();
   });
+
+  it('renders the empty-body / no-photos edge state', async () => {
+    // why: D5 edge states — a post with no body and no photos still renders its
+    // title + footer (exercises both `: null` branches).
+    vi.mocked(api.getPublicPost).mockResolvedValue({ ...dto, body: '', photos: [] } as never);
+    render(await PublicPostPage({ params: Promise.resolve({ id: 'tok' }) }));
+    expect(screen.getByText('Trip')).toBeTruthy();
+    expect(screen.getByRole('contentinfo')).toBeTruthy();
+  });
 });

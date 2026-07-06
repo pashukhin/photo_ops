@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { getPost, listPhotos, publishPost, unpublishPost, updatePost } from '../../lib/api';
-import type { PhotoAsset } from '../../lib/api';
+import type { PhotoAsset, Post } from '../../lib/api';
+import { canonicalPostUrl, shareText } from '../../lib/share';
 
 // One editable photo row: photo_id is fixed (a member of the post's snapshot),
 // caption + list position are what the editor mutates. Order is the array
@@ -30,6 +31,8 @@ export function PostEditor({ postId }: { postId: string }) {
   const [visibility, setVisibility] = useState<'public' | 'unlisted'>('public');
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
+  // Share (session 020): one shared "Copied" confirmation reused by both buttons.
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     getPost(postId)
@@ -87,11 +90,13 @@ export function PostEditor({ postId }: { postId: string }) {
     }
   }, [postId, title, body, photos]);
 
-  const publish = useCallback(async () => {
+  // Publish/unpublish share the same envelope (x36 #2): toggle publishing, clear
+  // the error, apply the returned status/slug, surface a failure.
+  const runPublishAction = useCallback(async (action: () => Promise<Post>) => {
     setPublishing(true);
     setPublishError(null);
     try {
-      const updated = await publishPost(postId, visibility);
+      const updated = await action();
       setStatus(updated.status);
       setSlug(updated.slug);
     } catch (e: unknown) {
@@ -99,21 +104,21 @@ export function PostEditor({ postId }: { postId: string }) {
     } finally {
       setPublishing(false);
     }
-  }, [postId, visibility]);
+  }, []);
 
-  const unpublish = useCallback(async () => {
-    setPublishing(true);
-    setPublishError(null);
-    try {
-      const updated = await unpublishPost(postId);
-      setStatus(updated.status);
-      setSlug(updated.slug);
-    } catch (e: unknown) {
-      setPublishError(String(e));
-    } finally {
-      setPublishing(false);
-    }
-  }, [postId]);
+  const publish = useCallback(
+    () => runPublishAction(() => publishPost(postId, visibility)),
+    [runPublishAction, postId, visibility]
+  );
+
+  const unpublish = useCallback(() => runPublishAction(() => unpublishPost(postId)), [runPublishAction, postId]);
+
+  // Copy text to the clipboard and flash a shared, self-reverting confirmation.
+  const copy = useCallback(async (text: string) => {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }, []);
 
   if (loadError) {
     return (
@@ -211,12 +216,29 @@ export function PostEditor({ postId }: { postId: string }) {
       <div className="space-y-2 border-t pt-4">
         {status === 'published' ? (
           <>
-            <p className="text-sm">
-              Published ·{' '}
-              <a href={`/posts/${slug}`} className="underline">
-                /posts/{slug}
-              </a>
-            </p>
+            <p className="text-sm text-muted-foreground">Published</p>
+            <a href={canonicalPostUrl(slug)} className="block text-sm underline break-all">
+              {canonicalPostUrl(slug)}
+            </a>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void copy(canonicalPostUrl(slug))}
+                className="border rounded-md px-3 py-1 text-sm"
+              >
+                Copy link
+              </button>
+              <button
+                type="button"
+                onClick={() => void copy(shareText({ title, body, slug }))}
+                className="border rounded-md px-3 py-1 text-sm"
+              >
+                Copy share text
+              </button>
+              <span role="status" aria-live="polite" className="text-sm text-muted-foreground">
+                {copied ? 'Copied' : ''}
+              </span>
+            </div>
             <button
               type="button"
               onClick={() => void unpublish()}

@@ -501,9 +501,12 @@ export interface PostSummary {
   updatedAt: string;
 }
 
-// GREEN obligation (session 020): GET `${API_BASE_URL}/v1/posts` with credentials
-// and return { posts: body.posts ?? [] } (throw readErrorMessage on !ok).
+// GET the owner's posts (owner-scoped at the gateway) — the "My posts" listing.
 export async function listPosts(): Promise<{ posts: PostSummary[] }> {
-  await Promise.resolve();
-  throw new Error('not implemented');
+  const response = await fetch(`${API_BASE_URL}/v1/posts`, { credentials: 'include', cache: 'no-store' });
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, `ListPosts failed: ${response.status}`));
+  }
+  const body = (await response.json()) as { posts?: PostSummary[] };
+  return { posts: body.posts ?? [] };
 }

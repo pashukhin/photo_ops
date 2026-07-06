@@ -1,15 +1,28 @@
 // Pure share helpers (session 020). WEB_ORIGIN is build-time-inlined by next build;
 // the code default is the effective value (see design D1). No window / no I/O.
-const WEB_ORIGIN = process.env.NEXT_PUBLIC_WEB_ORIGIN ?? 'http://localhost:3000';
+// The one canonical public origin — also used server-side for og:url/metadataBase.
+export const WEB_ORIGIN = process.env.NEXT_PUBLIC_WEB_ORIGIN ?? 'http://localhost:3000';
 
+// The canonical, absolute public URL of a published post (stable/immutable slug).
 export function canonicalPostUrl(slug: string): string {
-  throw new Error(`not implemented: ${WEB_ORIGIN} ${slug}`);
+  return `${WEB_ORIGIN}/posts/${slug}`;
 }
 
+// A single-line, length-bounded summary of a post body for the share text and
+// og:description. Collapses whitespace; empty when the body is blank; appends an
+// ellipsis only when it actually truncates.
 export function shortDescription(body: string, max = 140): string {
-  throw new Error(`not implemented: ${body.length} ${max}`);
+  const oneLine = body.replace(/\s+/g, ' ').trim();
+  if (!oneLine) return '';
+  return oneLine.length > max ? `${oneLine.slice(0, max)}…` : oneLine;
 }
 
+// The generated share text: `New photo story: <title>\n<short desc>\n<link>`.
+// The description line is omitted when the body is blank; title falls back.
 export function shareText(input: { title: string; body: string; slug: string }): string {
-  throw new Error(`not implemented: ${input.slug}`);
+  const desc = shortDescription(input.body);
+  const lines = [`New photo story: ${input.title || 'Untitled story'}`];
+  if (desc) lines.push(desc);
+  lines.push(canonicalPostUrl(input.slug));
+  return lines.join('\n');
 }

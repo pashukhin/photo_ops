@@ -1,14 +1,32 @@
+import { cache } from 'react';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getPublicPost } from '@/lib/api';
 import type { PublicPostPhoto } from '@/lib/api';
+import { WEB_ORIGIN, canonicalPostUrl, shortDescription } from '@/lib/share';
+
+// generateMetadata and the page both need the post; cache() dedupes the fetch
+// within one request (no memo outside a render — harmless for the unit tests).
+const getPublicPostCached = cache(getPublicPost);
 
 // Text Open Graph + Twitter meta so a shared link previews with title + description
-// (session 020, D4). No og:image (deferred, photo_ops-278). GREEN wires a React
-// cache()-wrapped getPublicPost shared with the page + a safe 404 branch.
+// (session 020, D4). No og:image (deferred, photo_ops-278). A missing/unpublished
+// slug returns a safe object (the page component 404s — never throws here).
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
-  const { id } = await params;
-  throw new Error(`not implemented: ${id}`);
+  const { id: slug } = await params;
+  const post = await getPublicPostCached(slug);
+  if (!post) {
+    return { title: 'Story not found' };
+  }
+  const title = post.title || 'Untitled story';
+  const description = shortDescription(post.body);
+  return {
+    title: `${title} · Photo Ops`,
+    description,
+    metadataBase: new URL(WEB_ORIGIN),
+    openGraph: { title, description, url: canonicalPostUrl(slug), type: 'article' },
+    twitter: { card: 'summary' }
+  };
 }
 
 // Public, anonymous, server-rendered post page (session 019). Lives OUTSIDE the
@@ -37,7 +55,7 @@ function dateRange(from: string, to: string): string | null {
 // different param names at the same path position. The value IS the opaque slug.
 export default async function PublicPostPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: slug } = await params;
-  const post = await getPublicPost(slug);
+  const post = await getPublicPostCached(slug);
   if (!post) {
     // A missing/unpublished/private slug is a 404 — NOT a 500. A backend failure
     // (getPublicPost throws) propagates to the error boundary instead.
@@ -45,35 +63,60 @@ export default async function PublicPostPage({ params }: { params: Promise<{ id:
   }
 
   const range = dateRange(post.dateFrom, post.dateTo);
+  const meta = [post.locationLabel, range].filter(Boolean).join(' · ');
 
   return (
-    <article className="mx-auto max-w-2xl px-4 py-10 space-y-6">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-semibold">{post.title || 'Untitled story'}</h1>
-        {(range || post.locationLabel) && (
-          <p className="text-sm text-muted-foreground">
-            {[post.locationLabel, range].filter(Boolean).join(' · ')}
-          </p>
-        )}
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
+      <header className="border-b">
+        <div className="mx-auto flex max-w-2xl items-center px-4 py-4">
+          <a href="/" className="text-sm font-semibold tracking-tight">
+            Photo Ops
+          </a>
+        </div>
       </header>
 
-      {post.body ? <p className="whitespace-pre-wrap leading-relaxed">{post.body}</p> : null}
+      <main className="flex-1">
+        <article className="mx-auto max-w-2xl px-4 py-12 space-y-8">
+          <header className="space-y-2">
+            <h1 className="text-3xl font-semibold leading-tight tracking-tight">
+              {post.title || 'Untitled story'}
+            </h1>
+            {meta && <p className="text-sm text-muted-foreground">{meta}</p>}
+          </header>
 
-      <div className="space-y-6">
-        {post.photos.map((photo, index) => {
-          const url = variantUrl(photo);
-          return (
-            <figure key={index} className="space-y-1">
-              {url ? (
-                <img src={url} alt={photo.caption || `Photo ${index + 1}`} className="w-full rounded-md" />
-              ) : null}
-              {photo.caption ? (
-                <figcaption className="text-sm text-muted-foreground">{photo.caption}</figcaption>
-              ) : null}
-            </figure>
-          );
-        })}
-      </div>
-    </article>
+          {post.body ? (
+            <p className="whitespace-pre-wrap text-lg leading-relaxed text-foreground/90">{post.body}</p>
+          ) : null}
+
+          {post.photos.length > 0 ? (
+            <div className="space-y-8">
+              {post.photos.map((photo, index) => {
+                const url = variantUrl(photo);
+                return (
+                  <figure key={index} className="space-y-2">
+                    {url ? (
+                      <img
+                        src={url}
+                        alt={photo.caption || `Photo ${index + 1}`}
+                        className="w-full rounded-lg shadow-sm"
+                      />
+                    ) : null}
+                    {photo.caption ? (
+                      <figcaption className="text-sm text-muted-foreground">{photo.caption}</figcaption>
+                    ) : null}
+                  </figure>
+                );
+              })}
+            </div>
+          ) : null}
+        </article>
+      </main>
+
+      <footer role="contentinfo" className="border-t">
+        <div className="mx-auto max-w-2xl px-4 py-8 text-sm text-muted-foreground">
+          Published on Photo Ops
+        </div>
+      </footer>
+    </div>
   );
 }
