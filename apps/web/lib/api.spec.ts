@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { completeUpload, createPost, createUploadIntent, generateClusters, getClusteringResult, getPhoto, getPost, getUsageSummary, listClusteringMethods, listClusteringResults, listPhotos, listUsageEvents, signUp, updatePost, uploadFileToPresignedUrl } from './api';
+import { completeUpload, createPost, createUploadIntent, generateClusters, getClusteringResult, getPhoto, getPost, getUsageSummary, listClusteringMethods, listClusteringResults, listPhotos, listPosts, listUsageEvents, signUp, updatePost, uploadFileToPresignedUrl } from './api';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -219,5 +219,25 @@ describe('web API helper', () => {
   it('getPost throws on a non-ok response (session 018)', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('nope', { status: 404 }));
     await expect(getPost('ghost')).rejects.toThrow(/GetPost failed/);
+  });
+
+  it('listPosts GETs /v1/posts with credentials and returns posts (session 020)', async () => {
+    // why: the owner "My posts" listing reads the owner-scoped summary list.
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ posts: [{ id: 'post-1', title: 'Trip', status: 'published' }] }))
+    );
+    const result = await listPosts();
+    expect(result).toEqual({ posts: [{ id: 'post-1', title: 'Trip', status: 'published' }] });
+    expect(fetchMock).toHaveBeenCalledWith('http://localhost:3001/v1/posts', expect.objectContaining({ credentials: 'include' }));
+  });
+
+  it('listPosts defaults to [] when the body has no posts (session 020)', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({})));
+    await expect(listPosts()).resolves.toEqual({ posts: [] });
+  });
+
+  it('listPosts throws on a non-ok response (session 020)', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('nope', { status: 500 }));
+    await expect(listPosts()).rejects.toThrow(/ListPosts failed/);
   });
 });

@@ -484,3 +484,26 @@ async function readErrorMessage(response: Response, fallback: string) {
     return fallback;
   }
 }
+
+// --- Owner post listing (session 020) ---------------------------------------
+
+// A post as it appears in the owner's "My posts" list — the gateway's mapSummary
+// shape. No slug (rows link to the editor); no photos/body.
+export interface PostSummary {
+  id: string;
+  title: string;
+  status: string;
+  visibility: string;
+  dateFrom: string;
+  dateTo: string;
+  photoCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// GREEN obligation (session 020): GET `${API_BASE_URL}/v1/posts` with credentials
+// and return { posts: body.posts ?? [] } (throw readErrorMessage on !ok).
+export async function listPosts(): Promise<{ posts: PostSummary[] }> {
+  await Promise.resolve();
+  throw new Error('not implemented');
+}
