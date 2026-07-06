@@ -167,10 +167,20 @@ then **throws** (`apps/photo-service/src/app.module.ts`,
 (a root provider injecting the emitter) resolve the bus at boot, so a down broker
 would crash-loop the whole service and take *every* post RPC offline — including the
 public `GetPublicPostBySlug`, which emits nothing. That is a strictly larger blast
-radius than the "lose one event" this best-effort design accepts. Therefore the
-publisher **connects lazily** (no connect at `bootstrap()`; first connect attempt on
-first emit, cached/reconnecting thereafter) and **every emit is guarded** (try/catch,
-logged) — a broker outage never blocks boot or any RPC. `UnpublishPost` emits nothing.
+radius than the "lose one event" this best-effort design accepts. Therefore:
+
+- **No connect at `bootstrap()`** — the publisher connects **lazily** on first emit.
+- **The emit is fire-and-forget** — dispatched after commit and **not awaited** on
+  the `PublishPost` request path (the RPC returns on the DB commit; the emit runs
+  detached, its promise `.catch()`-guarded and logged). This matters because a lazy
+  connect on the request path would otherwise add the adapter's retry latency to the
+  RPC. The lazy connect itself must be **bounded** (short timeout / few attempts, NOT
+  the adapter's default 15×2s ≈ 30s) so a detached emit against a down broker fails
+  fast instead of spinning.
+- **Cached connection, no auto-reconnect.** The existing `RabbitMqBus` has no
+  reconnect (its own comment: "stops until the process is restarted"); `on('close')`
+  only logs. So after a broker drop, subsequent emits are lost until a restart — an
+  accepted MVP posture, not something 019 fixes. `UnpublishPost` emits nothing.
 
 ### D7 — editor Publish UX
 
@@ -202,14 +212,28 @@ The existing owner editor (`app/(app)/posts/[id]/edit`) gains:
   `GetVariantsByIdsResponse{ repeated PhotoVariantsForId }`,
   `PhotoVariantsForId{ string photo_id, repeated PhotoVariantView variants }`.
   Internal (no HTTP annotation, like `ListPhotoSpacetime`).
-- Regenerate via `make proto`; commit `packages/proto-ts` in the same change.
-  (Note: `make proto-check` can't run locally — BSR rate-limit on the remote
-  ts-proto plugin; drift is proven by a clean working tree on generated artifacts;
-  full check runs in CI.)
+- Regenerate via `make proto`; commit the changed `packages/proto-ts` artifacts in
+  the same change. **Adding these RPCs *will* change the checked-in generated files**
+  (`packages/proto-ts/src/{publication,photo}/v1/*.ts`), and CI's `proto-check`
+  git-diffs them — so a *clean* tree after a proto edit means you failed to
+  regenerate (stale artifacts → CI red), the opposite of drift-free. The wrinkle:
+  `make proto` uses the **remote** BSR plugin (`buf.build/community/stephenh-ts-proto`)
+  and can be rate-limited, so regeneration itself (not just the check) may need
+  retries. Nothing fails to *compile* locally — all three services use runtime
+  `@grpc/proto-loader` + `@GrpcMethod` string handlers and `usage.codec` uses runtime
+  protobufjs — so the only failure surface is CI `proto-check` on stale committed
+  artifacts. Do not treat local regeneration as optional; retry until it succeeds.
 
 ### publication-service
 
 - `db/schema.ts` + new migration `0002_*`: add a `UNIQUE` index on `posts.slug`.
+  **Also edit the `migrate-publication` Makefile target** (`Makefile`) to pipe
+  `0002` after `0001` — today it lists only `0001`, so a new migration file is
+  silently never applied (migrations run manually via `make migrate`, not at boot;
+  cf. `migrate-photo`, which lists both). Without this the UNIQUE index D2 leans on
+  is absent in dev and in the smoke, and — because the index is purely defensive
+  (token entropy carries uniqueness) — everything still goes green, so the miss is
+  invisible. Model the target edit on `migrate-photo`.
 - `post.types.ts`: `PostPatch` gains `status?`, `slug?`, `publishedAt?`.
 - `post.repository.ts`: extend `updateForUser`'s set-builder to carry
   `status`/`slug`/`publishedAt`; add `findBySlugPublic(slug)` (not owner-scoped;
@@ -263,7 +287,9 @@ The existing owner editor (`app/(app)/posts/[id]/edit`) gains:
   range / `location_label` (if set) / photos (variant `<img>` + caption);
   **only** a 404 → `notFound()`; any other non-OK status throws → Next error
   boundary / 500 (a 404 means "no such published post", a 500 means "backend
-  problem" — the two must not be conflated). `force-dynamic`.
+  problem" — the two must not be conflated). `force-dynamic`. (Known noise: the root
+  `SessionProvider` still hydrates on this page and fires an anonymous
+  `getCurrentUser` → 401 + a client `console.warn`; harmless, not fixed in 019.)
 - `.env.example` + `docker-compose`: `API_BASE_URL_INTERNAL=http://api-gateway:3001`
   on the `web` service; add `RABBITMQ_URL` + `depends_on: rabbitmq` (or its
   healthcheck equivalent) to the `publication-service` block — today it has neither
@@ -289,19 +315,25 @@ replace-all 500 slipped past mocks).
   `publishPost`; published panel shows the `/posts/<slug>` link + Unpublish.
   (The server-component public page is exercised by the live smoke, not jsdom.)
 - **dqb / live smoke:** extend `scripts/smoke-publication.sh` (or a new
-  `scripts/smoke-public.sh`): create → publish → `GET /posts/<slug>` **logged-out**
-  → 200; unpublish → `GET /posts/<slug>` → 404. Because the server-component render
-  path has **no jsdom coverage**, the smoke must assert more than a status code — it
-  must confirm the logged-out response carries a **resolvable variant URL** (fetch
-  one variant URL from the public payload and assert it returns image bytes), the
-  s018 dqb lesson applied to the wire boundary. Then `make gate` +
-  `make coverage-gate` + `make test-guard`; final `/code-review`.
+  `scripts/smoke-public.sh`; the current smoke is cookie-authed on every curl —
+  "logged-out" = simply omit `-b $COOKIE`). Two distinct surfaces, don't conflate:
+  - **gateway JSON** `GET :3001/v1/public/posts/<slug>` logged-out → 200 with a DTO
+    carrying variant URLs; **fetch one of those variant URLs and assert image bytes**
+    (this is the resolvable-variant assertion — the s018 dqb lesson at the wire
+    boundary; the server-component render path has no jsdom coverage). Presigned URLs
+    are on `MINIO_BROWSER_ENDPOINT`, host-reachable as existing smokes already rely on.
+  - **web SSR page** `GET :3000/posts/<slug>` logged-out → 200 HTML (optionally scrape
+    an `<img src>`); after unpublish → 404 on both surfaces.
+
+  Then `make gate` + `make coverage-gate` + `make test-guard`; final `/code-review`.
 
 ## Order
 
 New branch `session-019-publish-public` from fresh `main`; claim `m71.4`
 (opportunistically `e9g #1`). brainstorm doc (this) → **skeleton** commit (proto
-delta for publication + photo, gateway public route stub, web public route stub,
-messaging skeleton, RED/jsdom tests; `make skeleton-gate` green) → **GREEN** →
-gates + coverage-gate + test-guard + live smoke (publish → logged-out
-`/posts/<slug>` — the dqb boundary) → `/code-review`.
+delta for publication + photo **+ regenerated `packages/proto-ts` — retry `make
+proto` past BSR rate-limits until artifacts actually change**; migration `0002` +
+`migrate-publication` Makefile target; gateway public route stub, web public route
+stub, messaging skeleton; RED/jsdom tests; `make skeleton-gate` green) → **GREEN**
+→ gates + coverage-gate + test-guard + live smoke (publish → logged-out
+`/posts/<slug>` + resolvable variant bytes — the dqb boundary) → `/code-review`.
