@@ -36,4 +36,16 @@ describe('publish/unpublish/getPublicPost api', () => {
     stubFetch({ ok: false, status: 404 });
     expect(await getPublicPost('ghost')).toBeNull();
   });
+
+  it('throws on a non-ok publish / unpublish / getPublicPost (non-404)', async () => {
+    // why: a failed publish/unpublish surfaces; a 5xx public read is NOT a 404.
+    stubFetch({ ok: false, status: 400, text: () => Promise.resolve('bad') });
+    await expect(publishPost('post-1', 'public')).rejects.toThrow(/PublishPost failed|bad/);
+
+    stubFetch({ ok: false, status: 500, text: () => Promise.resolve('boom') });
+    await expect(unpublishPost('post-1')).rejects.toThrow(/UnpublishPost failed|boom/);
+
+    stubFetch({ ok: false, status: 500, text: () => Promise.resolve('down') });
+    await expect(getPublicPost('tok')).rejects.toThrow(/GetPublicPost failed|down/);
+  });
 });

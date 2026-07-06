@@ -302,6 +302,16 @@ describe('PublicationGrpcController', () => {
     expect(res.status).toBe(3); // UNPUBLISHED
   });
 
+  it('UnpublishPost: maps a "post not found" domain error to NOT_FOUND', async () => {
+    // why: an owner-scoped unpublish that misses must surface as a 404.
+    const unpublishPost = vi.fn().mockRejectedValue(new Error('post not found'));
+    const { controller } = createController({ unpublishPost });
+    await expect(controller.unpublishPost({ postId: 'ghost', userId: 'user-1' })).rejects.toBeInstanceOf(RpcException);
+    await controller.unpublishPost({ postId: 'ghost', userId: 'user-1' }).catch((err: RpcException) => {
+      expect((err.getError() as { code: number }).code).toBe(status.NOT_FOUND);
+    });
+  });
+
   it('GetPublicPostBySlug: returns the proto post; a miss is NOT_FOUND', async () => {
     // why: the public read gate — a hit maps to proto; a miss (draft/unpublished/
     // private/unknown) is NOT_FOUND → the gateway 404.

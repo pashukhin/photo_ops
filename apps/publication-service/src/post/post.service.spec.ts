@@ -408,9 +408,22 @@ describe('PostDomainService.publishPost', () => {
     await expect(service.publishPost('user-1', 'ghost', 'public')).rejects.toThrow('post not found');
   });
 
+  it('rejects when the post vanishes between read and update (TOCTOU)', async () => {
+    // why: the post existed at the membership read but updateForUser matched no row
+    // (deleted/unowned in between) → not found, not a silent success.
+    const { service } = createService({
+      repository: {
+        findByIdForUser: vi.fn().mockResolvedValue(makePostRecord()),
+        updateForUser: vi.fn().mockResolvedValue(null)
+      }
+    });
+    await expect(service.publishPost('user-1', 'post-1', 'public')).rejects.toThrow('post not found');
+  });
+
   it('still resolves when the usage emit fails (fire-and-forget, best-effort)', async () => {
     // why: D6 — usage is a side channel; a broker/emit failure must NOT fail or
-    // roll back publish. The emit is dispatched, its rejection swallowed.
+    // roll back publish. The emit is dispatched, its rejection swallowed + logged.
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const updateForUser = vi.fn().mockResolvedValue(makePostRecord({ status: 'published', visibility: 'public' }));
     const { service, usage } = createService({
       repository: { findByIdForUser: vi.fn().mockResolvedValue(makePostRecord()), updateForUser }
@@ -419,6 +432,9 @@ describe('PostDomainService.publishPost', () => {
 
     await expect(service.publishPost('user-1', 'post-1', 'public')).resolves.toBeDefined();
     expect(usage.emitPostPublished).toHaveBeenCalled();
+    // fire-and-forget: flush the detached rejection handler (it logs, not throws).
+    await vi.waitFor(() => expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('post_published')));
+    errorSpy.mockRestore();
   });
 });
 

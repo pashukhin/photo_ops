@@ -19,7 +19,9 @@ const dto = {
   dateTo: '2024-06-15T10:05:00.000Z',
   publishedAt: '2026-07-06T00:00:00.000Z',
   photos: [
-    { order: 0, caption: 'first', variants: [{ variantType: 'thumbnail', url: 'http://img/p1', width: 40, height: 40 }] }
+    { order: 0, caption: 'first', variants: [{ variantType: 'thumbnail', url: 'http://img/p1', width: 40, height: 40 }] },
+    // a photo with no resolved variant + no caption exercises the empty branches
+    { order: 1, caption: '', variants: [] }
   ]
 };
 

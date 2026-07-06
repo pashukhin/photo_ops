@@ -6,7 +6,3 @@ export interface BusMessage {
 export interface MessagePublisher {
   publish(destination: string, msg: BusMessage): Promise<void>;
 }
-
-// DI token for the publisher port. The bound adapter (LazyRabbitMqPublisher) is
-// swapped at the module level without touching business code.
-export const MESSAGE_PUBLISHER = 'MESSAGE_PUBLISHER';

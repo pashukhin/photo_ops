@@ -201,4 +201,21 @@ describe('PostEditor', () => {
     fireEvent.click(await screen.findByRole('button', { name: /unpublish/i }));
     await waitFor(() => expect(api.unpublishPost).toHaveBeenCalledWith('post-1'));
   });
+
+  it('surfaces a publish failure without losing the editor', async () => {
+    // why: a failed Publish shows the error, editor stays mounted.
+    vi.mocked(api.publishPost).mockRejectedValue(new Error('publish boom'));
+    render(<PostEditor postId="post-1" />);
+    fireEvent.click(await screen.findByRole('button', { name: /^publish$/i }));
+    await screen.findByText(/publish boom/);
+    expect(screen.getByDisplayValue('Trip')).toBeTruthy();
+  });
+
+  it('surfaces an unpublish failure', async () => {
+    vi.mocked(api.getPost).mockResolvedValue({ ...post(), status: 'published', slug: 'tok', publishedAt: 'x' } as never);
+    vi.mocked(api.unpublishPost).mockRejectedValue(new Error('unpublish boom'));
+    render(<PostEditor postId="post-1" />);
+    fireEvent.click(await screen.findByRole('button', { name: /unpublish/i }));
+    await screen.findByText(/unpublish boom/);
+  });
 });
