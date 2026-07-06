@@ -40,16 +40,26 @@ export class LazyRabbitMqPublisher implements MessagePublisher {
   }
 
   async publish(destination: string, msg: BusMessage): Promise<void> {
-    const bus = await this.connect();
+    // Capture the exact promise this call uses so the error path resets/closes
+    // THIS bus, not whatever the cache points to later (see the concurrency note).
+    const busPromise = this.connect();
+    const bus = await busPromise;
     try {
       await bus.publish(destination, msg);
     } catch (err) {
-      // A publish failure usually means the cached connection/channel died (a
-      // broker blip; RabbitMqBus has no auto-reconnect). Drop the cache so the
-      // NEXT emit reconnects instead of forever retrying a dead channel — one
-      // event is lost, not every future event. The caller emits fire-and-forget,
-      // so this rejection is swallowed.
-      this.busPromise = null;
+      // A publish failure usually means this connection/channel died (a broker
+      // blip; RabbitMqBus has no auto-reconnect). Reset the cache so the NEXT emit
+      // reconnects instead of forever retrying a dead channel — one event is lost,
+      // not every future event. The caller emits fire-and-forget, so this
+      // rejection is swallowed.
+      //   - Only clear the cache if it still points to THIS bus: a concurrent emit
+      //     may already have reconnected to a healthy bus, which we must not clobber.
+      //   - Close THIS (dead) bus so a channel-only error doesn't orphan its still-
+      //     open TCP connection. Best-effort — ignore close errors.
+      if (this.busPromise === busPromise) {
+        this.busPromise = null;
+      }
+      void bus.close().catch(() => {});
       throw err;
     }
   }
