@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as api from '../../lib/api';
 import { PostEditor } from './PostEditor';
@@ -183,8 +183,8 @@ describe('PostEditor', () => {
       publishedAt: 'x'
     } as never);
     render(<PostEditor postId="post-1" />);
-    const link = await screen.findByRole('link', { name: /\/posts\/tok|view|public/i });
-    expect(link.getAttribute('href')).toBe('/posts/tok');
+    const link = await screen.findByRole('link', { name: /localhost:3000\/posts\/tok/i });
+    expect(link.getAttribute('href')).toBe('http://localhost:3000/posts/tok');
     expect(screen.getByRole('button', { name: /unpublish/i })).toBeTruthy();
     expect(screen.queryByRole('button', { name: /^publish$/i })).toBeNull();
   });
@@ -217,5 +217,80 @@ describe('PostEditor', () => {
     render(<PostEditor postId="post-1" />);
     fireEvent.click(await screen.findByRole('button', { name: /unpublish/i }));
     await screen.findByText(/unpublish boom/);
+  });
+});
+
+// --- session 020: copy-link / share ----------------------------------------
+// Reuses the top-level imports + the post() fixture. jsdom has no
+// navigator.clipboard — DEFINE it (vi.spyOn on undefined throws).
+describe('PostEditor share (published)', () => {
+  const writeText = vi.fn();
+  beforeEach(() => {
+    writeText.mockReset();
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    vi.mocked(api.getPost).mockResolvedValue({
+      ...post(),
+      title: 'Summer Crimea',
+      body: 'Three days by the sea',
+      status: 'published',
+      visibility: 'public',
+      slug: 'tok',
+      publishedAt: 'x'
+    } as never);
+  });
+
+  it('shows the absolute canonical URL and Copy buttons once published', async () => {
+    // why: m71.5 RED — a published post exposes the canonical public URL to copy.
+    render(<PostEditor postId="post-1" />);
+    const link = await screen.findByRole('link', { name: /localhost:3000\/posts\/tok/i });
+    expect(link.getAttribute('href')).toBe('http://localhost:3000/posts/tok');
+    expect(screen.getByRole('button', { name: /copy link/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /copy share text/i })).toBeTruthy();
+  });
+
+  it('Copy link writes only the canonical URL to the clipboard', async () => {
+    render(<PostEditor postId="post-1" />);
+    fireEvent.click(await screen.findByRole('button', { name: /copy link/i }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('http://localhost:3000/posts/tok'));
+  });
+
+  it('Copy share text writes the full generated template', async () => {
+    render(<PostEditor postId="post-1" />);
+    fireEvent.click(await screen.findByRole('button', { name: /copy share text/i }));
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith(
+        'New photo story: Summer Crimea\nThree days by the sea\nhttp://localhost:3000/posts/tok'
+      )
+    );
+  });
+
+  it('shows a transient "Copied" confirmation that reverts', async () => {
+    // why: feedback that the copy happened; the setTimeout revert must be covered
+    // (100% diff-cover). Let the async load settle under REAL timers first, then
+    // switch to fake timers only for the revert — findBy* + fake timers deadlock.
+    render(<PostEditor postId="post-1" />);
+    const btn = await screen.findByRole('button', { name: /copy link/i });
+    vi.useFakeTimers();
+    try {
+      fireEvent.click(btn);
+      await act(async () => {}); // flush the awaited clipboard.writeText microtask
+      expect(screen.getByText(/copied/i)).toBeTruthy();
+      await act(async () => {
+        vi.advanceTimersByTime(2500); // fire the revert setTimeout
+        await Promise.resolve(); // flush the state update it schedules
+      });
+      expect(screen.queryByText(/copied/i)).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('hides the copy affordance on a draft', async () => {
+    // why: share is only for a published post.
+    vi.mocked(api.getPost).mockResolvedValue({ ...post(), title: 'Summer Crimea', status: 'draft', slug: '' } as never);
+    render(<PostEditor postId="post-1" />);
+    await screen.findByDisplayValue('Summer Crimea');
+    expect(screen.queryByRole('button', { name: /copy link/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /copy share text/i })).toBeNull();
   });
 });
