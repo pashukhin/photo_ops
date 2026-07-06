@@ -113,9 +113,11 @@ the truncation rule lives once.
 
 `app/posts/[id]/page.tsx` gains a `generateMetadata({ params })` exporting:
 `title` (`<post.title> · Photo Ops`, fallback `Untitled story`; brand string
-matches the AppShell's `Photo Ops`), `og:title`,
-`og:description` = `shortDescription(post.body)`, `og:type='article'`, `og:url` =
-canonical, `twitter:card='summary'`, and `metadataBase = new URL(WEB_ORIGIN)`.
+matches the AppShell's `Photo Ops`), `description` = `shortDescription(post.body)`
+(the plain `<meta name="description">` — otherwise the public page inherits the
+root layout's generic app description), `og:title`, `og:description` =
+`shortDescription(post.body)`, `og:type='article'`, `og:url` = canonical,
+`twitter:card='summary'`, and `metadataBase = new URL(WEB_ORIGIN)`.
 
 **No `og:image`** — deferred (`photo_ops-278`): variant URLs are short-lived
 presigned GETs (~1h TTL), so an og:image would break the stable-link promise, and
@@ -238,7 +240,10 @@ revert timer callback).
     success **and** catch branches). **Clipboard mocking:** jsdom has no
     `navigator.clipboard`, so `vi.spyOn` throws — the test must *define* it:
     `Object.defineProperty(navigator, 'clipboard', { value: { writeText: vi.fn() },
-    configurable: true })` with an `afterEach` restore.
+    configurable: true })` with an `afterEach` restore. Also: the existing
+    assertion on the published panel's **relative** `href='/posts/<slug>'` must be
+    **updated** to the absolute `canonicalPostUrl` (same `it` — an edit, not a
+    removal → no `Allow-test-removal` trailer; mp0 not tripped).
   - `app/posts/[id]/page.spec.tsx` (extend): `generateMetadata` returns
     `og:title`/`og:description`/`og:url`/`og:type` + `twitter:card` for a found
     post, and a safe object (no throw) for a 404 slug; the render shows the new
@@ -258,15 +263,22 @@ revert timer callback).
   - **`scripts/smoke-publication.sh` (curl, already owns publish→public→unpublish):**
     it already publishes, captures the slug, curls the web SSR page
     `GET :3000/posts/$SLUG` → 200 (line ~254) and asserts unpublish → 404 on both
-    surfaces. Add there: **grep the fetched SSR HTML for `<meta property="og:title"`**
-    (the cheapest home — the HTML is already in hand; D5 also changes this HTML, so
-    re-run it). This curl (no `-b` cookie) is the honest **logged-out** check — the
-    public SSR page fetches anonymously server-side regardless of any browser cookie.
+    surfaces. Add there: **capture the SSR body and grep it for
+    `<meta property="og:title"`**. Note the existing line ~254 uses
+    `curl -s -o /dev/null -w '%{http_code}'`, which **discards the body** — so the
+    grep is NOT a one-liner over an existing variable; add a body-capturing curl
+    (`curl -fsS -o "$HTML" "$WEB_BASE_URL/posts/$SLUG"` then `grep -q 'property="og:title"' "$HTML"`).
+    D5 also changes this HTML. This curl (no `-b` cookie) is the honest
+    **logged-out** check — the public SSR page fetches anonymously server-side
+    regardless of any browser cookie.
   - **`apps/web/smoke/post-editor.smoke.ts` (Playwright):** scope the extension to
     the genuinely UI-render pieces the curl smoke can't reach — drive **Publish** in
     the browser, then assert the published panel shows the canonical URL + **both**
-    Copy buttons, and that `/posts` (owner) lists the post. (Draft-hidden is covered
-    in jsdom; don't claim "logged-out" here — the public render is cookie-independent.)
+    Copy buttons, and that `/posts` (owner) lists the post. Also **navigate to the
+    public `/posts/<slug>` and assert the polished page renders** (a header / an
+    `<img>`) — this gives **D5** a live in-browser render (the s018/`fth` lesson:
+    jsdom misses Tailwind-generation bugs). (Draft-hidden is covered in jsdom; don't
+    claim "logged-out" here — the public render is cookie-independent.)
 
   Then `make gate` + `make coverage-gate` + `make test-guard`; final `/code-review`.
 
@@ -308,3 +320,16 @@ og-in-SSR-HTML — were verified correct):
 - `cache()` dedup marked as a live-smoke property (do not assert in unit tests).
 - Nits: brand `· Photo Ops` (matches AppShell); runbook says sign up if the demo
   user is absent (no seed yet).
+
+A **second** independent review verified all six fixes are grounded and found no
+blockers / no contradictions (route layout, `title` merge with the root layout,
+`metadataBase`, no-proto-change all re-confirmed). Its low findings folded in:
+- **N1**: `smoke-publication.sh:254` discards the body (`-o /dev/null`) — the
+  og:title grep needs a body-capturing curl first (corrected in Testing).
+- **N2**: the existing `PostEditor.spec.tsx` relative-`href` assertion must be
+  edited to the absolute URL (noted; not a removal → mp0 safe).
+- **N3**: also set the plain `description` in `generateMetadata` (added to D4).
+- **N4**: Playwright now navigates the public page so **D5** gets a live render.
+- **N5** (not actioned, pre-existing/out of scope): the root layout `<title>` is
+  `'PhotoOps'` (one word) vs the AppShell `'Photo Ops'` — a pre-existing cosmetic
+  divergence 020 does not introduce or fix.
