@@ -335,6 +335,58 @@ export async function generateClusters(input: {
   return response.json() as Promise<{ resultId: string; status: string }>;
 }
 
+// --- Publication (session 018) ----------------------------------------------
+
+export interface PostPhoto {
+  photoId: string;
+  order: number;
+  caption: string;
+}
+
+export interface Post {
+  id: string;
+  userId: string;
+  sourceClusterId: string;
+  sourceResultId: string;
+  title: string;
+  body: string;
+  status: string;
+  visibility: string;
+  slug: string;
+  locationLabel: string;
+  dateFrom: string;
+  dateTo: string;
+  mapEnabled: boolean;
+  publishedAt: string;
+  createdAt: string;
+  updatedAt: string;
+  photos: PostPhoto[];
+}
+
+// Replace-all photos: the post's photos become exactly this list (order =
+// position). Omit `photos` for a scalar-only PATCH (leaves photos untouched).
+export interface UpdatePostPatch {
+  title?: string;
+  body?: string;
+  photos?: { photoId: string; caption: string }[];
+}
+
+export function createPost(input: { resultId: string; nodeId: string; title?: string }): Promise<Post> {
+  void input;
+  return Promise.reject(new Error('not implemented')); // GREEN is the implementer's job
+}
+
+export function getPost(postId: string): Promise<Post> {
+  void postId;
+  return Promise.reject(new Error('not implemented')); // GREEN is the implementer's job
+}
+
+export function updatePost(postId: string, patch: UpdatePostPatch): Promise<Post> {
+  void postId;
+  void patch;
+  return Promise.reject(new Error('not implemented')); // GREEN is the implementer's job
+}
+
 export async function uploadFileToPresignedUrl(uploadUrl: string, file: File) {
   const response = await fetch(uploadUrl, {
     method: 'PUT',

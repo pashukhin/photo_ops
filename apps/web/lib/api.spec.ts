@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { completeUpload, createUploadIntent, generateClusters, getClusteringResult, getPhoto, getUsageSummary, listClusteringMethods, listClusteringResults, listPhotos, listUsageEvents, signUp, uploadFileToPresignedUrl } from './api';
+import { completeUpload, createPost, createUploadIntent, generateClusters, getClusteringResult, getPhoto, getPost, getUsageSummary, listClusteringMethods, listClusteringResults, listPhotos, listUsageEvents, signUp, updatePost, uploadFileToPresignedUrl } from './api';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -167,5 +167,47 @@ describe('web API helper', () => {
     );
 
     await expect(signUp({ email: 'person@example.com', password: 'secret123', displayName: 'Person' })).rejects.toThrow('email already exists');
+  });
+
+  it('createPost POSTs the cluster ref and returns the post (session 018)', async () => {
+    // why: the bridge — a cluster node id + result id become a new draft post.
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ id: 'post-1', photos: [] })));
+
+    const result = await createPost({ resultId: 'r1', nodeId: 'n1' });
+
+    expect(result).toMatchObject({ id: 'post-1' });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('http://localhost:3001/v1/posts');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual({ resultId: 'r1', nodeId: 'n1' });
+    expect(init.credentials).toBe('include');
+  });
+
+  it('getPost GETs the post by id with credentials (session 018)', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ id: 'post-1', photos: [] })));
+
+    const result = await getPost('post-1');
+
+    expect(result).toMatchObject({ id: 'post-1' });
+    expect(fetchMock).toHaveBeenCalledWith('http://localhost:3001/v1/posts/post-1', expect.objectContaining({ credentials: 'include' }));
+  });
+
+  it('updatePost PATCHes title + photos (session 018)', async () => {
+    // why: Save carries the scalar edits + the reordered/re-captioned photo list.
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ id: 'post-1', photos: [] })));
+
+    await updatePost('post-1', { title: 'T', photos: [{ photoId: 'p1', caption: 'c' }] });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('http://localhost:3001/v1/posts/post-1');
+    expect(init.method).toBe('PATCH');
+    expect(JSON.parse(init.body as string)).toEqual({ title: 'T', photos: [{ photoId: 'p1', caption: 'c' }] });
+  });
+
+  it('updatePost throws the gateway error message on failure (session 018)', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ message: 'bad visibility' }), { status: 400, headers: { 'content-type': 'application/json' } })
+    );
+    await expect(updatePost('post-1', { title: 'x' })).rejects.toThrow('bad visibility');
   });
 });
