@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { getPost, listPhotos, publishPost, unpublishPost, updatePost } from '../../lib/api';
 import type { PhotoAsset, Post } from '../../lib/api';
 import { canonicalPostUrl, shareText } from '../../lib/share';
@@ -31,8 +31,10 @@ export function PostEditor({ postId }: { postId: string }) {
   const [visibility, setVisibility] = useState<'public' | 'unlisted'>('public');
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
-  // Share (session 020): one shared "Copied" confirmation reused by both buttons.
-  const [copied, setCopied] = useState(false);
+  // Share (session 020): one shared, self-reverting confirmation reused by both
+  // buttons ('Copied' on success, 'Copy failed' on a clipboard error).
+  const [copied, setCopied] = useState<string | null>(null);
+  const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     getPost(postId)
@@ -113,12 +115,29 @@ export function PostEditor({ postId }: { postId: string }) {
 
   const unpublish = useCallback(() => runPublishAction(() => unpublishPost(postId)), [runPublishAction, postId]);
 
-  // Copy text to the clipboard and flash a shared, self-reverting confirmation.
-  const copy = useCallback(async (text: string) => {
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  // Flash a shared confirmation for ~2s; a single timer (cleared on re-flash and
+  // on unmount) avoids stacking and setState-after-unmount.
+  const flash = useCallback((message: string) => {
+    setCopied(message);
+    if (copiedTimer.current) clearTimeout(copiedTimer.current);
+    copiedTimer.current = setTimeout(() => setCopied(null), 2000);
   }, []);
+
+  // Copy text to the clipboard; surface success or a failure (e.g. denied
+  // permission / insecure context) rather than silently swallowing the rejection.
+  const copy = useCallback(
+    async (text: string) => {
+      try {
+        await navigator.clipboard.writeText(text);
+        flash('Copied');
+      } catch {
+        flash('Copy failed');
+      }
+    },
+    [flash]
+  );
+
+  useEffect(() => () => { if (copiedTimer.current) clearTimeout(copiedTimer.current); }, []);
 
   if (loadError) {
     return (
@@ -236,7 +255,7 @@ export function PostEditor({ postId }: { postId: string }) {
                 Copy share text
               </button>
               <span role="status" aria-live="polite" className="text-sm text-muted-foreground">
-                {copied ? 'Copied' : ''}
+                {copied}
               </span>
             </div>
             <button

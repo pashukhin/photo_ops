@@ -297,4 +297,13 @@ describe('PostEditor share (published)', () => {
     expect(screen.queryByRole('button', { name: /copy link/i })).toBeNull();
     expect(screen.queryByRole('button', { name: /copy share text/i })).toBeNull();
   });
+
+  it('shows "Copy failed" when the clipboard write is rejected', async () => {
+    // why: a denied/insecure-context clipboard must surface a failure, not
+    // silently no-op (and not leak an unhandled rejection).
+    writeText.mockRejectedValueOnce(new Error('denied'));
+    render(<PostEditor postId="post-1" />);
+    fireEvent.click(await screen.findByRole('button', { name: /copy link/i }));
+    expect(await screen.findByText(/copy failed/i)).toBeTruthy();
+  });
 });
