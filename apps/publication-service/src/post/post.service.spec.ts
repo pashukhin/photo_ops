@@ -68,13 +68,15 @@ function createService(overrides: {
     findByIdForUser: vi.fn(),
     listForUser: vi.fn(),
     updateForUser: vi.fn(),
+    findBySlugPublic: vi.fn(),
     ...overrides.repository
   };
   const clusters: ClusterReaderPort = {
     getResult: vi.fn(),
     ...overrides.clusters
   };
-  return { service: new PostDomainService(repository, clusters), repository, clusters };
+  const usage = { emitPostPublished: vi.fn().mockResolvedValue(undefined) };
+  return { service: new PostDomainService(repository, clusters, usage), repository, clusters, usage };
 }
 
 describe('PostDomainService.createPostFromCluster', () => {
@@ -351,5 +353,103 @@ describe('PostDomainService.createPostFromCluster node-selection guard', () => {
     await expect(
       service.createPostFromCluster({ userId: 'user-1', resultId: 'result-1', nodeId: 'empty', title: '' })
     ).rejects.toThrow('empty node');
+  });
+});
+
+describe('PostDomainService.publishPost', () => {
+  it('publishes a draft: sets status/visibility, mints an opaque slug + published_at, emits once', async () => {
+    // why: first publish is the atomic "publish as <visibility>" transition — slug
+    // and published_at are minted here (empty until now) and a usage event fires.
+    const current = makePostRecord(); // draft, slug null, publishedAt null
+    const updateForUser = vi.fn().mockResolvedValue(makePostRecord({ status: 'published', visibility: 'public' }));
+    const { service, usage } = createService({
+      repository: { findByIdForUser: vi.fn().mockResolvedValue(current), updateForUser }
+    });
+
+    await service.publishPost('user-1', 'post-1', 'public');
+
+    const patch = vi.mocked(updateForUser).mock.calls[0][2];
+    expect(patch.status).toBe('published');
+    expect(patch.visibility).toBe('public');
+    expect(patch.slug).toMatch(/^[A-Za-z0-9_-]{16,}$/); // opaque, unguessable token
+    expect(patch.publishedAt).toBeInstanceOf(Date);
+    expect(usage.emitPostPublished).toHaveBeenCalledWith({ postId: 'post-1', userId: 'user-1' });
+  });
+
+  it('republish keeps the existing slug and published_at (immutable)', async () => {
+    // why: links + first-published-at stay stable across unpublish → republish.
+    const at = new Date('2026-07-01T00:00:00.000Z');
+    const current = makePostRecord({ status: 'unpublished', slug: 'frozenSlugToken00', publishedAt: at });
+    const updateForUser = vi
+      .fn()
+      .mockResolvedValue(makePostRecord({ status: 'published', slug: 'frozenSlugToken00', publishedAt: at }));
+    const { service } = createService({
+      repository: { findByIdForUser: vi.fn().mockResolvedValue(current), updateForUser }
+    });
+
+    await service.publishPost('user-1', 'post-1', 'unlisted');
+
+    const patch = vi.mocked(updateForUser).mock.calls[0][2];
+    expect(patch.slug).toBeUndefined(); // not regenerated
+    expect(patch.publishedAt).toBeUndefined(); // not overwritten
+    expect(patch.status).toBe('published');
+    expect(patch.visibility).toBe('unlisted');
+  });
+
+  it('rejects publishing as private (guarded before any write)', async () => {
+    // why: private cannot be a public/unlisted publication (defense in depth behind the gateway 400).
+    const { service, repository } = createService();
+    await expect(service.publishPost('user-1', 'post-1', 'private')).rejects.toThrow('cannot publish private');
+    expect(repository.updateForUser).not.toHaveBeenCalled();
+  });
+
+  it('rejects when the post is absent or not owned', async () => {
+    const { service } = createService({ repository: { findByIdForUser: vi.fn().mockResolvedValue(null) } });
+    await expect(service.publishPost('user-1', 'ghost', 'public')).rejects.toThrow('post not found');
+  });
+
+  it('still resolves when the usage emit fails (fire-and-forget, best-effort)', async () => {
+    // why: D6 — usage is a side channel; a broker/emit failure must NOT fail or
+    // roll back publish. The emit is dispatched, its rejection swallowed.
+    const updateForUser = vi.fn().mockResolvedValue(makePostRecord({ status: 'published', visibility: 'public' }));
+    const { service, usage } = createService({
+      repository: { findByIdForUser: vi.fn().mockResolvedValue(makePostRecord()), updateForUser }
+    });
+    usage.emitPostPublished.mockRejectedValue(new Error('broker down'));
+
+    await expect(service.publishPost('user-1', 'post-1', 'public')).resolves.toBeDefined();
+    expect(usage.emitPostPublished).toHaveBeenCalled();
+  });
+});
+
+describe('PostDomainService.unpublishPost', () => {
+  it('flips status to unpublished, touching nothing else, emitting nothing', async () => {
+    const updateForUser = vi.fn().mockResolvedValue(makePostRecord({ status: 'unpublished' }));
+    const { service, usage } = createService({ repository: { updateForUser } });
+    await service.unpublishPost('user-1', 'post-1');
+    expect(updateForUser).toHaveBeenCalledWith('user-1', 'post-1', { status: 'unpublished' });
+    expect(usage.emitPostPublished).not.toHaveBeenCalled();
+  });
+
+  it('rejects when the post is absent or not owned', async () => {
+    const { service } = createService({ repository: { updateForUser: vi.fn().mockResolvedValue(null) } });
+    await expect(service.unpublishPost('user-1', 'ghost')).rejects.toThrow('post not found');
+  });
+});
+
+describe('PostDomainService.getPublicPostBySlug', () => {
+  it('returns the post for a slug of a published public/unlisted post', async () => {
+    const rec = makePostRecord({ status: 'published', visibility: 'public', slug: 'tok' });
+    const findBySlugPublic = vi.fn().mockResolvedValue(rec);
+    const { service } = createService({ repository: { findBySlugPublic } });
+    const result = await service.getPublicPostBySlug('tok');
+    expect(findBySlugPublic).toHaveBeenCalledWith('tok');
+    expect(result).toBe(rec);
+  });
+
+  it('rejects (not found) when no published public/unlisted post has the slug', async () => {
+    // why: draft/unpublished/private/unknown all collapse to not-found — no leak.
+    const { service } = createService({ repository: { findBySlugPublic: vi.fn().mockResolvedValue(null) } });
+    await expect(service.getPublicPostBySlug('tok')).rejects.toThrow('post not found');
   });
 });
