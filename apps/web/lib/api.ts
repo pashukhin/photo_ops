@@ -371,20 +371,38 @@ export interface UpdatePostPatch {
   photos?: { photoId: string; caption: string }[];
 }
 
-export function createPost(input: { resultId: string; nodeId: string; title?: string }): Promise<Post> {
-  void input;
-  return Promise.reject(new Error('not implemented')); // GREEN is the implementer's job
+export async function createPost(input: { resultId: string; nodeId: string; title?: string }): Promise<Post> {
+  const response = await fetch(`${API_BASE_URL}/v1/posts`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input)
+  });
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, `CreatePost failed: ${response.status}`));
+  }
+  return response.json() as Promise<Post>;
 }
 
-export function getPost(postId: string): Promise<Post> {
-  void postId;
-  return Promise.reject(new Error('not implemented')); // GREEN is the implementer's job
+export async function getPost(postId: string): Promise<Post> {
+  const response = await fetch(`${API_BASE_URL}/v1/posts/${postId}`, { credentials: 'include', cache: 'no-store' });
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, `GetPost failed: ${response.status}`));
+  }
+  return response.json() as Promise<Post>;
 }
 
-export function updatePost(postId: string, patch: UpdatePostPatch): Promise<Post> {
-  void postId;
-  void patch;
-  return Promise.reject(new Error('not implemented')); // GREEN is the implementer's job
+export async function updatePost(postId: string, patch: UpdatePostPatch): Promise<Post> {
+  const response = await fetch(`${API_BASE_URL}/v1/posts/${postId}`, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(patch)
+  });
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, `UpdatePost failed: ${response.status}`));
+  }
+  return response.json() as Promise<Post>;
 }
 
 export async function uploadFileToPresignedUrl(uploadUrl: string, file: File) {

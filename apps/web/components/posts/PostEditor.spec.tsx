@@ -45,6 +45,7 @@ function photoAsset(id: string) {
 }
 
 beforeEach(() => {
+  vi.clearAllMocks(); // call history is per-test — assertions read mock.calls[0]
   vi.mocked(api.getPost).mockResolvedValue(post() as never);
   vi.mocked(api.updatePost).mockResolvedValue(post() as never);
   vi.mocked(api.listPhotos).mockResolvedValue({

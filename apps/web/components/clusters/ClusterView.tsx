@@ -1,7 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
+  createPost,
   generateClusters,
   getClusteringResult,
   listClusteringMethods,
@@ -24,14 +26,23 @@ export const CLUSTER_POLL_MS = 2000;
 // down / DLQ) and surfaces a timeout instead of spinning forever (photo_ops-n7w).
 export const CLUSTER_POLL_MAX_ATTEMPTS = 30;
 
+// A post can be drafted from a cluster of any level (ADR-0005), but NOT the
+// whole-library root or the excluded-photos bucket, and not an empty node
+// (4o2 #3 — the backend guard rejects these too).
+function isPostableNode(node: ClusterNode): boolean {
+  return node.kind !== 'root' && node.kind !== 'not_clusterable' && node.photoCount > 0;
+}
+
 function TreeNodeView({
   node,
   depth,
-  photosById
+  photosById,
+  onCreatePost
 }: {
   node: ClusterNode;
   depth: number;
   photosById: Map<string, PhotoAsset>;
+  onCreatePost: (nodeId: string) => void;
 }) {
   const label = node.segmentLabel || node.kind;
   return (
@@ -44,6 +55,15 @@ function TreeNodeView({
             {' '}
             · {node.dateFrom} – {node.dateTo}
           </span>
+        ) : null}
+        {isPostableNode(node) ? (
+          <button
+            type="button"
+            onClick={() => onCreatePost(node.id)}
+            className="ml-2 border rounded-md px-2 py-0.5 text-xs"
+          >
+            Create post
+          </button>
         ) : null}
       </div>
       {node.items.length > 0 ? (
@@ -71,7 +91,7 @@ function TreeNodeView({
       {node.children.length > 0 ? (
         <ul>
           {node.children.map((c) => (
-            <TreeNodeView key={c.id} node={c} depth={depth + 1} photosById={photosById} />
+            <TreeNodeView key={c.id} node={c} depth={depth + 1} photosById={photosById} onCreatePost={onCreatePost} />
           ))}
         </ul>
       ) : null}
@@ -88,6 +108,22 @@ export function ClusterView() {
   const [error, setError] = useState<string | null>(null);
   // Resolves cluster item ids → photos so the tree can render thumbnails.
   const [photosById, setPhotosById] = useState<Map<string, PhotoAsset>>(new Map());
+  const router = useRouter();
+
+  // Draft a post from a cluster node (session 018) and jump to its editor. A
+  // failure surfaces in the shared error banner rather than losing the click.
+  const createPostFromNode = useCallback(
+    async (nodeId: string) => {
+      if (!active) return;
+      try {
+        const post = await createPost({ resultId: active.id, nodeId });
+        router.push(`/posts/${post.id}/edit`);
+      } catch (e: unknown) {
+        setError(String(e));
+      }
+    },
+    [active, router]
+  );
 
   const refreshResults = useCallback(async () => {
     const { results } = await listClusteringResults();
@@ -199,7 +235,12 @@ export function ClusterView() {
             <p className="text-sm text-destructive">{active.errorMessage}</p>
           ) : active.root ? (
             <ul>
-              <TreeNodeView node={active.root} depth={0} photosById={photosById} />
+              <TreeNodeView
+                node={active.root}
+                depth={0}
+                photosById={photosById}
+                onCreatePost={(nodeId) => void createPostFromNode(nodeId)}
+              />
             </ul>
           ) : (
             <p className="text-sm text-muted-foreground">Not ready.</p>
