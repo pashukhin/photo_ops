@@ -209,6 +209,7 @@ export class LazyRabbitMqPublisher implements MessagePublisher {
 - Modify: `apps/publication-service/src/post/post.types.ts` (extend `PostPatch`)
 - Modify: `apps/publication-service/src/post/post.service.ts` (`PostRepositoryPort` += `findBySlugPublic`; `PostDomainService` += 3 methods + `usage` ctor param + slug gen)
 - Modify: `apps/publication-service/src/post/post.repository.ts` (implement `findBySlugPublic`; extend `updateForUser` set-builder — **coverage-excluded**, smoke-covered)
+- Modify: `apps/publication-service/src/app.module.ts` (**REQUIRED** — the `PostDomainService` `useFactory` is `new PostDomainService(repository, clusters)` today; the new 3rd ctor arg makes this a typecheck error until the factory also builds `LazyRabbitMqPublisher(RABBITMQ_URL)` → `PostUsageEmitter(publisher, USAGE_PROVIDER)` and passes it in. Coverage-excluded.)
 - Modify: `apps/publication-service/src/post/post.service.spec.ts` (RED — extend `createService` helper with a `usage` fake + `findBySlugPublic`; add the describes below)
 
 **Interfaces:**
@@ -279,6 +280,19 @@ describe('PostDomainService.publishPost', () => {
   it('rejects when the post is absent or not owned', async () => {
     const { service } = createService({ repository: { findByIdForUser: vi.fn().mockResolvedValue(null) } });
     await expect(service.publishPost('user-1', 'ghost', 'public')).rejects.toThrow('post not found');
+  });
+
+  it('still resolves when the usage emit fails (fire-and-forget, best-effort)', async () => {
+    // why: D6 — usage is a side channel; a broker/emit failure must NOT fail or
+    // roll back publish. The emit is dispatched, its rejection swallowed.
+    const updateForUser = vi.fn().mockResolvedValue(makePostRecord({ status: 'published', visibility: 'public' }));
+    const { service, usage } = createService({
+      repository: { findByIdForUser: vi.fn().mockResolvedValue(makePostRecord()), updateForUser }
+    });
+    usage.emitPostPublished.mockRejectedValue(new Error('broker down'));
+
+    await expect(service.publishPost('user-1', 'post-1', 'public')).resolves.toBeDefined();
+    expect(usage.emitPostPublished).toHaveBeenCalled();
   });
 });
 
@@ -351,7 +365,20 @@ async getPublicPostBySlug(_slug: string): Promise<PostRecord> {
 async findBySlugPublic(_slug: string): Promise<PostRecord | null> { throw new Error('not implemented'); }
 // and extend updateForUser's set-builder to carry status/slug/publishedAt when present.
 ```
-- [ ] **Step 4: Confirm still RED + typecheck** — rerun the spec (new tests FAIL on assertion; symbols resolve); `make typecheck` clean.
+Then wire the emitter into the `PostDomainService` factory in `app.module.ts` (so the new required 3rd ctor arg typechecks — B1):
+```ts
+// app.module.ts — extend the existing PostDomainService useFactory:
+{
+  provide: PostDomainService,
+  useFactory: (repo: PostRepository, clusters: ClusterReader) => {
+    const publisher = new LazyRabbitMqPublisher(process.env.RABBITMQ_URL ?? 'amqp://guest:guest@rabbitmq:5672');
+    const usage = new PostUsageEmitter(publisher, process.env.USAGE_PROVIDER ?? 'local-demo');
+    return new PostDomainService(repo, clusters, usage);
+  },
+  inject: [PostRepository, ClusterReader]
+}
+```
+- [ ] **Step 4: Confirm still RED + typecheck** — rerun the spec (new tests FAIL on assertion; symbols resolve); `make typecheck` clean (this is why the `app.module.ts` wiring is part of THIS task — the 3-arg ctor won't compile without it).
 - [ ] **Step 5: Commit** — `git commit -am "skeleton(019): publication domain publish/unpublish/getPublicPostBySlug (RED) + stubs"`
 
 ---
@@ -372,7 +399,7 @@ async findBySlugPublic(_slug: string): Promise<PostRecord | null> { throw new Er
 ```ts
 describe('PublicationGrpcController publish/unpublish/public', () => {
   it('PublishPost maps the visibility enum to a string and returns a proto post', async () => {
-    const publishPost = vi.fn().mockResolvedValue(makeRecord({ status: 'published', visibility: 'public', slug: 'tok' }));
+    const publishPost = vi.fn().mockResolvedValue(makePostRecord({ status: 'published', visibility: 'public', slug: 'tok' }));
     const { controller } = createController({ publishPost });
     const res = await controller.PublishPost({ postId: 'post-1', userId: 'user-1', visibility: 3 });
     expect(publishPost).toHaveBeenCalledWith('user-1', 'post-1', 'public');
@@ -388,7 +415,7 @@ describe('PublicationGrpcController publish/unpublish/public', () => {
   });
 
   it('UnpublishPost calls the domain owner-scoped and returns the proto post', async () => {
-    const unpublishPost = vi.fn().mockResolvedValue(makeRecord({ status: 'unpublished' }));
+    const unpublishPost = vi.fn().mockResolvedValue(makePostRecord({ status: 'unpublished' }));
     const { controller } = createController({ unpublishPost });
     const res = await controller.UnpublishPost({ postId: 'post-1', userId: 'user-1' });
     expect(unpublishPost).toHaveBeenCalledWith('user-1', 'post-1');
@@ -396,7 +423,7 @@ describe('PublicationGrpcController publish/unpublish/public', () => {
   });
 
   it('GetPublicPostBySlug returns the proto post; a miss is NOT_FOUND', async () => {
-    const getPublicPostBySlug = vi.fn().mockResolvedValue(makeRecord({ status: 'published', visibility: 'public', slug: 'tok' }));
+    const getPublicPostBySlug = vi.fn().mockResolvedValue(makePostRecord({ status: 'published', visibility: 'public', slug: 'tok' }));
     const { controller } = createController({ getPublicPostBySlug });
     expect((await controller.GetPublicPostBySlug({ slug: 'tok' })).slug).toBe('tok');
 
@@ -406,10 +433,10 @@ describe('PublicationGrpcController publish/unpublish/public', () => {
   });
 });
 ```
-(`status` from `@grpc/grpc-js`; reuse the file's existing `createController`/`makeRecord` helpers, extending the fake-service shape with the three methods.)
+(`status` from `@grpc/grpc-js`; the file's existing `createController` accepts a `Partial<PostDomainService>` — extend it with the three new methods; the record fixture is `makePostRecord`.)
 - [ ] **Step 2: Run → RED** — `npx vitest run src/post/post.grpc.controller.spec.ts` (FAIL on behavior).
-- [ ] **Step 3: Write the stubs** — three `@GrpcMethod('PublicationService', 'PublishPost'|'UnpublishPost'|'GetPublicPostBySlug')` handlers that map input, delegate, and `toProtoPost` the result, all wrapped in the existing `try/catch → mapDomainError`; add `'cannot publish private'` to `INVALID_ARGUMENT_MESSAGES`. Bodies may `throw new Error('not implemented')` first if you prefer a strict RED, but the mapping wiring is small enough to fill directly.
-- [ ] **Step 4: Confirm still RED + typecheck**, then **Step 5: Commit** — `git commit -am "skeleton(019): publication gRPC publish/unpublish/public handlers (RED)"`
+- [ ] **Step 3: Write the stub handlers** — three `@GrpcMethod('PublicationService', 'PublishPost'|'UnpublishPost'|'GetPublicPostBySlug')` methods whose bodies `throw new Error('not implemented')`; add `'cannot publish private'` to `INVALID_ARGUMENT_MESSAGES` now (so the domain-error mapping resolves). Keep the handlers as stubs — GREEN is the implementer's job.
+- [ ] **Step 4: Confirm still RED + typecheck** (handlers throw → tests FAIL on assertion; symbols resolve), then **Step 5: Commit** — `git commit -am "skeleton(019): publication gRPC publish/unpublish/public handlers (RED)"`
 
 ---
 
@@ -428,7 +455,7 @@ describe('PublicationGrpcController publish/unpublish/public', () => {
 
 **GREEN obligation:** make the RED tests pass within these stubs.
 
-- [ ] **Step 1: Write the RED tests**. Service (`photo.service.spec.ts`, reuse its existing service-construction helper; add `findVariantsByIdsForUser` to the repo fake and a `createPresignedGetUrl` storage fake):
+- [ ] **Step 1: Write the RED tests**. NOTE: the existing `createService()` (`photo.service.spec.ts`) and `createController()` (`photo.grpc.controller.spec.ts`) currently take **no arguments** and build fixed fakes — first **refactor each to accept an overrides object** (mirror publication-service's `createService({ repository, ... })` pattern: spread overrides onto the default fakes, return the built service/controller + the fakes). `PhotoDomainService` needs all 5 ctor args (repository, storage, publisher, logger, usageEmitter). Then add `findVariantsByIdsForUser` to the default repo fake and keep the default `createPresignedGetUrl` storage fake. Service test:
 ```ts
 describe('PhotoDomainService.getVariantsByIds', () => {
   it('resolves owner-scoped variant views for the given ids, omitting non-owned/absent ids', async () => {
@@ -439,7 +466,7 @@ describe('PhotoDomainService.getVariantsByIds', () => {
       { photoId: 'p1', variants: [{ id: 'v1', photoId: 'p1', variantType: 'thumbnail', objectKey: 'k1', width: 40, height: 40, sizeBytes: 1n, contentType: 'image/jpeg' }] }
     ]) };
     const storage = { createPresignedGetUrl: vi.fn().mockResolvedValue('http://img/k1') };
-    const { service } = makeService({ repository: repo, storage }); // helper in this file
+    const { service } = createService({ repository: repo, storage }); // helper extended to accept overrides
 
     const result = await service.getVariantsByIds('user-1', ['p1', 'pX']);
 
@@ -544,7 +571,7 @@ describe('PublicationController publish/unpublish/public', () => {
 });
 ```
 - [ ] **Step 2: Run → RED** — `cd apps/api-gateway && npx vitest run src/http/publication.controller.spec.ts` (FAIL on behavior; existing tests still green after the ctor gains `photoClient`).
-- [ ] **Step 3: Write the stubs** — client methods (mirror the existing promisified `createPostFromCluster`); controller handlers `@Post('posts/:postId/publish')`, `@Post('posts/:postId/unpublish')`, `@Get('public/posts/:slug')` and `private mapPublicPost(...)`; bodies `throw new Error('not implemented')` where logic is non-trivial, but the explicit visibility guard + allow-list DTO are small enough to fill.
+- [ ] **Step 3: Write the stubs** — client methods promisified like the existing `createPostFromCluster`, EXCEPT `getVariantsByIds` must **remap `photoIds` → the proto wire field `photoId`** before the gRPC call (the wire field is `photoId` under `keepCase:false`; a literal pass-through would silently drop the ids — mirror how `updatePost` wraps `photos → { photos }` in `publication.client.ts`). Controller handlers `@Post('posts/:postId/publish')`, `@Post('posts/:postId/unpublish')`, `@Get('public/posts/:slug')` and `private mapPublicPost(...)` — bodies `throw new Error('not implemented')`. Also update `createController` in the spec to build/return the `photoClient` fake and pass it as the new 3rd ctor arg (Nest auto-resolves `PhotoClient` at runtime — already a provider — so no gateway `app.module` edit is needed).
 - [ ] **Step 4: Confirm still RED + typecheck**, then **Step 5: Commit** — `git commit -am "skeleton(019): gateway publish/unpublish + public slug route (RED)"`
 
 ---
@@ -666,7 +693,7 @@ describe('PublicPostPage', () => {
 });
 ```
 - [ ] **Step 2: Run → RED** — `cd apps/web && npx vitest run lib/api.publish.spec.ts components/posts/PostEditor.spec.tsx "app/posts/[slug]/page.spec.tsx"` (FAIL on behavior).
-- [ ] **Step 3: Write the stubs** — `lib/api.ts` three functions (client `publishPost`/`unpublishPost`; server `getPublicPost`) + `PublicPost` type; `PostEditor` gains visibility state + Publish/Unpublish handlers + a published panel (stub the new branches so symbols resolve, `throw`/no-op where logic is nontrivial); `app/posts/[slug]/page.tsx` async component + `export const dynamic = 'force-dynamic'`.
+- [ ] **Step 3: Write the stubs** — `lib/api.ts` three functions bodied `throw new Error('not implemented')` (client `publishPost`/`unpublishPost`; server `getPublicPost`) + the `PublicPost` type. `PostEditor`: render the new controls so the queries resolve — a `<select aria-label="visibility">`, a Publish `<button>`, and (for a published post) the `/posts/<slug>` link + an Unpublish `<button>` — but leave their click handlers **unwired** (no `publishPost`/`unpublishPost` call) so the RED tests fail on behavior, not on a missing element. `app/posts/[slug]/page.tsx`: async component returning minimal markup + `export const dynamic = 'force-dynamic'` (does not yet call `getPublicPost`/`notFound` → RED).
 - [ ] **Step 4: Confirm still RED + typecheck** — rerun; `make typecheck`; add `API_BASE_URL_INTERNAL` to `.env.example`.
 - [ ] **Step 5: Commit** — `git commit -am "skeleton(019): web publish UI + public SSR page (RED) + api stubs"`
 
@@ -683,6 +710,7 @@ describe('PublicPostPage', () => {
 - [ ] **Step 1: Extend `scripts/smoke-publication.sh`** after the existing owner-scoping section, using the already-created `$POST_ID` + `$COOKIE_PATH`:
   - Publish: `POST /v1/posts/$POST_ID/publish` `{"visibility":"public"}` → assert `.status=="published"`, `.slug` non-empty, `.publishedAt` non-empty.
   - **Gateway JSON, logged-out** (omit `-b`): `GET /v1/public/posts/$SLUG` → 200; assert the DTO has `.photos[0].variants[0].url` and NO `.userId`/`.status`/`.visibility`; then `curl -fsS "$VARIANT_URL" -o /dev/null -w '%{content_type}'` → an `image/*` content-type (**resolvable variant bytes**).
+  - **Usage emit (end-to-end, pins D6 + the lazy publisher actually connecting):** poll `GET /v1/usage/events` (owner cookie) up to a bounded deadline until an event with `.eventType=="post_published"` and `.sourceEntityId=="$POST_ID"` appears (the AMQP hop is async; mirror the existing photo-event assertions in `smoke-usage.sh`). Its absence means the emit never reached `usage.events`.
   - Reject: publishing `{"visibility":"private"}` → HTTP 400.
   - **Web SSR, logged-out**: `GET ${WEB_BASE_URL:-http://localhost:3000}/posts/$SLUG` → 200 HTML.
   - Unpublish: `POST /v1/posts/$POST_ID/unpublish` → `.status=="unpublished"`; then logged-out `GET /v1/public/posts/$SLUG` → **404** and web `GET /posts/$SLUG` → **404**.
