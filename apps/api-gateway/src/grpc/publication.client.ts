@@ -72,11 +72,17 @@ export interface PublicationGatewayClient {
 
 type Callback<T> = (error: Error | null, value: T) => void;
 
+// Wire shape for UpdatePost: proto's `photos` is a wrapper message
+// (PostPhotoList), distinct from the gateway's flat UpdatePostInput.photos.
+type UpdatePostWire = Omit<UpdatePostInput, 'photos'> & {
+  photos?: { photos: { photoId: string; caption: string }[] };
+};
+
 interface GrpcPublicationServiceClient {
   CreatePostFromCluster(input: CreatePostFromClusterInput, callback: Callback<PostRaw>): void;
   GetPost(input: { userId: string; postId: string }, callback: Callback<PostRaw>): void;
   ListPosts(input: { userId: string }, callback: Callback<{ posts: PostSummaryRaw[] }>): void;
-  UpdatePost(input: UpdatePostInput, callback: Callback<PostRaw>): void;
+  UpdatePost(input: UpdatePostWire, callback: Callback<PostRaw>): void;
 }
 
 @Injectable()
@@ -146,8 +152,10 @@ export class PublicationClient implements PublicationGatewayClient {
   }
 
   updatePost(input: UpdatePostInput): Promise<PostRaw> {
+    const { photos, ...rest } = input;
+    const wire: UpdatePostWire = photos !== undefined ? { ...rest, photos: { photos } } : rest;
     return new Promise((resolve, reject) => {
-      this.client.UpdatePost(input, (error, value) => {
+      this.client.UpdatePost(wire, (error, value) => {
         if (error) {
           reject(error);
           return;

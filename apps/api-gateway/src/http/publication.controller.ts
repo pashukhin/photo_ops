@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Param, Patch, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Headers, Param, Patch, Post } from '@nestjs/common';
 import { AuthService } from '../auth/auth.service';
 import { PostRaw, PostSummaryRaw, PublicationClient, UpdatePostInput } from '../grpc/publication.client';
 
@@ -74,27 +74,67 @@ export class PublicationController {
     const input: UpdatePostInput = { userId: auth.userId, postId };
     if (body.title !== undefined) input.title = body.title;
     if (body.body !== undefined) input.body = body.body;
-    if (body.visibility !== undefined) input.visibility = VISIBILITY_TO_PROTO[body.visibility];
+    if (body.visibility !== undefined) {
+      // 4o2 #1: an unknown visibility must be a 400, not a silent 200 no-op.
+      const mapped = VISIBILITY_TO_PROTO[body.visibility];
+      if (mapped === undefined) {
+        throw new BadRequestException(`invalid visibility: ${body.visibility}`);
+      }
+      input.visibility = mapped;
+    }
     if (body.locationLabel !== undefined) input.locationLabel = body.locationLabel;
     if (body.mapEnabled !== undefined) input.mapEnabled = body.mapEnabled;
-    if (body.dateFrom !== undefined) input.dateFrom = body.dateFrom;
-    if (body.dateTo !== undefined) input.dateTo = body.dateTo;
+    // 4o2 #2: a non-empty, non-ISO date must be a 400 (never reach Drizzle). ""
+    // clears the date and is allowed through unchanged.
+    if (body.dateFrom !== undefined) input.dateFrom = this.validateDate(body.dateFrom, 'dateFrom');
+    if (body.dateTo !== undefined) input.dateTo = this.validateDate(body.dateTo, 'dateTo');
+    if (body.photos !== undefined) input.photos = body.photos;
     return this.mapPost(await this.publicationClient.updatePost(input));
   }
 
+  private validateDate(value: string, field: string): string {
+    if (value !== '' && Number.isNaN(Date.parse(value))) {
+      throw new BadRequestException(`invalid ${field}: not an ISO date`);
+    }
+    return value;
+  }
+
+  // Explicit browser DTO (4o2 #4) — enumerate fields instead of spreading ...raw,
+  // so a future proto field cannot auto-leak. sourceCluster/Result are intentional
+  // provenance (smoke asserts them).
   private mapPost(raw: PostRaw) {
     return {
-      ...raw,
+      id: raw.id,
+      userId: raw.userId,
+      sourceClusterId: raw.sourceClusterId,
+      sourceResultId: raw.sourceResultId,
+      title: raw.title,
+      body: raw.body,
       status: STATUS[raw.status] ?? 'unspecified',
-      visibility: VISIBILITY[raw.visibility] ?? 'unspecified'
+      visibility: VISIBILITY[raw.visibility] ?? 'unspecified',
+      slug: raw.slug,
+      locationLabel: raw.locationLabel,
+      dateFrom: raw.dateFrom,
+      dateTo: raw.dateTo,
+      mapEnabled: raw.mapEnabled,
+      publishedAt: raw.publishedAt,
+      createdAt: raw.createdAt,
+      updatedAt: raw.updatedAt,
+      photos: raw.photos.map((p) => ({ photoId: p.photoId, order: p.order, caption: p.caption }))
     };
   }
 
   private mapSummary(raw: PostSummaryRaw) {
     return {
-      ...raw,
+      id: raw.id,
+      title: raw.title,
       status: STATUS[raw.status] ?? 'unspecified',
-      visibility: VISIBILITY[raw.visibility] ?? 'unspecified'
+      visibility: VISIBILITY[raw.visibility] ?? 'unspecified',
+      dateFrom: raw.dateFrom,
+      dateTo: raw.dateTo,
+      photoCount: raw.photoCount,
+      createdAt: raw.createdAt,
+      updatedAt: raw.updatedAt
     };
   }
 }

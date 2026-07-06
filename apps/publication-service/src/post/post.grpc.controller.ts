@@ -13,6 +13,15 @@ const PROTO_TO_VISIBILITY: Record<number, PostVisibility> = { 1: 'private', 2: '
 // Domain error messages that map to gRPC NOT_FOUND (→ HTTP 404 at the gateway).
 const NOT_FOUND_MESSAGES = new Set(['post not found', 'cluster result not found', 'cluster node not found']);
 
+// Domain error messages that map to gRPC INVALID_ARGUMENT (→ HTTP 400): a valid
+// request the domain rejects as bad input (premature run, bad node, bad photos).
+const INVALID_ARGUMENT_MESSAGES = new Set([
+  'cluster result not ready',
+  'node not selectable',
+  'empty node',
+  'invalid photo membership'
+]);
+
 export interface ProtoPostPhoto {
   photoId: string;
   order: number;
@@ -136,6 +145,11 @@ export class PublicationGrpcController {
     if (request.mapEnabled !== undefined) patch.mapEnabled = request.mapEnabled;
     if (request.dateFrom !== undefined) patch.dateFrom = request.dateFrom ? new Date(request.dateFrom) : null;
     if (request.dateTo !== undefined) patch.dateTo = request.dateTo ? new Date(request.dateTo) : null;
+    // Replace-all wrapper (proto3 optional message) → flat {photoId,caption}[];
+    // order is the list position, canonicalized by the repository.
+    if (request.photos !== undefined) {
+      patch.photos = request.photos.photos.map((p) => ({ photoId: p.photoId, caption: p.caption }));
+    }
     return patch;
   }
 
@@ -182,7 +196,7 @@ export class PublicationGrpcController {
       if (NOT_FOUND_MESSAGES.has(error.message)) {
         return new RpcException({ code: status.NOT_FOUND, message: error.message });
       }
-      if (error.message === 'cluster result not ready') {
+      if (INVALID_ARGUMENT_MESSAGES.has(error.message)) {
         return new RpcException({ code: status.INVALID_ARGUMENT, message: error.message });
       }
     }

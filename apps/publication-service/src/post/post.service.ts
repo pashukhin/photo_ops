@@ -73,6 +73,17 @@ export class PostDomainService {
     if (!node) {
       throw new Error('cluster node not found');
     }
+    // Node-selection guard (4o2 #3). Kinds: 1=ROOT, 2=INTERNAL, 3=LEAF,
+    // 4=NOT_CLUSTERABLE, 5=SEGMENT. ROOT snapshots the whole tree incl. the
+    // not_clusterable bucket; NOT_CLUSTERABLE is the excluded-photos bucket —
+    // neither is a story. An empty subtree would yield a silently-empty post.
+    if (node.kind === 1 || node.kind === 4) {
+      throw new Error('node not selectable');
+    }
+    const photoIds = collectPhotos(node);
+    if (photoIds.length === 0) {
+      throw new Error('empty node');
+    }
     const row: CreatePostRow = {
       id: uuidv7(),
       userId: input.userId,
@@ -88,7 +99,7 @@ export class PostDomainService {
       dateFrom: node.dateFrom ? new Date(node.dateFrom) : null,
       dateTo: node.dateTo ? new Date(node.dateTo) : null,
       mapEnabled: false,
-      photos: collectPhotos(node).map((photoId, order) => ({ photoId, order, caption: '' }))
+      photos: photoIds.map((photoId, order) => ({ photoId, order, caption: '' }))
     };
     return this.repository.createPostWithPhotos(row);
   }
@@ -106,8 +117,25 @@ export class PostDomainService {
     return this.repository.listForUser(userId);
   }
 
-  // Owner-scoped scalar update; throws 'post not found' when absent or not owned.
+  // Owner-scoped update; throws 'post not found' when absent or not owned. When
+  // `patch.photos` is present (replace-all), the new list must be a non-empty,
+  // duplicate-free subset of the post's current membership (4o2 — no add via
+  // replace-all, no cross-user photo injection); order is canonicalized by the
+  // repository from list position.
   async updatePost(userId: string, postId: string, patch: PostPatch): Promise<PostRecord> {
+    if (patch.photos !== undefined) {
+      const current = await this.repository.findByIdForUser(userId, postId);
+      if (!current) {
+        throw new Error('post not found');
+      }
+      const ids = patch.photos.map((p) => p.photoId);
+      const currentIds = new Set(current.photos.map((p) => p.photoId));
+      const noDuplicates = new Set(ids).size === ids.length;
+      const isSubset = ids.every((id) => currentIds.has(id));
+      if (ids.length === 0 || !noDuplicates || !isSubset) {
+        throw new Error('invalid photo membership');
+      }
+    }
     const post = await this.repository.updateForUser(userId, postId, patch);
     if (!post) {
       throw new Error('post not found');
