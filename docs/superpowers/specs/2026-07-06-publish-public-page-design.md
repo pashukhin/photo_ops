@@ -159,6 +159,19 @@ charge-once key). No transactional outbox — deliberately consistent with
 photo-service. Emitted on the transition into `published` (first publish and
 republish); the idempotency key makes it count once.
 
+**The broker must NOT be a boot dependency of publication-service** (unlike
+photo-service, which is inherently a `usage.events` *consumer*). photo-service
+wires `RABBITMQ_BUS` as an eager async factory whose `RabbitMqBus.create()` retries
+then **throws** (`apps/photo-service/src/app.module.ts`,
+`src/messaging/rabbitmq-bus.ts`) — copying that verbatim would make `PostDomainService`
+(a root provider injecting the emitter) resolve the bus at boot, so a down broker
+would crash-loop the whole service and take *every* post RPC offline — including the
+public `GetPublicPostBySlug`, which emits nothing. That is a strictly larger blast
+radius than the "lose one event" this best-effort design accepts. Therefore the
+publisher **connects lazily** (no connect at `bootstrap()`; first connect attempt on
+first emit, cached/reconnecting thereafter) and **every emit is guarded** (try/catch,
+logged) — a broker outage never blocks boot or any RPC. `UnpublishPost` emits nothing.
+
 ### D7 — editor Publish UX
 
 The existing owner editor (`app/(app)/posts/[id]/edit`) gains:
@@ -211,8 +224,10 @@ The existing owner editor (`app/(app)/posts/[id]/edit`) gains:
   `GetPublicPostBySlug` handlers; map `PostVisibility` in via `PROTO_TO_VISIBILITY`;
   reject private/unspecified on publish.
 - New `src/messaging/` (`messaging.port.ts`, `rabbitmq-bus.ts`) + `post/usage.codec.ts`
-  + `post/usage.emitter.ts`, adapted from photo-service; DI in `app.module.ts`
-  (`RABBITMQ_BUS` async factory, `MESSAGE_PUBLISHER`, `UsageEmitter`).
+  + `post/usage.emitter.ts`, adapted from photo-service; DI in `app.module.ts`. The
+  publisher provider must be **lazy / non-throwing at boot** (D6) — not a straight
+  copy of photo-service's eager `RABBITMQ_BUS` factory. Reads `RABBITMQ_URL` /
+  `USAGE_PROVIDER` env.
 
 ### photo-service
 
@@ -228,10 +243,12 @@ The existing owner editor (`app/(app)/posts/[id]/edit`) gains:
   `getPublicPostBySlug`.
 - `grpc/photo.client.ts`: add `getVariantsByIds`.
 - `http/publication.controller.ts`: `@Post('posts/:postId/publish')` (authed;
-  validate visibility body → `VISIBILITY_TO_PROTO`, private/unknown → 400),
-  `@Post('posts/:postId/unpublish')` (authed); a public `@Get('public/posts/:slug')`
-  (no `requireSession`) → `getPublicPostBySlug` → `getVariantsByIds` →
-  `mapPublicPost` allow-list DTO; NOT_FOUND → 404.
+  visibility body validated with an **explicit** `private`/unknown → 400 check —
+  NOT the `updatePost` pattern, since `VISIBILITY_TO_PROTO` *includes* `private:1`
+  and would let it through), `@Post('posts/:postId/unpublish')` (authed); a public
+  `@Get('public/posts/:slug')` (no `requireSession`) → `getPublicPostBySlug` →
+  `getVariantsByIds` → `mapPublicPost` allow-list DTO; NOT_FOUND → 404; other
+  errors propagate as 500 (a photo-service outage must not masquerade as 404).
 
 ### web
 
@@ -244,8 +261,13 @@ The existing owner editor (`app/(app)/posts/[id]/edit`) gains:
   keep the existing `listPhotos` resolution; `e9g #1` stays open.)
 - `app/posts/[slug]/page.tsx`: server component (D5) rendering title / body / date
   range / `location_label` (if set) / photos (variant `<img>` + caption);
-  `notFound()` on 404; `force-dynamic`.
-- `.env.example` + `docker-compose`: `API_BASE_URL_INTERNAL=http://api-gateway:3001`.
+  **only** a 404 → `notFound()`; any other non-OK status throws → Next error
+  boundary / 500 (a 404 means "no such published post", a 500 means "backend
+  problem" — the two must not be conflated). `force-dynamic`.
+- `.env.example` + `docker-compose`: `API_BASE_URL_INTERNAL=http://api-gateway:3001`
+  on the `web` service; add `RABBITMQ_URL` + `depends_on: rabbitmq` (or its
+  healthcheck equivalent) to the `publication-service` block — today it has neither
+  and connects only by matching the hardcoded default.
 
 ## Testing (RED on skeleton → GREEN)
 
@@ -268,8 +290,12 @@ replace-all 500 slipped past mocks).
   (The server-component public page is exercised by the live smoke, not jsdom.)
 - **dqb / live smoke:** extend `scripts/smoke-publication.sh` (or a new
   `scripts/smoke-public.sh`): create → publish → `GET /posts/<slug>` **logged-out**
-  → 200 with variant thumbnails; unpublish → `GET /posts/<slug>` → 404. Then
-  `make gate` + `make coverage-gate` + `make test-guard`; final `/code-review`.
+  → 200; unpublish → `GET /posts/<slug>` → 404. Because the server-component render
+  path has **no jsdom coverage**, the smoke must assert more than a status code — it
+  must confirm the logged-out response carries a **resolvable variant URL** (fetch
+  one variant URL from the public payload and assert it returns image bytes), the
+  s018 dqb lesson applied to the wire boundary. Then `make gate` +
+  `make coverage-gate` + `make test-guard`; final `/code-review`.
 
 ## Order
 
