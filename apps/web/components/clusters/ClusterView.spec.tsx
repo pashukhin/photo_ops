@@ -215,6 +215,15 @@ describe('ClusterView', () => {
     await waitFor(() => expect(push).toHaveBeenCalledWith('/posts/post-9/edit'));
   });
 
+  it('surfaces a create-post failure in the error banner', async () => {
+    // why: a failed create must not be lost — it shows in the shared error state.
+    vi.mocked(api.createPost).mockRejectedValue(new Error('create boom'));
+    render(<ClusterView />);
+    fireEvent.click(await screen.findByTestId('result-row'));
+    fireEvent.click(await screen.findByRole('button', { name: /create post/i }));
+    await screen.findByText(/create boom/);
+  });
+
   it('does not show "Create post" on the root node', async () => {
     // why: 4o2 #3 — root would snapshot the whole tree incl. not_clusterable.
     render(<ClusterView />);

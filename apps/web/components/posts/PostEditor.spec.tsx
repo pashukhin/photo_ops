@@ -114,6 +114,23 @@ describe('PostEditor', () => {
     });
   });
 
+  it('surfaces a save failure without losing the editor', async () => {
+    // why: a failed Save shows a banner but keeps the edits (not a fatal page).
+    vi.mocked(api.updatePost).mockRejectedValue(new Error('save boom'));
+    render(<PostEditor postId="post-1" />);
+    fireEvent.click(await screen.findByRole('button', { name: /save/i }));
+    await screen.findByText(/save boom/);
+    expect(screen.getByDisplayValue('Trip')).toBeTruthy(); // editor still mounted
+  });
+
+  it('falls back to the photo id when its variant is not resolved', async () => {
+    // why: a post photo missing from the ready-photo map must not vanish.
+    vi.mocked(api.listPhotos).mockResolvedValue({ photos: [], totalCount: 0 } as never);
+    render(<PostEditor postId="post-1" />);
+    expect(await screen.findByText('p1')).toBeTruthy();
+    expect(screen.getByText('p2')).toBeTruthy();
+  });
+
   it('shows an error when the post cannot be loaded (404 / not owned)', async () => {
     // why: an unauthorized/missing draft must surface a message, not a blank page.
     vi.mocked(api.getPost).mockRejectedValue(new Error('GetPost failed: 404'));

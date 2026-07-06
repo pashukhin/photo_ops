@@ -210,4 +210,14 @@ describe('web API helper', () => {
     );
     await expect(updatePost('post-1', { title: 'x' })).rejects.toThrow('bad visibility');
   });
+
+  it('createPost throws on a non-ok response (session 018)', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('nope', { status: 400 }));
+    await expect(createPost({ resultId: 'r1', nodeId: 'n1' })).rejects.toThrow(/CreatePost failed/);
+  });
+
+  it('getPost throws on a non-ok response (session 018)', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('nope', { status: 404 }));
+    await expect(getPost('ghost')).rejects.toThrow(/GetPost failed/);
+  });
 });

@@ -145,6 +145,18 @@ describe('PublicationController', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  it('updatePost: forwards a valid ISO date unchanged', async () => {
+    // why: a well-formed instant passes edge validation and reaches the domain.
+    const { controller, publicationClient } = createController();
+    vi.mocked(publicationClient.updatePost).mockResolvedValue(makePostRaw());
+    await controller.updatePost('photoops_session=s', 'post-1', { dateFrom: '2024-06-15T10:00:00.000Z' });
+    expect(publicationClient.updatePost).toHaveBeenCalledWith({
+      userId: 'user-1',
+      postId: 'post-1',
+      dateFrom: '2024-06-15T10:00:00.000Z'
+    });
+  });
+
   it('updatePost: forwards a photos replace-all list to the client input', async () => {
     // why: the editor's Save carries the reordered/re-captioned list.
     const { controller, publicationClient } = createController();
