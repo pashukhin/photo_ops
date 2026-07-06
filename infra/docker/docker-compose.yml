@@ -128,6 +128,10 @@ services:
       dockerfile: apps/web/Dockerfile
     environment:
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
+      # Public origin for canonical /posts/<slug> links + og:url (020). Parity only:
+      # NEXT_PUBLIC_* is build-time-inlined, so the code default is the effective
+      # value unless the image is rebuilt with a build-arg (design D1).
+      NEXT_PUBLIC_WEB_ORIGIN: ${NEXT_PUBLIC_WEB_ORIGIN:-http://localhost:3000}
       # Server-side (SSR) gateway URL for the public /posts/[slug] page (019).
       API_BASE_URL_INTERNAL: ${API_BASE_URL_INTERNAL:-http://api-gateway:3001}
     depends_on:
