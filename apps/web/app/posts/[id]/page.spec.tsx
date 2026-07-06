@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import PublicPostPage from './page';
+import PublicPostPage, { generateMetadata } from './page';
 import * as api from '@/lib/api';
 
 vi.mock('@/lib/api', () => ({ getPublicPost: vi.fn() }));
@@ -40,5 +40,36 @@ describe('PublicPostPage', () => {
   it('calls notFound() (→404, not 500) when the slug has no published post', async () => {
     vi.mocked(api.getPublicPost).mockResolvedValue(null as never);
     await expect(PublicPostPage({ params: Promise.resolve({ id: 'ghost' }) })).rejects.toThrow('NEXT_NOT_FOUND');
+  });
+});
+
+describe('PublicPostPage generateMetadata (session 020)', () => {
+  it('emits text OG + twitter meta for a found post', async () => {
+    // why: a pasted link previews with the post's title + description.
+    vi.mocked(api.getPublicPost).mockResolvedValue(dto as never);
+    const md = await generateMetadata({ params: Promise.resolve({ id: 'tok' }) });
+    expect(md.title).toBe('Trip · Photo Ops');
+    expect(md.description).toBe('day one');
+    expect(md.openGraph?.title).toBe('Trip');
+    expect(md.openGraph?.description).toBe('day one');
+    expect((md.openGraph as { url?: string }).url).toBe('http://localhost:3000/posts/tok');
+    expect((md.openGraph as { type?: string }).type).toBe('article');
+    expect((md.twitter as { card?: string }).card).toBe('summary');
+  });
+
+  it('returns a safe object (no throw) for a 404 slug', async () => {
+    // why: generateMetadata must not 500 the page; the page component 404s.
+    vi.mocked(api.getPublicPost).mockResolvedValue(null as never);
+    const md = await generateMetadata({ params: Promise.resolve({ id: 'ghost' }) });
+    expect(md.title).toBe('Story not found');
+  });
+});
+
+describe('PublicPostPage polish (session 020)', () => {
+  it('renders a footer landmark', async () => {
+    // why: D5 adds a header/footer frame to the share destination.
+    vi.mocked(api.getPublicPost).mockResolvedValue(dto as never);
+    render(await PublicPostPage({ params: Promise.resolve({ id: 'tok' }) }));
+    expect(screen.getByRole('contentinfo')).toBeTruthy();
   });
 });

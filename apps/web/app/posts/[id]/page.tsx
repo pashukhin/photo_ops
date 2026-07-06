@@ -1,6 +1,15 @@
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getPublicPost } from '@/lib/api';
 import type { PublicPostPhoto } from '@/lib/api';
+
+// Text Open Graph + Twitter meta so a shared link previews with title + description
+// (session 020, D4). No og:image (deferred, photo_ops-278). GREEN wires a React
+// cache()-wrapped getPublicPost shared with the page + a safe 404 branch.
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  throw new Error(`not implemented: ${id}`);
+}
 
 // Public, anonymous, server-rendered post page (session 019). Lives OUTSIDE the
 // (app) route group, so it never touches AuthGuard/AppShell — no session. Photos
