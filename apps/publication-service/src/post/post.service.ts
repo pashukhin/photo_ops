@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { uuidv7 } from 'uuidv7';
 import {
@@ -6,8 +7,18 @@ import {
   CreatePostRow,
   PostPatch,
   PostRecord,
-  PostSummaryRecord
+  PostSummaryRecord,
+  PostVisibility
 } from './post.types';
+import { PostUsagePort } from './usage.emitter';
+
+// Opaque, unguessable slug token minted once at first publish. Decoupled from
+// mutable fields (location/title/date) and unguessable — the latter is what makes
+// `unlisted` (link-only, not listed) meaningful. base64url(12 bytes) = 16 chars
+// over [A-Za-z0-9_-].
+function generateSlug(): string {
+  return randomBytes(12).toString('base64url');
+}
 
 // Depth-first search for a node by id within a result tree.
 function findNode(node: ClusterTreeNode | null, id: string): ClusterTreeNode | null {
@@ -36,6 +47,9 @@ export interface PostRepositoryPort {
   findByIdForUser(userId: string, postId: string): Promise<PostRecord | null>;
   listForUser(userId: string): Promise<PostSummaryRecord[]>;
   updateForUser(userId: string, postId: string, patch: PostPatch): Promise<PostRecord | null>;
+  // Public read gate (session 019): a post by slug ONLY when published +
+  // public|unlisted; else null. Not owner-scoped.
+  findBySlugPublic(slug: string): Promise<PostRecord | null>;
 }
 
 // Cluster-service read port — the proto-loader gRPC adapter implements this.
@@ -54,7 +68,8 @@ export interface CreatePostFromClusterInput {
 export class PostDomainService {
   constructor(
     private readonly repository: PostRepositoryPort,
-    private readonly clusters: ClusterReaderPort
+    private readonly clusters: ClusterReaderPort,
+    private readonly usage: PostUsagePort
   ) {}
 
   // Reads the clustering result (owner-scoped), locates the node, snapshots its
@@ -137,6 +152,68 @@ export class PostDomainService {
       }
     }
     const post = await this.repository.updateForUser(userId, postId, patch);
+    if (!post) {
+      throw new Error('post not found');
+    }
+    return post;
+  }
+
+  // Publish a draft/unpublished post as public|unlisted (session 019). Atomic
+  // "publish as <visibility>": sets status=published; mints an opaque slug and
+  // published_at ONLY on first publish (both immutable thereafter, so republish
+  // keeps stable links + first-published-at). private/unspecified is rejected
+  // before any write. Owner-scoped ('post not found' when absent/not owned).
+  async publishPost(userId: string, postId: string, visibility: PostVisibility): Promise<PostRecord> {
+    if (visibility !== 'public' && visibility !== 'unlisted') {
+      throw new Error('cannot publish private');
+    }
+    const current = await this.repository.findByIdForUser(userId, postId);
+    if (!current) {
+      throw new Error('post not found');
+    }
+    const patch: PostPatch = { status: 'published', visibility };
+    if (current.slug === null) {
+      patch.slug = generateSlug();
+    }
+    if (current.publishedAt === null) {
+      patch.publishedAt = new Date();
+    }
+    const post = await this.repository.updateForUser(userId, postId, patch);
+    if (!post) {
+      throw new Error('post not found');
+    }
+    // Best-effort, fire-and-forget: usage is a side channel — a broker failure
+    // must not fail or roll back publish (design D6). The emit is dispatched and
+    // not awaited on the request path; its rejection is logged, not propagated.
+    void this.usage.emitPostPublished({ postId, userId }).catch((err) => {
+      console.error(
+        JSON.stringify({
+          level: 'error',
+          msg: 'usage.emit.post_published.failed',
+          postId,
+          error: err instanceof Error ? err.message : String(err)
+        })
+      );
+    });
+    return post;
+  }
+
+  // Unpublish a published post (session 019): status=unpublished only; slug +
+  // published_at + visibility are left untouched (so a later republish is stable).
+  // Emits nothing. Owner-scoped.
+  async unpublishPost(userId: string, postId: string): Promise<PostRecord> {
+    const post = await this.repository.updateForUser(userId, postId, { status: 'unpublished' });
+    if (!post) {
+      throw new Error('post not found');
+    }
+    return post;
+  }
+
+  // Public, unauthenticated read gate (session 019): the post for a slug ONLY
+  // when it is published + public|unlisted; draft/unpublished/private/unknown all
+  // collapse to 'post not found' (→ NOT_FOUND → 404), leaking no distinction.
+  async getPublicPostBySlug(slug: string): Promise<PostRecord> {
+    const post = await this.repository.findBySlugPublic(slug);
     if (!post) {
       throw new Error('post not found');
     }

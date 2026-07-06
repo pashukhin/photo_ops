@@ -46,6 +46,28 @@ SORT_DIRECTION_UNSPECIFIED: SortDirection
 SORT_DIRECTION_ASC: SortDirection
 SORT_DIRECTION_DESC: SortDirection
 
+class GetVariantsByIdsRequest(_message.Message):
+    __slots__ = ("user_id", "photo_id")
+    USER_ID_FIELD_NUMBER: _ClassVar[int]
+    PHOTO_ID_FIELD_NUMBER: _ClassVar[int]
+    user_id: str
+    photo_id: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, user_id: _Optional[str] = ..., photo_id: _Optional[_Iterable[str]] = ...) -> None: ...
+
+class PhotoVariantsForId(_message.Message):
+    __slots__ = ("photo_id", "variants")
+    PHOTO_ID_FIELD_NUMBER: _ClassVar[int]
+    VARIANTS_FIELD_NUMBER: _ClassVar[int]
+    photo_id: str
+    variants: _containers.RepeatedCompositeFieldContainer[PhotoVariantView]
+    def __init__(self, photo_id: _Optional[str] = ..., variants: _Optional[_Iterable[_Union[PhotoVariantView, _Mapping]]] = ...) -> None: ...
+
+class GetVariantsByIdsResponse(_message.Message):
+    __slots__ = ("results",)
+    RESULTS_FIELD_NUMBER: _ClassVar[int]
+    results: _containers.RepeatedCompositeFieldContainer[PhotoVariantsForId]
+    def __init__(self, results: _Optional[_Iterable[_Union[PhotoVariantsForId, _Mapping]]] = ...) -> None: ...
+
 class ListPhotoSpacetimeRequest(_message.Message):
     __slots__ = ("user_id",)
     USER_ID_FIELD_NUMBER: _ClassVar[int]

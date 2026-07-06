@@ -193,6 +193,37 @@ export class PhotoRepository implements PhotoRepositoryPort {
     return rows.map((v) => this.toVariantRecord(v));
   }
 
+  // Owner-scoped batched variant lookup (session 019). Owner scope is enforced
+  // here: only photos owned by userId among the requested ids are considered,
+  // then their variants are grouped by photo. Non-owned / unknown / no-variant
+  // ids simply do not appear in the result.
+  async findVariantsByIdsForUser(
+    userId: string,
+    photoIds: string[]
+  ): Promise<{ photoId: string; variants: PhotoVariantRecord[] }[]> {
+    if (photoIds.length === 0) return [];
+    const ownedRows = await this.db
+      .select({ id: photoAssets.id })
+      .from(photoAssets)
+      .where(and(eq(photoAssets.userId, userId), inArray(photoAssets.id, photoIds)));
+    const ownedIds = ownedRows.map((r) => r.id);
+    if (ownedIds.length === 0) return [];
+    const variantRows = await this.db
+      .select()
+      .from(photoVariants)
+      .where(inArray(photoVariants.photoId, ownedIds));
+    const byPhoto = new Map<string, PhotoVariantRecord[]>();
+    for (const row of variantRows) {
+      const rec = this.toVariantRecord(row);
+      const existing = byPhoto.get(rec.photoId);
+      if (existing) existing.push(rec);
+      else byPhoto.set(rec.photoId, [rec]);
+    }
+    return ownedIds
+      .filter((id) => byPhoto.has(id))
+      .map((id) => ({ photoId: id, variants: byPhoto.get(id) as PhotoVariantRecord[] }));
+  }
+
   private toRecord(row: typeof photoAssets.$inferSelect): PhotoAssetRecord {
     return {
       id: row.id,

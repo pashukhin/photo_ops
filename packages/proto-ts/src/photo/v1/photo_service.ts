@@ -41,6 +41,21 @@ export enum SortDirection {
   UNRECOGNIZED = -1,
 }
 
+export interface GetVariantsByIdsRequest {
+  /** owner scope */
+  userId: string;
+  photoId: string[];
+}
+
+export interface PhotoVariantsForId {
+  photoId: string;
+  variants: PhotoVariantView[];
+}
+
+export interface GetVariantsByIdsResponse {
+  results: PhotoVariantsForId[];
+}
+
 export interface ListPhotoSpacetimeRequest {
   /** owner scope; returns only this user's `ready` photos */
   userId: string;
@@ -153,6 +168,139 @@ export interface PhotoAsset {
 }
 
 export const PHOTOOPS_PHOTO_V1_PACKAGE_NAME = "photoops.photo.v1";
+
+function createBaseGetVariantsByIdsRequest(): GetVariantsByIdsRequest {
+  return { userId: "", photoId: [] };
+}
+
+export const GetVariantsByIdsRequest: MessageFns<GetVariantsByIdsRequest> = {
+  encode(message: GetVariantsByIdsRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.userId !== "") {
+      writer.uint32(10).string(message.userId);
+    }
+    for (const v of message.photoId) {
+      writer.uint32(18).string(v!);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetVariantsByIdsRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetVariantsByIdsRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.userId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.photoId.push(reader.string());
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBasePhotoVariantsForId(): PhotoVariantsForId {
+  return { photoId: "", variants: [] };
+}
+
+export const PhotoVariantsForId: MessageFns<PhotoVariantsForId> = {
+  encode(message: PhotoVariantsForId, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.photoId !== "") {
+      writer.uint32(10).string(message.photoId);
+    }
+    for (const v of message.variants) {
+      PhotoVariantView.encode(v!, writer.uint32(18).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): PhotoVariantsForId {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBasePhotoVariantsForId();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.photoId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.variants.push(PhotoVariantView.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBaseGetVariantsByIdsResponse(): GetVariantsByIdsResponse {
+  return { results: [] };
+}
+
+export const GetVariantsByIdsResponse: MessageFns<GetVariantsByIdsResponse> = {
+  encode(message: GetVariantsByIdsResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    for (const v of message.results) {
+      PhotoVariantsForId.encode(v!, writer.uint32(10).fork()).join();
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GetVariantsByIdsResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGetVariantsByIdsResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.results.push(PhotoVariantsForId.decode(reader, reader.uint32()));
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
 
 function createBaseListPhotoSpacetimeRequest(): ListPhotoSpacetimeRequest {
   return { userId: "" };
@@ -1084,6 +1232,16 @@ export interface PhotoServiceClient {
    */
 
   listPhotoSpacetime(request: ListPhotoSpacetimeRequest): Observable<ListPhotoSpacetimeResponse>;
+
+  /**
+   * Internal batched owner-scoped variant resolution (session 019): given a set
+   * of photo ids, return each owned photo's variant views (short-lived presigned
+   * GET urls — variants only, NEVER originals). Non-owned / unknown ids are
+   * simply absent from the result. Consumed by api-gateway's public post route.
+   * Deliberately NOT gateway-exposed (no http annotation).
+   */
+
+  getVariantsByIds(request: GetVariantsByIdsRequest): Observable<GetVariantsByIdsResponse>;
 }
 
 export interface PhotoServiceController {
@@ -1113,6 +1271,18 @@ export interface PhotoServiceController {
   listPhotoSpacetime(
     request: ListPhotoSpacetimeRequest,
   ): Promise<ListPhotoSpacetimeResponse> | Observable<ListPhotoSpacetimeResponse> | ListPhotoSpacetimeResponse;
+
+  /**
+   * Internal batched owner-scoped variant resolution (session 019): given a set
+   * of photo ids, return each owned photo's variant views (short-lived presigned
+   * GET urls — variants only, NEVER originals). Non-owned / unknown ids are
+   * simply absent from the result. Consumed by api-gateway's public post route.
+   * Deliberately NOT gateway-exposed (no http annotation).
+   */
+
+  getVariantsByIds(
+    request: GetVariantsByIdsRequest,
+  ): Promise<GetVariantsByIdsResponse> | Observable<GetVariantsByIdsResponse> | GetVariantsByIdsResponse;
 }
 
 export function PhotoServiceControllerMethods() {
@@ -1124,6 +1294,7 @@ export function PhotoServiceControllerMethods() {
       "listPhotos",
       "getPhoto",
       "listPhotoSpacetime",
+      "getVariantsByIds",
     ];
     for (const method of grpcMethods) {
       const descriptor: any = Reflect.getOwnPropertyDescriptor(constructor.prototype, method);
@@ -1206,6 +1377,24 @@ export const PhotoServiceService = {
       Buffer.from(ListPhotoSpacetimeResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer): ListPhotoSpacetimeResponse => ListPhotoSpacetimeResponse.decode(value),
   },
+  /**
+   * Internal batched owner-scoped variant resolution (session 019): given a set
+   * of photo ids, return each owned photo's variant views (short-lived presigned
+   * GET urls — variants only, NEVER originals). Non-owned / unknown ids are
+   * simply absent from the result. Consumed by api-gateway's public post route.
+   * Deliberately NOT gateway-exposed (no http annotation).
+   */
+  getVariantsByIds: {
+    path: "/photoops.photo.v1.PhotoService/GetVariantsByIds" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: GetVariantsByIdsRequest): Buffer =>
+      Buffer.from(GetVariantsByIdsRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): GetVariantsByIdsRequest => GetVariantsByIdsRequest.decode(value),
+    responseSerialize: (value: GetVariantsByIdsResponse): Buffer =>
+      Buffer.from(GetVariantsByIdsResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): GetVariantsByIdsResponse => GetVariantsByIdsResponse.decode(value),
+  },
 } as const;
 
 export interface PhotoServiceServer extends UntypedServiceImplementation {
@@ -1221,6 +1410,14 @@ export interface PhotoServiceServer extends UntypedServiceImplementation {
    * payload (variants, presigned urls). Consumed by cluster-worker.
    */
   listPhotoSpacetime: handleUnaryCall<ListPhotoSpacetimeRequest, ListPhotoSpacetimeResponse>;
+  /**
+   * Internal batched owner-scoped variant resolution (session 019): given a set
+   * of photo ids, return each owned photo's variant views (short-lived presigned
+   * GET urls — variants only, NEVER originals). Non-owned / unknown ids are
+   * simply absent from the result. Consumed by api-gateway's public post route.
+   * Deliberately NOT gateway-exposed (no http annotation).
+   */
+  getVariantsByIds: handleUnaryCall<GetVariantsByIdsRequest, GetVariantsByIdsResponse>;
 }
 
 export interface MessageFns<T> {

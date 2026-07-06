@@ -148,6 +148,7 @@ migrate-cluster:
 migrate-publication:
 	$(DC) exec -T postgres psql -U "$${POSTGRES_SUPERUSER}" -d postgres < infra/postgres/init/001-create-databases.sql
 	$(DC) exec -T postgres psql "$${PUBLICATION_DATABASE_URL}" < apps/publication-service/migrations/0001_create_publication_tables.sql
+	$(DC) exec -T postgres psql "$${PUBLICATION_DATABASE_URL}" < apps/publication-service/migrations/0002_publish_slug_unique.sql
 
 smoke-upload:
 	scripts/smoke-upload.sh

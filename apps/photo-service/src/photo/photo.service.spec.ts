@@ -78,7 +78,8 @@ function createService() {
     applyAttributes: vi.fn(),
     setStatus: vi.fn(),
     findByIdWithVariantsForUser: vi.fn(),
-    listVariantsForPhotos: vi.fn()
+    listVariantsForPhotos: vi.fn(),
+    findVariantsByIdsForUser: vi.fn()
   };
   const storage = {
     createPresignedPutUrl: vi.fn(),
@@ -464,5 +465,25 @@ describe('PhotoDomainService', () => {
 
     const published = publisher.publish.mock.calls[0][1];
     expect(published.correlationId).toBe(`00-${'a'.repeat(32)}-${'b'.repeat(16)}-01`);
+  });
+});
+
+describe('PhotoDomainService.getVariantsByIds', () => {
+  it('resolves owner-scoped variant views for the given ids, omitting non-owned/absent ids', async () => {
+    // why: public delivery batches a published post's photo_ids → variant URLs in
+    // one call; a non-owned/unknown id is silently absent (no leak); only variants
+    // (never originals) carry a URL.
+    const { service, repository, storage } = createService();
+    repository.findVariantsByIdsForUser.mockResolvedValue([
+      { photoId: 'p1', variants: [makeVariantRecord({ photoId: 'p1', objectKey: 'k1', width: 40, height: 40 })] }
+    ]);
+    storage.createPresignedGetUrl.mockResolvedValue('http://img/k1');
+
+    const result = await service.getVariantsByIds('user-1', ['p1', 'pX']);
+
+    expect(repository.findVariantsByIdsForUser).toHaveBeenCalledWith('user-1', ['p1', 'pX']);
+    expect(result).toEqual([
+      { photoId: 'p1', variants: [{ variantType: 'thumbnail', url: 'http://img/k1', width: 40, height: 40 }] }
+    ]);
   });
 });

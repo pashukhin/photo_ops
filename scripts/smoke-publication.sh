@@ -207,4 +207,90 @@ curl -fsS -b "$COOKIE2" "$API_BASE_URL/v1/posts" \
   | jq -e '[.posts[].id] | index("'"$POST_ID"'") == null' >/dev/null \
   || { echo "ASSERTION FAILED: post leaked into another user's list" >&2; exit 1; }
 
+# ---------------------------------------------------------------------------
+# 8. Publish (session 019): slug + published_at; public page reachable LOGGED OUT
+# ---------------------------------------------------------------------------
+WEB_BASE_URL="${WEB_BASE_URL:-http://localhost:3000}"
+
+curl -fsS -b "$COOKIE_PATH" -H 'content-type: application/json' \
+  -d '{"visibility":"public"}' \
+  "$API_BASE_URL/v1/posts/$POST_ID/publish" > "$POST_PATH"
+jq -e '.status == "published" and (.slug | length) > 0 and (.publishedAt != "" and .publishedAt != null)' "$POST_PATH" >/dev/null \
+  || { echo "ASSERTION FAILED: publish did not set status/slug/published_at" >&2; cat "$POST_PATH" >&2; exit 1; }
+SLUG="$(jq -r '.slug' "$POST_PATH")"
+PUBLISHED_AT="$(jq -r '.publishedAt' "$POST_PATH")"
+echo "[smoke-publication] slug=$SLUG" >&2
+
+# Gateway JSON, LOGGED OUT (no -b cookie): only a published public|unlisted post;
+# the DTO carries variant urls and NO owner/status/visibility fields.
+PUB_PATH="$TMP/public.json"
+curl -fsS "$API_BASE_URL/v1/public/posts/$SLUG" > "$PUB_PATH"
+jq -e '
+  (.slug == "'"$SLUG"'")
+  and (has("userId") | not) and (has("status") | not) and (has("visibility") | not)
+  and (has("sourceClusterId") | not)
+  and ((.photos | length) > 0)
+  and ((.photos[0].variants | length) > 0)
+  and ((.photos[0].variants[0].url | length) > 0)
+' "$PUB_PATH" >/dev/null \
+  || { echo "ASSERTION FAILED: public DTO leaked owner fields or lacked variant urls" >&2; cat "$PUB_PATH" >&2; exit 1; }
+
+# dqb — the variant url must resolve to REAL image bytes (the wire boundary jsdom
+# cannot see; s018 lesson).
+VARIANT_URL="$(jq -r '.photos[0].variants[0].url' "$PUB_PATH")"
+CT="$(curl -fsS -o /dev/null -w '%{content_type}' "$VARIANT_URL")"
+case "$CT" in
+  image/*) : ;;
+  *) echo "ASSERTION FAILED: variant url did not return image bytes (content-type=$CT)" >&2; exit 1 ;;
+esac
+
+# Publishing as private is rejected at the edge (400).
+PRIV_CODE="$(curl -s -o /dev/null -w '%{http_code}' -b "$COOKIE_PATH" -H 'content-type: application/json' \
+  -d '{"visibility":"private"}' "$API_BASE_URL/v1/posts/$POST_ID/publish")"
+[ "$PRIV_CODE" = "400" ] \
+  || { echo "ASSERTION FAILED: publish private returned $PRIV_CODE (expected 400)" >&2; exit 1; }
+
+# Web SSR page, LOGGED OUT → 200 HTML.
+WEB_CODE="$(curl -s -o /dev/null -w '%{http_code}' "$WEB_BASE_URL/posts/$SLUG")"
+[ "$WEB_CODE" = "200" ] \
+  || { echo "ASSERTION FAILED: web GET /posts/$SLUG returned $WEB_CODE (expected 200)" >&2; exit 1; }
+
+# post_published usage event reaches the usage plane (async AMQP hop → poll).
+FOUND=0
+DEADLINE=$(( $(date +%s) + 30 ))
+while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+  if curl -fsS -b "$COOKIE_PATH" "$API_BASE_URL/v1/usage/events" \
+    | jq -e '[.lines[] | select(.eventType == "post_published")] | length > 0' >/dev/null 2>&1; then
+    FOUND=1; break
+  fi
+  sleep 2
+done
+[ "$FOUND" = "1" ] \
+  || { echo "ASSERTION FAILED: post_published usage event did not reach /v1/usage/events" >&2; exit 1; }
+
+# ---------------------------------------------------------------------------
+# 9. Unpublish → the public page 404s on BOTH surfaces
+# ---------------------------------------------------------------------------
+curl -fsS -b "$COOKIE_PATH" -X POST "$API_BASE_URL/v1/posts/$POST_ID/unpublish" > "$POST_PATH"
+jq -e '.status == "unpublished"' "$POST_PATH" >/dev/null \
+  || { echo "ASSERTION FAILED: unpublish did not set status=unpublished" >&2; cat "$POST_PATH" >&2; exit 1; }
+UNPUB_CODE="$(curl -s -o /dev/null -w '%{http_code}' "$API_BASE_URL/v1/public/posts/$SLUG")"
+[ "$UNPUB_CODE" = "404" ] \
+  || { echo "ASSERTION FAILED: public GET after unpublish returned $UNPUB_CODE (expected 404)" >&2; exit 1; }
+WEB_UNPUB_CODE="$(curl -s -o /dev/null -w '%{http_code}' "$WEB_BASE_URL/posts/$SLUG")"
+[ "$WEB_UNPUB_CODE" = "404" ] \
+  || { echo "ASSERTION FAILED: web GET after unpublish returned $WEB_UNPUB_CODE (expected 404)" >&2; exit 1; }
+
+# ---------------------------------------------------------------------------
+# 10. Republish as unlisted: slug + published_at IMMUTABLE; reachable by slug
+# ---------------------------------------------------------------------------
+curl -fsS -b "$COOKIE_PATH" -H 'content-type: application/json' \
+  -d '{"visibility":"unlisted"}' \
+  "$API_BASE_URL/v1/posts/$POST_ID/publish" > "$POST_PATH"
+jq -e '.slug == "'"$SLUG"'" and .publishedAt == "'"$PUBLISHED_AT"'"' "$POST_PATH" >/dev/null \
+  || { echo "ASSERTION FAILED: republish changed slug or published_at (must be immutable)" >&2; cat "$POST_PATH" >&2; exit 1; }
+RELIST_CODE="$(curl -s -o /dev/null -w '%{http_code}' "$API_BASE_URL/v1/public/posts/$SLUG")"
+[ "$RELIST_CODE" = "200" ] \
+  || { echo "ASSERTION FAILED: published+unlisted not reachable by direct slug ($RELIST_CODE, expected 200)" >&2; exit 1; }
+
 echo "[smoke-publication] OK" >&2

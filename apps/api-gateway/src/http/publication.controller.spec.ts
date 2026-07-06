@@ -1,5 +1,6 @@
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
+import { PhotoClient } from '../grpc/photo.client';
 import { PostRaw, PublicationClient } from '../grpc/publication.client';
 import { PublicationController } from './publication.controller';
 
@@ -31,12 +32,17 @@ function createController() {
     createPostFromCluster: vi.fn(),
     getPost: vi.fn(),
     listPosts: vi.fn(),
-    updatePost: vi.fn()
+    updatePost: vi.fn(),
+    publishPost: vi.fn(),
+    unpublishPost: vi.fn(),
+    getPublicPostBySlug: vi.fn()
   } as unknown as PublicationClient;
+  const photoClient = { getVariantsByIds: vi.fn() } as unknown as PhotoClient;
   const authService = { requireSession: vi.fn().mockResolvedValue({ userId: 'user-1' }) };
   return {
-    controller: new PublicationController(publicationClient, authService as never),
+    controller: new PublicationController(publicationClient, photoClient, authService as never),
     publicationClient,
+    photoClient,
     authService
   };
 }
@@ -190,5 +196,78 @@ describe('PublicationController', () => {
     expect(result.sourceClusterId).toBe('node-A');
     expect(result.status).toBe('draft');
     expect(result.photos).toEqual([{ photoId: 'p1', order: 0, caption: '' }]);
+  });
+
+  it('publishPost: maps the visibility string to the proto enum, owner-scoped', async () => {
+    const { controller, publicationClient } = createController();
+    vi.mocked(publicationClient.publishPost).mockResolvedValue(
+      makePostRaw({ status: 2, visibility: 3, slug: 'tok', publishedAt: '2026-07-06T00:00:00.000Z' })
+    );
+    const res = (await controller.publishPost('photoops_session=s', 'post-1', { visibility: 'public' })) as {
+      status: string;
+      slug: string;
+    };
+    expect(publicationClient.publishPost).toHaveBeenCalledWith({ userId: 'user-1', postId: 'post-1', visibility: 3 });
+    expect(res.status).toBe('published');
+    expect(res.slug).toBe('tok');
+  });
+
+  it('publishPost: rejects visibility=private with 400 and never calls the client', async () => {
+    // why: VISIBILITY_TO_PROTO includes private:1 — publish needs an EXPLICIT
+    // reject, not the updatePost lookup pattern.
+    const { controller, publicationClient } = createController();
+    await expect(
+      controller.publishPost('photoops_session=s', 'post-1', { visibility: 'private' })
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(publicationClient.publishPost).not.toHaveBeenCalled();
+  });
+
+  it('publishPost: rejects an unknown or absent visibility with 400', async () => {
+    const { controller } = createController();
+    await expect(
+      controller.publishPost('photoops_session=s', 'post-1', { visibility: 'pubic' })
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      controller.publishPost('photoops_session=s', 'post-1', {})
+    ).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('unpublishPost: owner-scoped, maps the result', async () => {
+    const { controller, publicationClient } = createController();
+    vi.mocked(publicationClient.unpublishPost).mockResolvedValue(makePostRaw({ status: 3 }));
+    const res = (await controller.unpublishPost('photoops_session=s', 'post-1')) as { status: string };
+    expect(publicationClient.unpublishPost).toHaveBeenCalledWith({ userId: 'user-1', postId: 'post-1' });
+    expect(res.status).toBe('unpublished');
+  });
+
+  it('publicPost: resolves a published post by slug with variant urls, no owner fields, no session', async () => {
+    const { controller, publicationClient, photoClient, authService } = createController();
+    vi.mocked(publicationClient.getPublicPostBySlug).mockResolvedValue(
+      makePostRaw({
+        status: 2,
+        visibility: 3,
+        slug: 'tok',
+        title: 'Trip',
+        body: 'day one',
+        photos: [{ photoId: 'p1', order: 0, caption: 'first' }]
+      })
+    );
+    vi.mocked(photoClient.getVariantsByIds).mockResolvedValue({
+      results: [{ photoId: 'p1', variants: [{ variantType: 'thumbnail', url: 'http://img/p1', width: 40, height: 40 }] }]
+    });
+
+    const res = (await controller.publicPost('tok')) as Record<string, unknown>;
+
+    expect(authService.requireSession).not.toHaveBeenCalled(); // public route
+    expect(publicationClient.getPublicPostBySlug).toHaveBeenCalledWith('tok');
+    expect(photoClient.getVariantsByIds).toHaveBeenCalledWith({ userId: 'user-1', photoIds: ['p1'] });
+    for (const leaked of ['userId', 'status', 'visibility', 'sourceClusterId', 'sourceResultId']) {
+      expect(res).not.toHaveProperty(leaked);
+    }
+    expect(res.slug).toBe('tok');
+    expect(res.title).toBe('Trip');
+    expect(res.photos).toEqual([
+      { order: 0, caption: 'first', variants: [{ variantType: 'thumbnail', url: 'http://img/p1', width: 40, height: 40 }] }
+    ]);
   });
 });

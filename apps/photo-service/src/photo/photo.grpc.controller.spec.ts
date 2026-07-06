@@ -44,7 +44,8 @@ function createController() {
     completeUpload: vi.fn(),
     listPhotos: vi.fn(),
     getPhoto: vi.fn(),
-    listSpacetime: vi.fn()
+    listSpacetime: vi.fn(),
+    getVariantsByIds: vi.fn()
   };
   return { controller: new PhotoGrpcController(photoService as never), photoService };
 }
@@ -194,6 +195,22 @@ describe('PhotoGrpcController', () => {
       expect(second.takenAtUtc).toBe('');
       expect('lat' in second).toBe(false);
       expect('lon' in second).toBe(false);
+    });
+  });
+
+  it('GetVariantsByIds delegates owner-scoped and wraps the results', async () => {
+    // why: the batched variant surface — the domain result is wrapped into the
+    // proto `{ results: [...] }` envelope; owner scope is the userId + photo ids.
+    const { controller, photoService } = createController();
+    photoService.getVariantsByIds.mockResolvedValue([
+      { photoId: 'p1', variants: [{ variantType: 'thumbnail', url: 'http://img/k1', width: 40, height: 40 }] }
+    ]);
+
+    const res = await controller.getVariantsByIds({ userId: 'user-1', photoId: ['p1'] });
+
+    expect(photoService.getVariantsByIds).toHaveBeenCalledWith('user-1', ['p1']);
+    expect(res).toEqual({
+      results: [{ photoId: 'p1', variants: [{ variantType: 'thumbnail', url: 'http://img/k1', width: 40, height: 40 }] }]
     });
   });
 });

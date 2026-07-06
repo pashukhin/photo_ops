@@ -44,6 +44,34 @@ service PublicationService {
       body: "*"
     };
   }
+
+  // Publish a draft/unpublished post as public|unlisted (session 019): sets
+  // status=published, mints an opaque slug (once) + published_at (once), and
+  // requires a public|unlisted visibility. Owner-scoped.
+  rpc PublishPost(PublishPostRequest) returns (Post) {
+    option (google.api.http) = {
+      post: "/v1/posts/{post_id}/publish"
+      body: "*"
+    };
+  }
+
+  // Unpublish a published post (session 019): status=unpublished; slug +
+  // published_at + visibility are left untouched. Owner-scoped.
+  rpc UnpublishPost(UnpublishPostRequest) returns (Post) {
+    option (google.api.http) = {
+      post: "/v1/posts/{post_id}/unpublish"
+      body: "*"
+    };
+  }
+
+  // Public, UNAUTHENTICATED read gate (session 019): returns a post ONLY when it
+  // is published AND visibility is public|unlisted, else NOT_FOUND (draft /
+  // unpublished / private / unknown slug all collapse to NOT_FOUND). Not
+  // owner-scoped (no user_id); the returned Post carries the owner user_id
+  // internally so api-gateway can resolve variant urls.
+  rpc GetPublicPostBySlug(GetPublicPostBySlugRequest) returns (Post) {
+    option (google.api.http) = {get: "/v1/public/posts/{slug}"};
+  }
 }
 
 message CreatePostFromClusterRequest {
@@ -79,6 +107,21 @@ message UpdatePostRequest {
   // Replace-all post_photos. Present -> the post's photos become exactly this
   // list (order = position); absent -> photos untouched (e.g. a title-only PATCH).
   optional PostPhotoList photos = 10;
+}
+
+message PublishPostRequest {
+  string post_id = 1;
+  string user_id = 2;             // owner scope
+  PostVisibility visibility = 3;  // must be PUBLIC or UNLISTED (private/unspecified rejected)
+}
+
+message UnpublishPostRequest {
+  string post_id = 1;
+  string user_id = 2;  // owner scope
+}
+
+message GetPublicPostBySlugRequest {
+  string slug = 1;  // no user_id — public read gated by published + public|unlisted
 }
 
 // A photo in a replace-all UpdatePost photos list. No order field — the list

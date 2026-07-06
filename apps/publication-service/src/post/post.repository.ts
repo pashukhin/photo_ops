@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { and, asc, count, desc, eq } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray } from 'drizzle-orm';
 import { createDb } from '../db/client';
 import { postPhotos, posts } from '../db/schema';
 import { PostRepositoryPort } from './post.service';
@@ -106,6 +106,10 @@ export class PostRepository implements PostRepositoryPort {
     if (patch.mapEnabled !== undefined) set.mapEnabled = patch.mapEnabled;
     if (patch.dateFrom !== undefined) set.dateFrom = patch.dateFrom;
     if (patch.dateTo !== undefined) set.dateTo = patch.dateTo;
+    // Publish/unpublish transitions (session 019).
+    if (patch.status !== undefined) set.status = patch.status;
+    if (patch.slug !== undefined) set.slug = patch.slug;
+    if (patch.publishedAt !== undefined) set.publishedAt = patch.publishedAt;
 
     // The scalar update and the (optional) post_photos replace-all are one unit.
     return this.db.transaction(async (tx) => {
@@ -142,6 +146,22 @@ export class PostRepository implements PostRepositoryPort {
         photoRows.map((row) => ({ photoId: row.photoId, order: row.order, caption: row.caption }))
       );
     });
+  }
+
+  // Public read gate: a post by slug ONLY when published + public|unlisted; else
+  // null. Not owner-scoped — the slug + status/visibility filter IS the gate.
+  async findBySlugPublic(slug: string): Promise<PostRecord | null> {
+    const [row] = await this.db
+      .select()
+      .from(posts)
+      .where(
+        and(eq(posts.slug, slug), eq(posts.status, 'published'), inArray(posts.visibility, ['public', 'unlisted']))
+      )
+      .limit(1);
+    if (!row) {
+      return null;
+    }
+    return this.toRecord(row, await this.photosFor(row.id));
   }
 
   private async photosFor(postId: string): Promise<PostPhotoRecord[]> {

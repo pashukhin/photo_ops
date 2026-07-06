@@ -81,6 +81,11 @@ export interface PostPatch {
   dateFrom?: Date | null;
   dateTo?: Date | null;
   photos?: PostPhotoInput[];
+  // Publish/unpublish transitions (session 019). slug + publishedAt are set only
+  // at first publish (immutable thereafter — the domain omits them on republish).
+  status?: PostStatus;
+  slug?: string;
+  publishedAt?: Date | null;
 }
 
 // The lean cluster tree the service reads from cluster-service (runtime gRPC

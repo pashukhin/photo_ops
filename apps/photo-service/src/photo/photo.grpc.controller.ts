@@ -124,6 +124,27 @@ export class PhotoGrpcController {
     };
   }
 
+  @GrpcMethod('PhotoService', 'GetVariantsByIds')
+  async getVariantsByIds(request: {
+    userId: string;
+    photoId?: string[]; // proto `repeated string photo_id`; empty repeated -> absent
+  }): Promise<{
+    results: { photoId: string; variants: { variantType: string; url: string; width: number; height: number }[] }[];
+  }> {
+    const results = await this.photoService.getVariantsByIds(request.userId, request.photoId ?? []);
+    return {
+      results: results.map((r) => ({
+        photoId: r.photoId,
+        variants: r.variants.map((v) => ({
+          variantType: v.variantType,
+          url: v.url,
+          width: v.width,
+          height: v.height
+        }))
+      }))
+    };
+  }
+
   private toProtoPhoto(pwv: PhotoWithVariants) {
     const statusMap = {
       uploading: 1,
