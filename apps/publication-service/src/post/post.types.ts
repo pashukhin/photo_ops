@@ -62,8 +62,16 @@ export interface CreatePostRow {
   photos: PostPhotoRecord[];
 }
 
-// Partial scalar update; only present keys are applied. post_photos mutation is
-// session 018 (not here).
+// A photo in a replace-all UpdatePost list; order = list position (assigned by
+// the repository). photo_id must already be a member of the post.
+export interface PostPhotoInput {
+  photoId: string;
+  caption: string;
+}
+
+// Partial update; only present keys are applied. `photos` present ⇒ replace-all
+// of post_photos (non-empty subset of the post's current membership, no dups —
+// session 018).
 export interface PostPatch {
   title?: string;
   body?: string;
@@ -72,6 +80,7 @@ export interface PostPatch {
   mapEnabled?: boolean;
   dateFrom?: Date | null;
   dateTo?: Date | null;
+  photos?: PostPhotoInput[];
 }
 
 // The lean cluster tree the service reads from cluster-service (runtime gRPC
