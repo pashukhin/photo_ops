@@ -312,8 +312,16 @@ replace-all 500 slipped past mocks).
   public route returns a DTO with **no** owner/status/visibility fields; public
   route 404 on NOT_FOUND; unpublish route wired.
 - **web (vitest/jsdom):** editor renders Publish + visibility selector and calls
-  `publishPost`; published panel shows the `/posts/<slug>` link + Unpublish.
-  (The server-component public page is exercised by the live smoke, not jsdom.)
+  `publishPost`; published panel shows the `/posts/<slug>` link + Unpublish. **The
+  server-component public page still needs a thin `app/posts/[slug]/page.spec.tsx`**
+  — `make coverage-gate` runs diff-cover at `--fail-under 100` and *will* score the
+  new `page.tsx`'s lines, so "covered by the smoke" is NOT enough (that phrasing
+  would walk into a red gate). Follow the s018 precedent
+  (`app/(app)/posts/[id]/edit/page.spec.tsx`): `render(await Page({ params:
+  Promise.resolve({ slug }) }))` with `getPublicPost` and `next/navigation`'s
+  `notFound` `vi.mock`-ed; assert the render for a found post and that a 404 path
+  calls `notFound()`. The live smoke is **additional** wire-boundary coverage, not a
+  substitute for this unit test.
 - **dqb / live smoke:** extend `scripts/smoke-publication.sh` (or a new
   `scripts/smoke-public.sh`; the current smoke is cookie-authed on every curl —
   "logged-out" = simply omit `-b $COOKIE`). Two distinct surfaces, don't conflate:
