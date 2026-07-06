@@ -16,11 +16,28 @@ export interface ListPhotosInput {
   filenameQuery: string;
 }
 
+// Variant views for the public post route (session 019). photo-service returns
+// each owned photo's variants (short-lived presigned GET urls — variants only).
+export interface PublicVariantView {
+  variantType: string;
+  url: string;
+  width: number;
+  height: number;
+}
+export interface PhotoVariantsForId {
+  photoId: string;
+  variants: PublicVariantView[];
+}
+export interface GetVariantsByIdsResult {
+  results: PhotoVariantsForId[];
+}
+
 export interface PhotoGatewayClient {
   createUploadIntent(input: { userId: string; filename: string; contentType: string; sizeBytes: string }): Promise<unknown>;
   completeUpload(input: { userId: string; photoId: string }): Promise<unknown>;
   listPhotos(input: ListPhotosInput): Promise<unknown>;
   getPhoto(input: { userId: string; photoId: string }): Promise<unknown>;
+  getVariantsByIds(input: { userId: string; photoIds: string[] }): Promise<GetVariantsByIdsResult>;
 }
 
 type Callback<T> = (error: Error | null, value: T) => void;
@@ -30,6 +47,8 @@ interface GrpcPhotoServiceClient {
   CompleteUpload(input: { userId: string; photoId: string }, callback: Callback<unknown>): void;
   ListPhotos(input: ListPhotosInput, callback: Callback<unknown>): void;
   GetPhoto(input: { userId: string; photoId: string }, callback: Callback<unknown>): void;
+  // Wire field is `photoId` (repeated), NOT `photoIds` — see getVariantsByIds.
+  GetVariantsByIds(input: { userId: string; photoId: string[] }, callback: Callback<GetVariantsByIdsResult>): void;
 }
 
 @Injectable()
@@ -67,6 +86,15 @@ export class PhotoClient implements PhotoGatewayClient {
 
   async getPhoto(input: { userId: string; photoId: string }) {
     return this.call((callback) => this.client.GetPhoto(input, callback));
+  }
+
+  // Remap the plural `photoIds` to the proto wire field `photoId` (repeated) —
+  // under keepCase:false a literal pass-through of `photoIds` would be an unknown
+  // field (dropped) and photo-service would receive an empty id list.
+  async getVariantsByIds(input: { userId: string; photoIds: string[] }): Promise<GetVariantsByIdsResult> {
+    return this.call((callback) =>
+      this.client.GetVariantsByIds({ userId: input.userId, photoId: input.photoIds }, callback)
+    );
   }
 
   private call<T>(invoke: (callback: Callback<T>) => void): Promise<T> {

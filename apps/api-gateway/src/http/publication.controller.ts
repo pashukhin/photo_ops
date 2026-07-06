@@ -1,5 +1,6 @@
 import { BadRequestException, Body, Controller, Get, Headers, Param, Patch, Post } from '@nestjs/common';
 import { AuthService } from '../auth/auth.service';
+import { PhotoClient, PublicVariantView } from '../grpc/photo.client';
 import { PostRaw, PostSummaryRaw, PublicationClient, UpdatePostInput } from '../grpc/publication.client';
 
 // Proto enum (numeric, from proto-loader) <-> browser-facing string.
@@ -24,12 +25,17 @@ export interface UpdatePostBody {
   photos?: { photoId: string; caption: string }[]; // replace-all; order = position
 }
 
+export interface PublishPostBody {
+  visibility?: string; // must be 'public' | 'unlisted'
+}
+
 // Session-authed Post edge. userId comes from the validated session, never the
 // body; proto status/visibility enum numbers map to browser strings.
 @Controller('v1')
 export class PublicationController {
   constructor(
     private readonly publicationClient: PublicationClient,
+    private readonly photoClient: PhotoClient,
     private readonly authService: AuthService
   ) {}
 
@@ -92,6 +98,53 @@ export class PublicationController {
     return this.mapPost(await this.publicationClient.updatePost(input));
   }
 
+  @Post('posts/:postId/publish')
+  async publishPost(
+    @Headers('cookie') cookieHeader: string | undefined,
+    @Param('postId') postId: string,
+    @Body() body: PublishPostBody
+  ) {
+    const auth = await this.authService.requireSession(cookieHeader);
+    // EXPLICIT reject — VISIBILITY_TO_PROTO includes private:1, so the updatePost
+    // "unknown → 400" lookup would let 'private' through. Publish is public|unlisted only.
+    if (body.visibility !== 'public' && body.visibility !== 'unlisted') {
+      throw new BadRequestException(`invalid visibility for publish: ${body.visibility}`);
+    }
+    const raw = await this.publicationClient.publishPost({
+      userId: auth.userId,
+      postId,
+      visibility: VISIBILITY_TO_PROTO[body.visibility]
+    });
+    return this.mapPost(raw);
+  }
+
+  @Post('posts/:postId/unpublish')
+  async unpublishPost(
+    @Headers('cookie') cookieHeader: string | undefined,
+    @Param('postId') postId: string
+  ) {
+    const auth = await this.authService.requireSession(cookieHeader);
+    return this.mapPost(await this.publicationClient.unpublishPost({ userId: auth.userId, postId }));
+  }
+
+  // PUBLIC, unauthenticated (no requireSession): a published public|unlisted post
+  // by slug, with photo variant urls resolved owner-scoped from photo-service.
+  // A NOT_FOUND (draft/unpublished/private/unknown) propagates as 404; a backend
+  // failure (e.g. photo-service down) propagates as 500 — never masqueraded as 404.
+  @Get('public/posts/:slug')
+  async publicPost(@Param('slug') slug: string) {
+    const raw = await this.publicationClient.getPublicPostBySlug(slug);
+    const { results } = await this.photoClient.getVariantsByIds({
+      userId: raw.userId, // owner id from the published post (internal), never sent to the browser
+      photoIds: raw.photos.map((p) => p.photoId)
+    });
+    const variantsByPhotoId = new Map<string, PublicVariantView[]>();
+    for (const r of results) {
+      variantsByPhotoId.set(r.photoId, r.variants);
+    }
+    return this.mapPublicPost(raw, variantsByPhotoId);
+  }
+
   private validateDate(value: string, field: string): string {
     if (value !== '' && Number.isNaN(Date.parse(value))) {
       throw new BadRequestException(`invalid ${field}: not an ISO date`);
@@ -121,6 +174,26 @@ export class PublicationController {
       createdAt: raw.createdAt,
       updatedAt: raw.updatedAt,
       photos: raw.photos.map((p) => ({ photoId: p.photoId, order: p.order, caption: p.caption }))
+    };
+  }
+
+  // Public browser DTO — an explicit allow-list. NO userId/status/visibility/
+  // sourceClusterId/sourceResultId (owner + provenance stay private). Each photo
+  // carries only its order/caption + resolved variant urls (never originals).
+  private mapPublicPost(raw: PostRaw, variantsByPhotoId: Map<string, PublicVariantView[]>) {
+    return {
+      slug: raw.slug,
+      title: raw.title,
+      body: raw.body,
+      locationLabel: raw.locationLabel,
+      dateFrom: raw.dateFrom,
+      dateTo: raw.dateTo,
+      publishedAt: raw.publishedAt,
+      photos: raw.photos.map((p) => ({
+        order: p.order,
+        caption: p.caption,
+        variants: variantsByPhotoId.get(p.photoId) ?? []
+      }))
     };
   }
 

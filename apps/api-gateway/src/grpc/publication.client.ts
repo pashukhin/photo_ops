@@ -68,6 +68,9 @@ export interface PublicationGatewayClient {
   getPost(input: { userId: string; postId: string }): Promise<PostRaw>;
   listPosts(userId: string): Promise<{ posts: PostSummaryRaw[] }>;
   updatePost(input: UpdatePostInput): Promise<PostRaw>;
+  publishPost(input: { userId: string; postId: string; visibility: number }): Promise<PostRaw>;
+  unpublishPost(input: { userId: string; postId: string }): Promise<PostRaw>;
+  getPublicPostBySlug(slug: string): Promise<PostRaw>;
 }
 
 type Callback<T> = (error: Error | null, value: T) => void;
@@ -83,6 +86,9 @@ interface GrpcPublicationServiceClient {
   GetPost(input: { userId: string; postId: string }, callback: Callback<PostRaw>): void;
   ListPosts(input: { userId: string }, callback: Callback<{ posts: PostSummaryRaw[] }>): void;
   UpdatePost(input: UpdatePostWire, callback: Callback<PostRaw>): void;
+  PublishPost(input: { userId: string; postId: string; visibility: number }, callback: Callback<PostRaw>): void;
+  UnpublishPost(input: { userId: string; postId: string }, callback: Callback<PostRaw>): void;
+  GetPublicPostBySlug(input: { slug: string }, callback: Callback<PostRaw>): void;
 }
 
 @Injectable()
@@ -156,6 +162,42 @@ export class PublicationClient implements PublicationGatewayClient {
     const wire: UpdatePostWire = photos !== undefined ? { ...rest, photos: { photos } } : rest;
     return new Promise((resolve, reject) => {
       this.client.UpdatePost(wire, (error, value) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(value);
+      });
+    });
+  }
+
+  publishPost(input: { userId: string; postId: string; visibility: number }): Promise<PostRaw> {
+    return new Promise((resolve, reject) => {
+      this.client.PublishPost(input, (error, value) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(value);
+      });
+    });
+  }
+
+  unpublishPost(input: { userId: string; postId: string }): Promise<PostRaw> {
+    return new Promise((resolve, reject) => {
+      this.client.UnpublishPost(input, (error, value) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(value);
+      });
+    });
+  }
+
+  getPublicPostBySlug(slug: string): Promise<PostRaw> {
+    return new Promise((resolve, reject) => {
+      this.client.GetPublicPostBySlug({ slug }, (error, value) => {
         if (error) {
           reject(error);
           return;
