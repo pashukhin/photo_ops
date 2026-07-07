@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { getPhoto } from '../../lib/api';
 import type { PhotoAsset } from '../../lib/api';
-import { FALLBACK, fmt } from './format';
+import { FALLBACK, fmt, formatLocation } from './format';
 
 export interface PhotoDetailModalProps {
   photoId: string | null; // null = closed
@@ -98,6 +98,9 @@ export function PhotoDetailModal({ photoId, onClose }: PhotoDetailModalProps) {
                   ? `${photo.lat}, ${photo.lon}`
                   : FALLBACK}
               </dd>
+
+              <dt className="font-medium text-muted-foreground">Location</dt>
+              <dd>{formatLocation(photo.location)}</dd>
 
               <dt className="font-medium text-muted-foreground">TZ source</dt>
               <dd>{fmt(photo.takenAtTzSource)}</dd>
