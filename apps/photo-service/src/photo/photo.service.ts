@@ -207,8 +207,15 @@ export class PhotoDomainService {
   }
 
   async finalizeResult(result: ProcessingResultInput): Promise<void> {
-    const applied = await this.repository.finalizeJob(result.jobId, result.outcome, result.errorMessage);
-    if (!applied) return;
+    await this.repository.finalizeJob(result.jobId, result.outcome, result.errorMessage);
+
+    // Winner-gate (opm): the job's RECORDED terminal status — not this message's
+    // outcome — decides which result wins. Fetched once and reused for the userId
+    // below. A redelivery of the winner re-applies the idempotent terminal writes
+    // (reaching 'ready'/'failed' even after a crash between finalizeJob and setStatus);
+    // a losing opposite-outcome duplicate is a no-op (must not clobber the winner).
+    const job = await this.repository.findJobById(result.jobId);
+    if (!job || job.status !== result.outcome) return;
 
     if (result.outcome === 'succeeded') {
       for (const v of result.variants) {
@@ -240,14 +247,12 @@ export class PhotoDomainService {
 
       await this.repository.setStatus(result.photoId, 'ready');
 
-      // Best-effort: emit usage for processing consumption. A publish failure
-      // must not break the finalize flow — log it and continue.
+      // Best-effort usage: always emit — charge-once is provided by the jobId-keyed
+      // dedup in usage-service, so a redelivery re-emit is a no-op there; gating on
+      // 'applied' would instead drop the charge on a redelivery. A publish failure
+      // must not break finalize — log and continue. (job is non-null past the gate.)
       try {
-        // userId is not on ProcessingResultInput; look it up from the job record
-        // persisted at job-creation time (stores userId alongside jobId).
-        const job = await this.repository.findJobById(result.jobId);
-        const userId = job?.userId ?? 'unknown';
-        await this.usageEmitter.emitProcessingConsumption({ result, userId });
+        await this.usageEmitter.emitProcessingConsumption({ result, userId: job.userId });
       } catch (err) {
         this.logger.warn({ msg: 'usage.emit.failed', event: 'processing_consumption', job_id: result.jobId, err }, 'usage emit failed');
       }
