@@ -190,3 +190,35 @@ if photo.get("lon") is None:
 
 print("SMOKE OK — status=ready, 2 variants (thumbnail+preview), EXIF+GPS attrs present")
 PY
+
+# ---------------------------------------------------------------------------
+# 8. Permanent failure (photo_ops-0od): a corrupt (non-image) object is a genuinely
+#    permanent error — it must reach 'failed', NOT stay stuck in 'processing' and NOT
+#    falsely become 'ready'. (Transient storage hiccups are retried, not failed; that
+#    path is not live-injectable and is covered by the media-worker unit tests.)
+# ---------------------------------------------------------------------------
+CORRUPT_PATH="$TMP/corrupt.jpg"
+printf 'this is not a JPEG' > "$CORRUPT_PATH"
+CSIZE="$(wc -c < "$CORRUPT_PATH" | tr -d ' ')"
+curl -fsS -b "$COOKIE_PATH" -H 'content-type: application/json' \
+  -d "{\"filename\":\"corrupt.jpg\",\"contentType\":\"image/jpeg\",\"sizeBytes\":\"$CSIZE\"}" \
+  "$API_BASE_URL/photos/upload-intents" > "$INTENT_PATH"
+CPID="$(jq -r '.photoId' "$INTENT_PATH")"
+CUP_URL="$(jq -r '.uploadUrl' "$INTENT_PATH")"
+curl -fsS -X PUT -H 'content-type: image/jpeg' --data-binary "@$CORRUPT_PATH" "$CUP_URL" >/dev/null
+curl -fsS -b "$COOKIE_PATH" -X POST "$API_BASE_URL/photos/$CPID/complete-upload" >/dev/null
+echo "[smoke-media] corrupt photo_id=$CPID — expecting failed" >&2
+
+DEADLINE=$(( $(date +%s) + 60 ))
+while true; do
+  CST="$(curl -fsS -b "$COOKIE_PATH" "$API_BASE_URL/photos/$CPID" | jq -r '.status')"
+  [ "$CST" = "failed" ] && break
+  if [ "$CST" = "ready" ]; then
+    echo "ASSERTION FAILED: corrupt image reached 'ready' (expected 'failed')" >&2; exit 1
+  fi
+  if [ "$(date +%s)" -ge "$DEADLINE" ]; then
+    echo "ASSERTION FAILED: corrupt image stuck at '$CST' after 60s (expected 'failed')" >&2; exit 1
+  fi
+  sleep 2
+done
+echo "[smoke-media] OK — corrupt image → failed (permanent branch)" >&2
