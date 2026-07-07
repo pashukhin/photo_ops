@@ -394,6 +394,30 @@ describe('PhotoDomainService', () => {
     expect(repository.setStatus).toHaveBeenCalledWith('p1', 'failed');
   });
 
+  it('crash-recovery: redelivery (finalizeJob=false, recorded winner succeeded) re-applies terminal state → ready', async () => {
+    // why (opm): a crash after finalizeJob but before setStatus strands the photo in
+    // 'processing'. Redelivery finds finalizeJob=false; because the RECORDED winner is
+    // 'succeeded', the idempotent terminal writes must still be applied. Current code
+    // early-returns on !applied → nothing applied → RED.
+    const { service, repository } = createService();
+    repository.finalizeJob.mockResolvedValue(false);
+    repository.findJobById.mockResolvedValue({ id: 'j1', userId: 'u1', status: 'succeeded' });
+    await service.finalizeResult({ jobId: 'j1', photoId: 'p1', outcome: 'succeeded',
+      attributes: {}, variants: [{ variantType: 'thumbnail', objectKey: 'variants/p1/thumbnail.jpg', width: 1, height: 1, sizeBytes: 1n, contentType: 'image/jpeg' }], metadataJson: '{}' });
+    expect(repository.upsertVariant).toHaveBeenCalledTimes(1);
+    expect(repository.setStatus).toHaveBeenCalledWith('p1', 'ready');
+  });
+
+  it('regression guard: a losing opposite-outcome duplicate does NOT clobber the winner', async () => {
+    // why (M1): SUCCEEDED won (recorded job.status='succeeded'); a redelivered FAILED for
+    // the same job must be ignored, not flip the good photo to 'failed'.
+    const { service, repository } = createService();
+    repository.finalizeJob.mockResolvedValue(false);
+    repository.findJobById.mockResolvedValue({ id: 'j1', userId: 'u1', status: 'succeeded' });
+    await service.finalizeResult({ jobId: 'j1', photoId: 'p1', outcome: 'failed', errorMessage: 'x', variants: [], metadataJson: '' });
+    expect(repository.setStatus).not.toHaveBeenCalledWith('p1', 'failed');
+  });
+
   it('completeUpload success: emits emitOriginalStored once with correct args', async () => {
     // why: usage accounting requires a usage event per upload completion;
     // emitting is best-effort and must not block the upload flow.
