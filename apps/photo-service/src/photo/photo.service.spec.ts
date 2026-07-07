@@ -504,6 +504,19 @@ describe('PhotoDomainService', () => {
     expect(repository.listLocationsByIds).not.toHaveBeenCalled();
   });
 
+  it('listPhotos attaches locations for photos that have a location_id', async () => {
+    // why (surface + coverage): the batched list compose (locationIds.length > 0
+    // branch) attaches the place to each located photo via one listLocationsByIds.
+    const { service, repository } = createService();
+    repository.list.mockResolvedValue({ rows: [makePhotoRecord({ id: 'p1', locationId: 'loc-1' })], totalCount: 1 });
+    repository.listLocationsByIds.mockResolvedValue([
+      { id: 'loc-1', continent: 'South America', country: 'Argentina', region: '', city: 'Buenos Aires', district: '', lat: -34.6, lon: -58.38 }
+    ]);
+    const res = await service.listPhotos(makeListParams());
+    expect(repository.listLocationsByIds).toHaveBeenCalledWith(['loc-1']);
+    expect(res.photos[0].location).toEqual(expect.objectContaining({ country: 'Argentina', city: 'Buenos Aires' }));
+  });
+
   it('completeUpload success: emits emitOriginalStored once with correct args', async () => {
     // why: usage accounting requires a usage event per upload completion;
     // emitting is best-effort and must not block the upload flow.

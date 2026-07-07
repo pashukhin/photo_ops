@@ -11,7 +11,6 @@ one photo per message (ADR-0007).
 """
 from __future__ import annotations
 
-import gzip
 import json
 import math
 import os
@@ -56,7 +55,7 @@ _cache: tuple[list[_City], dict[str, str], dict[str, tuple[str, str]]] | None = 
 def _load() -> tuple[list[_City], dict[str, str], dict[str, tuple[str, str]]]:
     """Load the vendored GeoNames extract: cities + admin1 names + country info."""
     cities: list[_City] = []
-    with gzip.open(os.path.join(_DATA_DIR, "cities15000.tsv.gz"), "rt", encoding="utf-8") as f:
+    with open(os.path.join(_DATA_DIR, "cities15000.tsv"), encoding="utf-8") as f:
         for line in f:
             name, lat, lon, cc, admin1 = line.rstrip("\n").split("\t")
             cities.append(_City(name, float(lat), float(lon), cc, admin1))
