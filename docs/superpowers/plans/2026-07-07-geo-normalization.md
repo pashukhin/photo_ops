@@ -96,7 +96,7 @@ git commit -m "proto(geo): GeoPlace + ImageAttributes.place + PhotoAsset.locatio
 - Produces: `@dataclass GeoPlace(continent, country, region, city, district, raw_provider_data: str)`; `reverse_geocode(lat: float | None, lon: float | None) -> GeoPlace | None`; internal seam `_lookup(lat: float, lon: float) -> GeoPlace`.
 - Consumes: nothing from other tasks.
 
-**GREEN obligation:** vendor the dataset + make the RED tests pass within these stubs. `reverse_geocode` validates inputs, calls `_lookup` inside `try/except Exception → None`, never raises. You may add narrower tests; you may not weaken/delete/rename these REDs.
+**GREEN obligation:** vendor the dataset + make the RED tests pass within these stubs. `reverse_geocode` validates inputs, calls `_lookup` inside `try/except Exception → None`, never raises. `_lookup` builds `raw_provider_data` as JSON of the matched GeoNames record **including the matched city's `lat`/`lon`** — that is the representative point photo-service reads back for `Location.lat/lon` (`GeoPlace` carries no lat/lon of its own; parsing raw is the seam). You may add narrower tests; you may not weaken/delete/rename these REDs.
 
 - [ ] **Step 1: Write the RED tests** — `apps/media-worker/tests/test_geocode.py`
 
@@ -140,7 +140,7 @@ def test_lookup_failure_is_swallowed_to_none(monkeypatch):
 - [ ] **Step 2: Run to confirm RED**
 
 Run: `cd apps/media-worker && .venv/bin/python -m pytest tests/test_geocode.py -q`
-Expected: FAIL — `reverse_geocode` raises `NotImplementedError` from the stub (all four tests error).
+Expected: FAIL — collection error (`ModuleNotFoundError: media_worker.geocode`), since the module is written in Step 3. After Step 3 it becomes `NotImplementedError` on the assertions.
 
 - [ ] **Step 3: Write the stub** — `apps/media-worker/src/media_worker/geocode.py`
 
@@ -201,13 +201,15 @@ git commit -m "skeleton(geo): media-worker reverse_geocode (RED + stub)"
 
 **GREEN obligation:** wire the geocode call + the place encode within these signatures; make the RED pass. Do not weaken the REDs.
 
-- [ ] **Step 1: Write the RED tests** — append to `apps/media-worker/tests/test_handler.py`
+- [ ] **Step 1: Write the RED tests** — in `apps/media-worker/tests/test_handler.py` add the two imports to the **top import block** (ruff I001/E402: imports must not be mid-file), and append `_attrs` + `TestHandlerGeocode` after the existing tests.
 
 ```python
+# --- add to the top import block ---
 from src.media_worker.exif import Attributes
 from src.media_worker.geocode import GeoPlace
 
 
+# --- append after the existing test classes ---
 def _attrs(lat, lon) -> Attributes:
     # minimal Attributes with the given coords; other fields are display defaults.
     return Attributes(
@@ -253,7 +255,7 @@ class TestHandlerGeocode:
 Run: `cd apps/media-worker && .venv/bin/python -m pytest tests/test_handler.py::TestHandlerGeocode -q`
 Expected: FAIL — `mock.patch("...handler.reverse_geocode")` errors because the symbol isn't imported into the handler yet (fix in Step 3), then FAIL on `HasField("place")`.
 
-- [ ] **Step 3: Add the skeleton wiring points** — in `handler.py` add `from .geocode import reverse_geocode` (import only — the call is GREEN); in `codec.py` add the `place: GeoPlace | None = None` parameter to `encode_result` (accept it; setting `result.attributes.place.*` is GREEN). Import `GeoPlace` in `codec.py`.
+- [ ] **Step 3: Add the skeleton wiring points** — in `handler.py` add `from .geocode import reverse_geocode  # noqa: F401` (import only — unused until GREEN wires the call; the `noqa` keeps `make lint-media-worker`/ruff F401 clean at the skeleton commit); in `codec.py` add the `place: GeoPlace | None = None` parameter to `encode_result` (accept it; setting `result.attributes.place.*` is GREEN). Import `GeoPlace` in `codec.py`.
 
 - [ ] **Step 4: Confirm RED on the assertion + lint**
 
@@ -277,16 +279,16 @@ git commit -m "skeleton(geo): handler geocode wiring RED + encode_result place p
 - Modify: `apps/photo-service/src/photo/photo.types.ts` (`GeoPlaceInput`, `NormalizedPlace`, `LocationRecord`; `ProcessingResultAttributes.place?`; `PhotoAssetRecord.locationId`; `PhotoWithVariants.location?`)
 - Stub: `apps/photo-service/src/photo/photo.service.ts` (`export function normalizePlace(...)` throws; port `upsertLocation`/`listLocationsByIds`; `applyAttributes` param += `locationId`)
 - Stub: `apps/photo-service/src/photo/photo.repository.ts` (`upsertLocation`/`listLocationsByIds` throw NotImplemented; `locationId` in `toRecord`/`applyAttributes`)
-- Test: `apps/photo-service/src/photo/photo.service.spec.ts` (RED)
-- Modify (GREEN): implement the repo methods (SQL upsert + batched select), and `finalizeResult` (decode place → `normalizePlace` → `upsertLocation` → `applyAttributes({… locationId})`).
+- Test: `apps/photo-service/src/photo/photo.service.spec.ts` (RED) + `apps/photo-service/src/photo/processing.codec.spec.ts` (RED — `place` decode)
+- Modify (GREEN): `processing.codec.ts` `decodeResult` (map proto `attributes.place` → `attributes.place`); the repo methods (SQL upsert + batched select); `finalizeResult` (`normalizePlace(place)` → parse `raw_provider_data` for the representative `lat`/`lon` → `upsertLocation` → `applyAttributes({… locationId})`).
 
 **Interfaces:**
 - Produces: `normalizePlace(place: GeoPlaceInput): NormalizedPlace` (all 5 fields trimmed, `''`-coalesced); `PhotoRepositoryPort.upsertLocation(input: NormalizedPlace & { lat: number|null; lon: number|null; rawProviderData: unknown }): Promise<string>`; `PhotoRepositoryPort.listLocationsByIds(ids: string[]): Promise<LocationRecord[]>`; `applyAttributes(..., { …, locationId: string | null })`.
 - Consumes: proto-decoded `place` on `ProcessingResultInput.attributes.place` (via `processing.codec.ts` decode — a GREEN wiring within this task), the opm winner-gate (`photo.service.ts:220`).
 
-**GREEN obligation:** implement the SQL (`ON CONFLICT … DO UPDATE … RETURNING id`, batched select), `normalizePlace`, and `finalizeResult` upsert+link. Preserve session-021 idempotent finalize — the upsert + `location_id` write are individually idempotent and run only past the winner-gate. Do not weaken the REDs.
+**GREEN obligation:** implement `decodeResult`'s place mapping, the SQL (`ON CONFLICT … DO UPDATE … RETURNING id`, batched select), `normalizePlace`, and `finalizeResult` upsert+link. `Location.lat/lon` (representative point) = the matched city's point parsed from `place.rawProviderData` (`GeoPlace` carries no lat/lon); pass those to `upsertLocation`, not the photo's coords. `applyAttributes`'s `locationId` is **optional** (`locationId?: string | null`) so the untouched call site still type-checks at skeleton; GREEN always passes it (value or `null`). Preserve session-021 idempotent finalize — the upsert + `location_id` write are individually idempotent and run only past the winner-gate. Do not weaken the REDs.
 
-- [ ] **Step 1: Write the RED tests** — add to `apps/photo-service/src/photo/photo.service.spec.ts` (extend the `createService()` mock with `upsertLocation: vi.fn()`, `listLocationsByIds: vi.fn()`)
+- [ ] **Step 1: Write the RED tests** — add to `apps/photo-service/src/photo/photo.service.spec.ts` (extend the `createService()` mock with `upsertLocation: vi.fn()` and `listLocationsByIds: vi.fn().mockResolvedValue([])` — the `[]` default protects the existing `listPhotos` tests, whose photos have no `locationId`, from a crash when GREEN calls the compose)
 
 ```typescript
 import { normalizePlace } from './photo.service';
@@ -330,10 +332,29 @@ it('finalizeResult sets no location when the result carries no place', async () 
 });
 ```
 
+And the wire→domain decode RED — add to `apps/photo-service/src/photo/processing.codec.spec.ts` (this is the live path `processing.consumer.ts` → `finalizeResult`; it is in coverage scope, so the new `place` mapping needs its own RED):
+
+```typescript
+it('decodeResult maps the proto place into attributes.place', () => {
+  // why (coverage + live path): finalizeResult reads attributes.place, but only if
+  // decodeResult carries it off the wire. Encode a result WITH a place, decode it,
+  // assert the place round-trips (country/city + raw_provider_data).
+  const body = encodeResultWithPlace({ country: 'Argentina', city: 'Buenos Aires', rawProviderData: '{"lat":-34.6,"lon":-58.38}' });
+  const decoded = decodeResult(body);
+  expect(decoded.attributes?.place).toEqual(expect.objectContaining({ country: 'Argentina', city: 'Buenos Aires' }));
+  expect(decoded.attributes?.place?.rawProviderData).toContain('lat');
+});
+```
+
+> Implementer note: `encodeResultWithPlace` builds a `PhotoProcessingResult` protobuf
+> (via the same generated message `decodeResult` consumes) with `attributes.place`
+> set — reuse the codec spec's existing encode helper / message builder; add the
+> place fields to it.
+
 - [ ] **Step 2: Run to confirm RED**
 
-Run: `cd apps/photo-service && npx vitest run src/photo/photo.service.spec.ts -t 'normalizePlace|finalizeResult upserts|no location'`
-Expected: FAIL — `normalizePlace` throws (stub); `finalizeResult` never calls `upsertLocation` and `applyAttributes` has no `locationId` key.
+Run: `cd apps/photo-service && npx vitest run src/photo/photo.service.spec.ts -t 'normalizePlace|finalizeResult upserts|no location'` and `npx vitest run src/photo/processing.codec.spec.ts -t 'maps the proto place'`
+Expected: FAIL — `normalizePlace` throws (stub); `finalizeResult` never calls `upsertLocation` and `applyAttributes` has no `locationId` key; `decodeResult` does not yet map `place` (`decoded.attributes.place` is undefined).
 
 - [ ] **Step 3: Write the stubs + schema/migration**
 
@@ -368,7 +389,7 @@ export function normalizePlace(place: GeoPlaceInput): NormalizedPlace {
   throw new Error('not implemented');  // GREEN is the implementer's job
 }
 ```
-Add to `PhotoRepositoryPort`: `upsertLocation(input: NormalizedPlace & { lat: number | null; lon: number | null; rawProviderData: unknown }): Promise<string>;` and `listLocationsByIds(ids: string[]): Promise<LocationRecord[]>;`, and add `locationId: string | null` to the `applyAttributes` param object.
+Add to `PhotoRepositoryPort`: `upsertLocation(input: NormalizedPlace & { lat: number | null; lon: number | null; rawProviderData: unknown }): Promise<string>;` and `listLocationsByIds(ids: string[]): Promise<LocationRecord[]>;`, and add `locationId?: string | null` (**optional** — so the current `applyAttributes` call site, which passes no `locationId`, still type-checks at skeleton) to the `applyAttributes` param object.
 `photo.repository.ts` — throwing stubs so the class still implements the port:
 ```typescript
 async upsertLocation(): Promise<string> { throw new Error('not implemented'); }
@@ -383,8 +404,8 @@ Run: same vitest command (Expected: `normalizePlace` RED on the throw; `finalize
 - [ ] **Step 5: Commit the skeleton**
 
 ```bash
-git add apps/photo-service/migrations/0003_location.sql Makefile apps/photo-service/src/db/schema.ts apps/photo-service/src/photo/photo.types.ts apps/photo-service/src/photo/photo.service.ts apps/photo-service/src/photo/photo.repository.ts apps/photo-service/src/photo/photo.service.spec.ts
-git commit -m "skeleton(geo): Location schema + finalize upsert/link RED + normalizePlace stub"
+git add apps/photo-service/migrations/0003_location.sql Makefile apps/photo-service/src/db/schema.ts apps/photo-service/src/photo/photo.types.ts apps/photo-service/src/photo/photo.service.ts apps/photo-service/src/photo/photo.repository.ts apps/photo-service/src/photo/photo.service.spec.ts apps/photo-service/src/photo/processing.codec.spec.ts
+git commit -m "skeleton(geo): Location schema + finalize upsert/link + place-decode RED + normalizePlace stub"
 ```
 
 ---
@@ -392,7 +413,7 @@ git commit -m "skeleton(geo): Location schema + finalize upsert/link RED + norma
 ### Task 5: photo-service surface — compose `location` in list + getPhoto + wire
 
 **Files:**
-- Test: `apps/photo-service/src/photo/photo.service.spec.ts` (RED — compose)
+- Test: `apps/photo-service/src/photo/photo.service.spec.ts` (RED — compose) + `apps/photo-service/src/photo/photo.grpc.controller.spec.ts` (RED — `toProtoPhoto` location; the controller is in coverage scope, so the wire mapping needs its own RED, not just the smoke)
 - Modify (GREEN): `photo.service.ts` (`getPhoto`/`listPhotos` collect `locationId`s → `listLocationsByIds` → attach `location` to each `PhotoWithVariants`), `photo.grpc.controller.ts` (`toProtoPhoto` maps `location` → proto `GeoPlace`).
 
 **Interfaces:**
@@ -424,10 +445,27 @@ it('getPhoto leaves location null when the photo has no location_id', async () =
 });
 ```
 
+And the wire-mapping RED — add to `apps/photo-service/src/photo/photo.grpc.controller.spec.ts` (build a `PhotoWithVariants` carrying a `location`, mirror the existing `makePhotoWithVariants()` helper):
+
+```typescript
+it('toProtoPhoto emits the location on the wire', async () => {
+  // why (coverage + wire): toProtoPhoto is in coverage scope; the new location
+  // mapping runs only when a location is present. Drive getPhoto with a located
+  // photo and assert the reply carries it.
+  service.getPhoto.mockResolvedValue({
+    photo: makePhotoRecord(),
+    variants: [],
+    location: { continent: 'South America', country: 'Argentina', region: '', city: 'Buenos Aires', district: '' },
+  });
+  const reply = await controller.getPhoto({ photoId: 'photo-1', userId: 'user-1' });
+  expect(reply.location).toEqual(expect.objectContaining({ country: 'Argentina', city: 'Buenos Aires' }));
+});
+```
+
 - [ ] **Step 2: Run to confirm RED**
 
-Run: `cd apps/photo-service && npx vitest run src/photo/photo.service.spec.ts -t 'attaches the location|leaves location null'`
-Expected: FAIL — `getPhoto` does not yet read `locationId` / attach `location` (`pwv.location` is `undefined`, and `listLocationsByIds` is not called).
+Run: `cd apps/photo-service && npx vitest run src/photo/photo.service.spec.ts -t 'attaches the location|leaves location null'` and `npx vitest run src/photo/photo.grpc.controller.spec.ts -t 'emits the location'`
+Expected: FAIL — `getPhoto` does not yet read `locationId` / attach `location` (`pwv.location` undefined, `listLocationsByIds` not called); `toProtoPhoto` does not yet copy `location` to the reply (`reply.location` undefined).
 
 - [ ] **Step 3: (no new stub — behavior change to `getPhoto`/`listPhotos`/`toProtoPhoto`)**
 
@@ -440,8 +478,8 @@ Run: same vitest command (Expected: FAIL on `pwv?.location` undefined) and `make
 - [ ] **Step 5: Commit the skeleton**
 
 ```bash
-git add apps/photo-service/src/photo/photo.service.spec.ts
-git commit -m "skeleton(geo): getPhoto/listPhotos location compose RED"
+git add apps/photo-service/src/photo/photo.service.spec.ts apps/photo-service/src/photo/photo.grpc.controller.spec.ts
+git commit -m "skeleton(geo): getPhoto/listPhotos compose + toProtoPhoto location RED"
 ```
 
 ---
@@ -524,34 +562,44 @@ git commit -m "skeleton(geo): web formatLocation RED + PhotoAsset.location type"
 
 ```bash
 # ---------------------------------------------------------------------------
-# 9. Geo (3iy): the resolved place is on the photo, and same-city photos DEDUP
-#    to ONE locations row. Place strings alone can't prove dedup (two rows render
-#    identical text) — a DB count probe is the only honest oracle.
+# 9. Geo (3iy): the resolved place is on the photo, and a SECOND photo at the SAME
+#    coordinates DEDUPs to the same Location row. Place strings can't prove dedup
+#    (two rows render identical text). A count DELTA (not an absolute count) is the
+#    honest oracle AND is robust to rows left by prior smoke runs / seeds.
 # ---------------------------------------------------------------------------
 "$VENV_PYTHON" - "$PHOTO_PATH" <<'PY'
 import json, sys
-photo = json.load(open(sys.argv[1]))
-loc = photo.get("location") or {}
-if not loc.get("country"):
-    print(f"ASSERTION FAILED: photo.location.country empty: {loc!r}", file=sys.stderr); sys.exit(1)
-if not loc.get("city"):
-    print(f"ASSERTION FAILED: photo.location.city empty: {loc!r}", file=sys.stderr); sys.exit(1)
+loc = (json.load(open(sys.argv[1])).get("location") or {})
+if not loc.get("country") or not loc.get("city"):
+    print(f"ASSERTION FAILED: photo.location incomplete: {loc!r}", file=sys.stderr); sys.exit(1)
 print(f"[smoke-media] place = {loc.get('country')} / {loc.get('city')}")
 PY
 
-# upload a SECOND photo at the SAME coordinates → must reuse the same Location row
-PHOTO2_ID="$(API_BASE_URL="$API_BASE_URL" COOKIE_PATH="$COOKIE_PATH" VENV_PYTHON="$VENV_PYTHON" TMP="$TMP" \
-  bash -c 'source scripts/lib/photoops-e2e.sh; upload_photo "2024:06:15 14:30:00" "Canon" "EOS")')"
-# (wait_photo_ready is sourced from the lib)
-source scripts/lib/photoops-e2e.sh
-wait_photo_ready "$PHOTO2_ID" 60
-
 CITY="$("$VENV_PYTHON" -c 'import json,sys;print((json.load(open(sys.argv[1])).get("location") or {}).get("city",""))' "$PHOTO_PATH")"
-COUNT="$(docker compose -f infra/docker/docker-compose.yml --env-file .env exec -T postgres \
-  psql "$PHOTO_DATABASE_URL" -tAc "SELECT count(*) FROM locations WHERE city = '${CITY}'")"
-[ "$(echo "$COUNT" | tr -d '[:space:]')" = "1" ] \
-  || { echo "ASSERTION FAILED: expected exactly 1 locations row for city='$CITY', got $COUNT" >&2; exit 1; }
-echo "[smoke-media] OK — geo place present + dedup (1 locations row for '$CITY')"
+loc_count() { docker compose -f infra/docker/docker-compose.yml --env-file .env exec -T postgres \
+  psql "$PHOTO_DATABASE_URL" -tAc "SELECT count(*) FROM locations WHERE city = '$1'" | tr -d '[:space:]'; }
+BEFORE="$(loc_count "$CITY")"
+[ "${BEFORE:-0}" -ge 1 ] || { echo "ASSERTION FAILED: no locations row for '$CITY' after first photo (got '$BEFORE')" >&2; exit 1; }
+
+# Upload a SECOND photo with the SAME Moscow fixture ($JPEG_PATH) → same city → must dedup.
+curl -fsS -b "$COOKIE_PATH" -H 'content-type: application/json' \
+  -d "{\"filename\":\"sample2.jpg\",\"contentType\":\"image/jpeg\",\"sizeBytes\":\"$SIZE_BYTES\"}" \
+  "$API_BASE_URL/photos/upload-intents" > "$INTENT_PATH"
+PID2="$(jq -r '.photoId' "$INTENT_PATH")"; UP2="$(jq -r '.uploadUrl' "$INTENT_PATH")"
+curl -fsS -X PUT -H 'content-type: image/jpeg' --data-binary "@$JPEG_PATH" "$UP2" >/dev/null
+curl -fsS -b "$COOKIE_PATH" -X POST "$API_BASE_URL/photos/$PID2/complete-upload" >/dev/null
+DEADLINE=$(( $(date +%s) + 60 ))
+while true; do
+  ST2="$(curl -fsS -b "$COOKIE_PATH" "$API_BASE_URL/photos/$PID2" | jq -r '.status')"
+  [ "$ST2" = "ready" ] && break
+  { [ "$ST2" = "failed" ] || [ "$(date +%s)" -ge "$DEADLINE" ]; } && { echo "ASSERTION FAILED: second photo status=$ST2" >&2; exit 1; }
+  sleep 2
+done
+
+AFTER="$(loc_count "$CITY")"
+[ "$AFTER" = "$BEFORE" ] \
+  || { echo "ASSERTION FAILED: dedup broken — a same-city second photo added a row ($BEFORE → $AFTER)" >&2; exit 1; }
+echo "[smoke-media] OK — geo place present + dedup ('$CITY' rows unchanged: $BEFORE → $AFTER)"
 ```
 
 - [ ] **Step 2: Run to confirm RED**
@@ -574,7 +622,7 @@ git add scripts/smoke-media-processing.sh
 git commit -m "skeleton(geo): smoke-media place + dedup DB probe (RED)"
 ```
 
-> Implementer note: `gen_jpeg`'s GPS is embedded at GREEN (Task 7 body) — it is shared by `smoke-publication.sh` (a fixed Buenos Aires point is benign there); `smoke-cluster.sh` / `smoke-media-processing.sh` keep their own inline fixtures. If `PHOTO_DATABASE_URL` / the compose invocation differ in the run environment, thread them through the `Makefile smoke-media` target rather than hard-coding here.
+> Implementer note: two separate fixtures for two purposes — (1) `gen_jpeg` gains a fixed Buenos Aires GPS for the **seed** (`seed-demo.sh` → fresh photos geocode via initial processing); it is shared by `smoke-publication.sh` (a fixed point is benign there); `smoke-cluster.sh` keeps its own inline copy. (2) `smoke-media` uses its **own inline Moscow fixture** (`$JPEG_PATH`) for *both* dedup photos — it does not depend on `gen_jpeg`. If `PHOTO_DATABASE_URL` / the compose invocation differ in the run environment, thread them through the `Makefile smoke-media` target rather than hard-coding here.
 
 ---
 
@@ -597,14 +645,15 @@ git commit -m "skeleton(geo): smoke-media place + dedup DB probe (RED)"
   - Place carried worker→service → `test_handler.py::TestHandlerGeocode` (place present / absent) ✓
   - Contract (`GeoPlace`, `place`, `location`) → Task 1 proto diff + `proto-check`/`typecheck` gate ✓
   - Location dedup key (B1: `NOT NULL DEFAULT ''` + trim/coalesce, no lower) → `normalizePlace` REDs + migration `UNIQUE` ✓
+  - Wire→domain place decode → `processing.codec.spec.ts` `decodeResult maps place` RED (also closes the coverage-gate gap on the new decode line) ✓
   - finalize upsert/link + no-place path → `finalizeResult` REDs ✓
-  - Surface on both read paths → `getPhoto` compose REDs (list mirrors) + `toProtoPhoto` GREEN (smoke oracle) ✓
+  - Surface on both read paths → `getPhoto` compose REDs (list mirrors, `listLocationsByIds` mock defaulted `[]`) + `toProtoPhoto` wire RED (controller spec) ✓
   - Gallery tag → `format.spec.ts` `formatLocation` REDs + `smoke-ui` ✓
-  - **Dedup actually fires + place present (B2)** → live `smoke-media` DB count probe ✓
+  - **Dedup actually fires + place present (B2)** → live `smoke-media` count-**delta** probe (robust to prior-run rows) ✓
   - Demo reachability (B3) → `gen_jpeg` GPS (GREEN) + reset+reseed non-goal note ✓
   - Migration wired (must-fix) → `Makefile migrate-photo` line in Task 4 ✓
 - **No GREEN:** stubs throw `NotImplementedError`/`Error('not implemented')`; the surface + smoke tasks carry REDs against existing code with no new production logic. The vendored dataset + NN, the SQL, the compose, and the renders are all the implementer's.
 - **Type consistency:** `GeoPlace`(py)/`GeoPlace`(proto)/`GeoPlaceInput`+`NormalizedPlace`(ts)/`PhotoLocation`(web) — names are per-layer and intentional; `reverse_geocode`/`_lookup`, `normalizePlace`, `upsertLocation`/`listLocationsByIds`, `formatLocation` match across their stubs + tests. `PhotoAsset.location = 21` (20 = variants); `ImageAttributes.place = 11`.
-- **Reviewable size:** ~10 focused REDs (4 py geocode + 2 py handler + 4 ts service + 2 web) + 1 live smoke probe + the proto/migration/schema diff — reviewable without reading an implementation.
+- **Reviewable size:** ~13 focused REDs (4 py geocode + 2 py handler + 4 ts service + 1 ts codec-decode + 1 ts controller + 2 web) + 1 live smoke delta-probe + the proto/migration/schema diff — reviewable without reading an implementation.
 - **Coverage note:** `reverse_geocode`/`_lookup` covered by `test_geocode` (Moscow exercises the real `_lookup`); `normalizePlace`/`formatLocation` by their unit REDs. Run `make skeleton-gate` before human review — an uncovered new stub line ⇒ add the missing RED (spec-change protocol).
 - **dqb:** the change crosses HTTP↔gRPC↔AMQP↔Postgres↔MinIO and renders UI → `smoke-media` (place + dedup) and `smoke-ui` (tag) are the required live oracles, run green before final review.
