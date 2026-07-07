@@ -27,19 +27,30 @@ class PostgresStore:  # pragma: no cover - live DB IO adapter (smoke-verified)
                 (result_id, user_id, method, params_json or "{}", scope),
             )
 
-    def save_tree(self, *, result_id: str, tree: ClusterTree, consumption_json: str) -> None:
+    def save_tree(self, *, result_id: str, tree: ClusterTree, consumption_json: str) -> bool:
+        # Returns whether the tree is persisted for a live result (drives the worker's
+        # SUCCEEDED+usage, 1m8). Idempotent by node existence: a redelivery-while-pending
+        # must not insert a second root (42b). The node-existence check runs inside the
+        # FOR UPDATE lock — the lock alone does not serialise sequential redeliveries
+        # because save_tree never flips status (the server's result-consumer does).
         with psycopg.connect(self._dsn) as conn:
             row = conn.execute(
                 "SELECT status FROM clustering_results WHERE id = %s FOR UPDATE", (result_id,)
             ).fetchone()
-            if row is None or row[0] != "pending":  # only fill a pending run (immutable)
-                return
+            if row is None or row[0] == "failed":  # no live result to fill (1m8)
+                return False
+            existing = conn.execute(
+                "SELECT 1 FROM cluster_nodes WHERE result_id = %s LIMIT 1", (result_id,)
+            ).fetchone()
+            if existing is not None:  # tree already persisted — don't re-insert (42b)
+                return True
             conn.execute(
                 "UPDATE clustering_results SET input_fingerprint = %s, photo_count = %s, "
                 "consumption_json = %s::jsonb WHERE id = %s",
                 (tree.input_fingerprint, tree.photo_count, consumption_json or "{}", result_id),
             )
             self._insert_node(conn, result_id, None, tree.root, 0)
+            return True
 
     def _insert_node(
         self,

@@ -108,9 +108,15 @@ class ClusterWorker:
             # tree's node/photo counts are on the result, not the usage ledger.
             clusters_generated=1,
         )
-        self._store.save_tree(
+        applied = self._store.save_tree(
             result_id=job.result_id, tree=tree, consumption_json=_usage_json(usage)
         )
+        if not applied:
+            # No live pending result to fill (missing / already failed) — skip the
+            # SUCCEEDED publish and the usage emission (1m8: don't phantom-succeed a run
+            # with no tree, don't charge for it).
+            log.info("cluster.process skipped: save_tree not applied result_id=%s", job.result_id)
+            return
 
         event = build_consumption_event(
             result_id=job.result_id,
