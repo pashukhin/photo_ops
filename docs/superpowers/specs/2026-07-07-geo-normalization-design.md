@@ -34,7 +34,8 @@ Foundation, not UI. One visible proof this session: a place-tag in the gallery.
    dataset** (not reinventing data) and hand-roll only the ~30-line NN (the libs'
    sole value — a fast *batch* KDTree — is moot at one-photo-per-message).
    - Vendored (GeoNames, **CC-BY 4.0 — needs a NOTICE**): `cities15000.txt`
-     (~25k rows; representative point = city centroid), `admin1CodesASCII.txt`
+     (~25k rows; `Location.lat/lon` = the **matched city's GeoNames point**, not
+     a computed centroid and not the photo's coord), `admin1CodesASCII.txt`
      (region/admin1 **name**, keyed `cc.admin1`), `countryInfo.txt` (country
      **name** + **continent**, keyed `cc`). Continent comes from `countryInfo`,
      **not** a hand-maintained map (Principle 7).
@@ -69,8 +70,8 @@ Foundation, not UI. One visible proof this session: a place-tag in the gallery.
 | place travels worker → service | `proto/photo/v1/processing.proto` (`GeoPlace` nested in `ImageAttributes`) |
 | `Location` table + dedup key + FK | `apps/photo-service/migrations/0003_location.sql` (schema + `UNIQUE`) |
 | upsert-dedup + link, idempotent | `photo.service.ts` `finalizeResult` (after the opm winner-gate) |
-| dedup actually fires; place present | **live `smoke-media`** (two same-city GPS → one Location, identical `location_id`; Moscow fixture → non-empty place) — **fix B2** |
-| place-tag visible | `photo_service.proto` `PhotoAsset` += `location`; `photo.repository` `listLocationsByIds` + service compose (mirrors the variant pattern, not a `list()` JOIN); web gallery render |
+| dedup actually fires; place present | **live `smoke-media` DB probe** (two same-city GPS uploads → `SELECT count(*) FROM locations WHERE city=…` **== 1**; Moscow fixture → non-empty place). Place *strings* alone don't prove dedup — two rows render identical text; the count probe is the only honest oracle — **fix B2** |
+| place-tag visible | `photo_service.proto` `PhotoAsset` += `location` (reuses `GeoPlace` via cross-import of `processing.proto` — no duplicate message, Principle 7); `photo.repository` `listLocationsByIds` + service compose in **both** `listPhotos` **and** `getPhoto` (mirrors the variant pattern, not a `list()` JOIN); `toProtoPhoto` maps it to the wire; web gallery render |
 | no-GPS / geocoder-down → coords kept, continue | RED unit (handler) + the fallback rows below |
 | durable why | `docs/adr/0007-geo-normalization.md` |
 
@@ -94,11 +95,20 @@ message ImageAttributes {
 }
 ```
 
+`PhotoAsset` (the list/get contract in `photo_service.proto`) gains
+`GeoPlace location = 20;` by **importing `photo/v1/processing.proto`** and reusing
+the `GeoPlace` message — not a second copy (Principle 7). `photo_service.proto`
+currently imports only `common` + annotations, so the new import is a deliberate
+contract edit.
+
 `make proto` regenerates **both** ts (`packages/proto-ts`) and python
 (`apps/media-worker/src/photoops_proto`) stubs; `proto-check` diffs both.
-**Prerequisite (cheap fix, Principle 8):** pin the python proto plugin — close
-`photo_ops-643` — *before* regenerating, so a floating-version header rewrite
-does not redden the drift check (the s020 ts-proto failure mode).
+**Prerequisite (cheap fix, Principle 8):** pin the **python** plugin in
+`proto/buf.gen.python.yaml` (`protocolbuffers/python` + `pyi` are unpinned)
+*before* regenerating, so a floating-version header rewrite does not redden the
+drift check (the s020 ts-proto failure mode). This pin is the *only* blocking
+part of `photo_ops-643` — that issue is broader (go/grpc/cluster-python plugins);
+closing it fully is **not** a prerequisite here.
 
 ## Schema (`photo-db`, migration 0003)
 
@@ -123,6 +133,15 @@ In-DB FK is legitimate: same DB, same owner (photo-service owns both) — not a
 cross-service ref (`docs/domain-model.md` §Location). Locations are append-only
 → `ON DELETE NO ACTION` is safe.
 
+**Wiring (must-fix):** `make migrate-photo` hardcodes each SQL file (there is no
+glob runner) and is run by `smoke-stack.sh` before the app starts. Add the
+`0003_location.sql` line to `migrate-photo`, else the table never exists on a
+migrated stack and finalize's `INSERT … ON CONFLICT` throws → the photo never
+reaches `ready`. Mirror the migration in the drizzle `src/db/schema.ts`
+(`locations` table + `photo_assets.location_id`). On the service side,
+`raw_provider_data` is proto `string` → `jsonb`: `JSON.parse` before the upsert
+(precedent: `parseMetadata` for `metadata_json`).
+
 ## Fallback (RED) — §3.4
 
 | Scenario | Behaviour |
@@ -135,9 +154,13 @@ cross-service ref (`docs/domain-model.md` §Location). Locations are append-only
 ## Demo reachability (fix B3)
 
 - Seed fixtures currently emit **GPS-less** JPEGs (`scripts/lib/photoops-e2e.sh`
-  `gen_jpeg` sets `"GPS": {}`). → **embed GPS in `gen_jpeg`** so a fresh seed
-  geocodes via *initial* processing (**no reprocess needed** — the honest
-  framing; `PROCESSING_TYPE_REPROCESS` is a seam, not emitted).
+  `gen_jpeg` sets `"GPS": {}`). → **embed GPS in `gen_jpeg`** (copy the proven
+  4-key piexif block from `smoke-media-processing.sh`) so a fresh seed geocodes
+  via *initial* processing (**no reprocess needed** — the honest framing;
+  `PROCESSING_TYPE_REPROCESS` is a seam, not emitted). Note the shared
+  `gen_jpeg` is also used by `smoke-publication.sh` (a hardcoded GPS point is
+  benign there); `smoke-cluster.sh`/`smoke-media-processing.sh` carry their own
+  inline copies and are unaffected.
 - Pre-022 `ready` photos won't backfill (no reprocess path) → document that the
   demo stack needs `make reset` + reseed to show places. `smoke-media` (already
   Moscow GPS) proves the pipeline without any backfill.
@@ -151,8 +174,11 @@ cross-service ref (`docs/domain-model.md` §Location). Locations are append-only
   sets `location_id`; place absent → `location_id` untouched). Dedup correctness
   is **not** claimed here (no in-process Postgres — `4vg`).
 - **Live `make smoke-media`** (dqb, authoritative): two same-city GPS uploads →
-  **one** `Location` row + identical `location_id`; Moscow fixture → non-empty
-  place. `make smoke-ui` shows the gallery tag.
+  a **DB probe** (`$(DC) exec -T postgres psql "$$PHOTO_DATABASE_URL" -c
+  "SELECT count(*) FROM locations WHERE city='…'"`, the migrate-target pattern)
+  asserts **exactly one** `locations` row (place strings alone can't prove
+  dedup); Moscow fixture → non-empty `.location` on `GET /photos/:id`.
+  `make smoke-ui` shows the gallery tag.
 - `make gate` + `make coverage-gate` + `make test-guard`; final `/code-review`.
 
 ## ADR-0007 (durable why)
@@ -172,10 +198,13 @@ rejected.
   `test_handler.py`.
 - `proto/photo/v1/processing.proto` (+`GeoPlace`), `photo_service.proto`
   (`PhotoAsset.location`); `proto/buf.gen.python.yaml` (pin — 643).
-- `apps/photo-service/migrations/0003_location.sql`; `src/db/schema.ts`;
-  `photo.service.ts` (`finalizeResult` upsert+link, `list` compose);
-  `photo.repository.ts` (`listLocationsByIds`); `photo.types.ts`;
-  `processing.codec.ts` (decode `place`); specs.
+- `apps/photo-service/migrations/0003_location.sql` + **`Makefile`
+  `migrate-photo`** (add the 0003 line); `src/db/schema.ts` (`locations` +
+  `location_id`); `photo.service.ts` (`finalizeResult` upsert+link;
+  `location` compose in **both** `listPhotos` and `getPhoto`); `photo.repository.ts`
+  (`listLocationsByIds`); `photo.grpc.controller.ts` (`toProtoPhoto` maps
+  `location`); `photo.types.ts`; `processing.codec.ts` (decode `place`,
+  `JSON.parse` `raw_provider_data`); specs.
 - `apps/web` gallery `PhotoAsset` type + place-tag render
   (`components/gallery/*`); `apps/api-gateway` `mapPhoto` (verify nested
   `location` flows through the non-`_` spread — expected no change).
