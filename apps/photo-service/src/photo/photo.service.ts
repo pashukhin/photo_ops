@@ -253,6 +253,22 @@ export class PhotoDomainService {
       }
 
       const a = result.attributes;
+
+      // Reverse-geocoded place → a deduped Location + link. The representative
+      // lat/lon come from the matched city record in raw_provider_data (GeoPlace
+      // carries no lat/lon of its own). Absent place (no GPS / geocoder-down) leaves
+      // location_id null and processing still reaches 'ready' (§3.4).
+      let locationId: string | null = null;
+      if (a?.place) {
+        const raw = parseMetadata(a.place.rawProviderData ?? '') as { lat?: number; lon?: number } | null;
+        locationId = await this.repository.upsertLocation({
+          ...normalizePlace(a.place),
+          lat: raw?.lat ?? null,
+          lon: raw?.lon ?? null,
+          rawProviderData: raw ?? null
+        });
+      }
+
       await this.repository.applyAttributes(result.photoId, {
         width: a?.width ?? null,
         height: a?.height ?? null,
@@ -264,7 +280,8 @@ export class PhotoDomainService {
         orientation: a?.orientation ? a.orientation : null,
         lat: a?.lat ?? null,
         lon: a?.lon ?? null,
-        metadataJson: parseMetadata(result.metadataJson)
+        metadataJson: parseMetadata(result.metadataJson),
+        locationId
       });
 
       await this.repository.setStatus(result.photoId, 'ready');

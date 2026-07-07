@@ -59,6 +59,14 @@ export function decodeResult(body: Uint8Array): ProcessingResultInput {
       orientation?: number;
       lat?: number;
       lon?: number;
+      place?: {
+        continent?: string;
+        country?: string;
+        region?: string;
+        city?: string;
+        district?: string;
+        rawProviderData?: string;
+      } | null;
     } | null;
     variants?: Array<{
       variantType: string;
@@ -88,7 +96,18 @@ export function decodeResult(body: Uint8Array): ProcessingResultInput {
           cameraModel: obj.attributes.cameraModel || undefined,
           orientation: obj.attributes.orientation,
           lat: obj.attributes.lat ?? null,
-          lon: obj.attributes.lon ?? null
+          lon: obj.attributes.lon ?? null,
+          // Absent (null) when there is no GPS / no geocoder result.
+          place: obj.attributes.place
+            ? {
+                continent: obj.attributes.place.continent,
+                country: obj.attributes.place.country,
+                region: obj.attributes.place.region,
+                city: obj.attributes.place.city,
+                district: obj.attributes.place.district,
+                rawProviderData: obj.attributes.place.rawProviderData
+              }
+            : undefined
         }
       : undefined,
     variants: (obj.variants ?? []).map((v) => ({
