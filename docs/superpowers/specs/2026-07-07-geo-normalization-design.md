@@ -46,9 +46,14 @@ Foundation, not UI. One visible proof this session: a place-tag in the gallery.
 
 3. **`Location` dedup by normalized 5-tuple** `(continent,country,region,city,
    district)`. Columns are **`NOT NULL DEFAULT ''`**; the service normalizes
-   `trim`/`lower`/`NULL→''` **before** the upsert; `UNIQUE` sits over the real
-   `''` values (Postgres treats NULL as *distinct* — nullable columns would
-   silently NOT dedup: **fix B1**). One round-trip:
+   `trim` + `NULL/undefined→''` **before** the upsert (**no lower-case** — all
+   022 Locations are geocoded from one GeoNames dataset so casing is already
+   consistent, and the display must stay human-readable: `Buenos Aires`, not
+   `buenos aires`. Case-insensitive dedup only matters once `9q4.3` adds
+   hand-typed manual entries — it can add a `lower()` functional unique index
+   then); `UNIQUE` sits over the stored display-case values (Postgres treats
+   NULL as *distinct* — nullable columns would silently NOT dedup: **fix B1**).
+   One round-trip:
    `INSERT … ON CONFLICT (…5 cols…) DO UPDATE SET continent = EXCLUDED.continent
    RETURNING id`. `Location.lat/lon` = the geocoder's representative point;
    `photo_assets.lat/lon` keeps the photo's exact coords. Manual `9q4.3` inserts
@@ -96,7 +101,8 @@ message ImageAttributes {
 ```
 
 `PhotoAsset` (the list/get contract in `photo_service.proto`) gains
-`GeoPlace location = 20;` by **importing `photo/v1/processing.proto`** and reusing
+`GeoPlace location = 21;` (field 20 is the existing `repeated variants`) by
+**importing `photo/v1/processing.proto`** and reusing
 the `GeoPlace` message — not a second copy (Principle 7). `photo_service.proto`
 currently imports only `common` + annotations, so the new import is a deliberate
 contract edit.
