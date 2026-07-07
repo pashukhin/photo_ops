@@ -61,6 +61,12 @@ def test_retry_attempt_reads_header_default_zero() -> None:
     assert retry_attempt({"x-attempt": 3}) == 3
 
 
+def test_retry_attempt_tolerates_malformed_header() -> None:
+    # why: a malformed/externally-set value must not raise into a DLQ nack — treat as 0.
+    assert retry_attempt({"x-attempt": "oops"}) == 0  # non-numeric str → ValueError
+    assert retry_attempt({"x-attempt": None}) == 0  # None → TypeError
+
+
 def test_should_retry_is_bounded() -> None:
     # why: bounded — retry below the cap, give up (→ FAILED) at/above it. No infinite requeue.
     assert should_retry({"x-attempt": 0}, MAX_RETRY_ATTEMPTS) is True

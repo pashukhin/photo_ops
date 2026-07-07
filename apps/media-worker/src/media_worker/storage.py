@@ -89,12 +89,20 @@ class MinioObjectStore:
                 raise TransientProcessingError(str(exc)) from exc
             raise
 
-    def head(self, object_key: str) -> dict[str, str] | None:
+    def head(self, object_key: str) -> dict[str, str] | None:  # pragma: no cover - live MinIO IO
         try:
             stat = self._client.stat_object(self._bucket, object_key)
         except minio.error.S3Error as exc:
             if exc.code == "NoSuchKey":
                 return None
+            # head() is the FIRST storage op (the claim check) — a transient hiccup here
+            # must also become a bounded retry, not a permanent FAILED (photo_ops-0od).
+            if classify_storage_error(exc):
+                raise TransientProcessingError(str(exc)) from exc
+            raise
+        except Exception as exc:
+            if classify_storage_error(exc):
+                raise TransientProcessingError(str(exc)) from exc
             raise
         # stat.metadata is a urllib3.HTTPHeaderDict; keys are lower-cased HTTP
         # headers like "x-amz-meta-job-id".  Strip the prefix to return plain

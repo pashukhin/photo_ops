@@ -214,6 +214,9 @@ export class PhotoDomainService {
     // below. A redelivery of the winner re-applies the idempotent terminal writes
     // (reaching 'ready'/'failed' even after a crash between finalizeJob and setStatus);
     // a losing opposite-outcome duplicate is a no-op (must not clobber the winner).
+    // NB: this assumes ONE terminal job per photo (only 'initial' jobs today). If a
+    // 'reprocess' second job is ever wired, strengthen the gate to "is this the photo's
+    // current run" — else a stale old-job redelivery reverts newer output (photo_ops-4uj).
     const job = await this.repository.findJobById(result.jobId);
     if (!job || job.status !== result.outcome) return;
 

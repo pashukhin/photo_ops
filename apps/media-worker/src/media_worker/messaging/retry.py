@@ -18,10 +18,17 @@ def requeue_on(exc: BaseException) -> bool:
 
 
 def retry_attempt(headers: dict | None) -> int:
-    """The current attempt count carried in the message header (0 on first delivery)."""
+    """The current attempt count carried in the message header (0 on first delivery).
+
+    Tolerant of a malformed/externally-set value (bytes, non-numeric str) — treat it
+    as 0 rather than raising, so one odd header can't escape into a DLQ nack.
+    """
     if not headers:
         return 0
-    return int(headers.get("x-attempt", 0))
+    try:
+        return int(headers.get("x-attempt", 0))
+    except (TypeError, ValueError):
+        return 0
 
 
 def should_retry(headers: dict | None, max_attempts: int) -> bool:

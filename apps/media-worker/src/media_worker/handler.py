@@ -55,19 +55,11 @@ class JobHandler:
             job = decode_job(message.body)
         except Exception as exc:
             log.error("job.failed", extra={"job_id": "", "photo_id": "", "error": str(exc)})
-            body = encode_result(
+            self._publish_failed(
                 job_id="",
                 photo_id="",
                 correlation_id=message.correlation_id,
-                outcome=PROCESSING_OUTCOME_FAILED,
-                attributes=None,
-                variants=[],
-                metadata_json="",
                 error_message=str(exc),
-            )
-            self._publisher.publish(
-                self._result_dest,
-                BusMessage(body=body, correlation_id=message.correlation_id),
             )
             return
 
@@ -83,20 +75,32 @@ class JobHandler:
                 "job.failed.transient_giveup",
                 extra={"job_id": job.job_id, "photo_id": job.photo_id, "error": str(exc)},
             )
-            self._publish_failed(job, f"transient storage error persisted after retries: {exc}")
+            self._publish_failed(
+                job_id=job.job_id,
+                photo_id=job.photo_id,
+                correlation_id=job.correlation_id,
+                error_message=f"transient storage error persisted after retries: {exc}",
+            )
         except Exception as exc:
             log.error(
                 "job.failed",
                 extra={"job_id": job.job_id, "photo_id": job.photo_id, "error": str(exc)},
             )
-            self._publish_failed(job, str(exc))
+            self._publish_failed(
+                job_id=job.job_id,
+                photo_id=job.photo_id,
+                correlation_id=job.correlation_id,
+                error_message=str(exc),
+            )
 
-    def _publish_failed(self, job: ProcessPhotoJob, error_message: str) -> None:
-        """Publish a permanent FAILED result for *job* (acked by the transport)."""
+    def _publish_failed(
+        self, *, job_id: str, photo_id: str, correlation_id: str, error_message: str
+    ) -> None:
+        """Publish a permanent FAILED result (acked by the transport)."""
         body = encode_result(
-            job_id=job.job_id,
-            photo_id=job.photo_id,
-            correlation_id=job.correlation_id,
+            job_id=job_id,
+            photo_id=photo_id,
+            correlation_id=correlation_id,
             outcome=PROCESSING_OUTCOME_FAILED,
             attributes=None,
             variants=[],
@@ -105,7 +109,7 @@ class JobHandler:
         )
         self._publisher.publish(
             self._result_dest,
-            BusMessage(body=body, correlation_id=job.correlation_id),
+            BusMessage(body=body, correlation_id=correlation_id),
         )
 
     def _process(self, job: ProcessPhotoJob) -> None:

@@ -21,5 +21,6 @@ production should check the AMQP connection or use a container health check).
 
 - Do not regenerate proto stubs from this service; `make proto` / `make proto-check` handles drift detection at the repo root.
 - `RabbitMqBus` is not instantiated in unit tests — it requires a live broker. It is covered by the Task 4.2 integration test.
+- Storage-error handling (`photo_ops-0od`): `errors.py` `classify_storage_error` splits transient (retryable — `urllib3` HTTP errors, `ServerError` 5xx, transient `S3Error` codes) from permanent (bad image, `NoSuchKey`). `MinioObjectStore.head/download/upload` re-raise a transient as `TransientProcessingError`; `JobHandler` bounded-retries it (re-raise below the cap, give up → FAILED at the cap) and `messaging/rabbitmq.py` republishes with an incremented `x-attempt` header (no callback sleep — it would block the single `BlockingConnection`). The retry arithmetic (`messaging/retry.py`, `MAX_RETRY_ATTEMPTS`) is pure + unit-covered; the pika republish and the Minio IO bodies are `# pragma: no cover` (smoke-verified).
 - Broker topology (exchange/queue/DLX/DLQ) is canonical and mirrored exactly by the TypeScript adapter in the photo-service (Task 4.2). Do not change topology constants without updating both sides.
 - Entry point: `python src/main.py` — calls `app.run(load())`, which blocks on `bus.start()`.
