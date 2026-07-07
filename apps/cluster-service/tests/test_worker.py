@@ -80,3 +80,29 @@ def test_worker_failure_publishes_failed_and_no_consumption() -> None:
     assert bus.messages("usage.events") == []  # no consumption on failure
     # the worker does not flip status — the server's result-consumer does
     assert store.get(result_id="r1", user_id="u1").status == "pending"
+
+
+def test_worker_skips_succeeded_when_save_tree_not_applied(fake_method, id_factory) -> None:
+    # why (1m8): on a non-pending EXISTING result save_tree returns False; the worker must
+    # NOT publish SUCCEEDED nor emit usage (currently it publishes regardless → a phantom
+    # SUCCEEDED / a run with no tree). Use a non-pending EXISTING result — a MISSING result
+    # KeyErrors → FAILED, which would be a false-GREEN.
+    store = InMemoryStore()
+    _pending(store)
+    store.mark_failed(result_id="r1", error_message="prior failure")
+    bus = InMemoryBus()
+    worker = ClusterWorker(
+        store=store,
+        photo_reader=FakeReader([make_point("a", minutes=0), make_point("b", minutes=1)]),
+        publisher=bus,
+        provider="local-demo",
+        id_factory=id_factory,
+        now=lambda: "2024-06-15T12:00:00+00:00",
+    )
+    worker.handle(_job())
+
+    results = bus.messages("cluster.result")
+    assert all(
+        decode_result(m.body).outcome != process_pb2.CLUSTER_OUTCOME_SUCCEEDED for m in results
+    )
+    assert bus.messages("usage.events") == []  # no usage when save_tree not applied

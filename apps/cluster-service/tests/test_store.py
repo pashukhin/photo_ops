@@ -12,9 +12,9 @@ def _pending(store: InMemoryStore, result_id: str = "r1", user_id: str = "u1") -
     )
 
 
-def _tree() -> ClusterTree:
+def _tree(root_id: str = "root") -> ClusterTree:
     root = TreeNode(
-        id="root",
+        id=root_id,
         kind=NodeKind.ROOT,
         date_from=datetime(2024, 6, 15, 12, 0, 0),
         date_to=datetime(2024, 6, 15, 13, 0, 0),
@@ -94,3 +94,26 @@ def test_list_reports_span_after_ready() -> None:
     assert summary.status == "ready"
     assert summary.date_from == datetime(2024, 6, 15, 12, 0, 0)
     assert summary.photo_count == 2
+
+
+def test_save_tree_is_idempotent_across_redelivery_with_a_distinct_tree() -> None:
+    # why (42b): a redelivery-while-pending recomputes a DIFFERENT tree (fresh ids); the
+    # second save must NOT overwrite/duplicate — the first tree wins. A DISTINCT second
+    # tree is required — reusing the same one would be a vacuous pass.
+    s = InMemoryStore()
+    _pending(s)
+    s.save_tree(result_id="r1", tree=_tree(root_id="root-A"), consumption_json="{}")
+    s.save_tree(result_id="r1", tree=_tree(root_id="root-B"), consumption_json="{}")  # redelivery
+    r = s.get(result_id="r1", user_id="u1")
+    assert r is not None and r.root is not None
+    assert r.root.id == "root-A"  # first tree wins; not overwritten by root-B
+
+
+def test_save_tree_returns_false_for_missing_or_failed_result() -> None:
+    # why (1m8): no live pending row to fill → False, so the worker skips SUCCEEDED.
+    # Also pins the .get() fix (a missing row must not KeyError, m7).
+    s = InMemoryStore()
+    assert s.save_tree(result_id="ghost", tree=_tree(), consumption_json="{}") is False
+    _pending(s)
+    s.mark_failed(result_id="r1", error_message="boom")
+    assert s.save_tree(result_id="r1", tree=_tree(), consumption_json="{}") is False
