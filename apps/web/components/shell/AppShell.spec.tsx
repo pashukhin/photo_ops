@@ -98,4 +98,14 @@ describe('AppShell', () => {
     expect(screen.queryByText('Ada')).toBeNull();
     expect(screen.queryByRole('button', { name: /log out/i })).toBeNull();
   });
+
+  it('exposes a Posts nav link (session 020)', () => {
+    // why: after 020 a published post is reachable again via /posts.
+    render(
+      <AppShell>
+        <p>s</p>
+      </AppShell>
+    );
+    expect(screen.getByRole('link', { name: 'Posts' })).toHaveAttribute('href', '/posts');
+  });
 });

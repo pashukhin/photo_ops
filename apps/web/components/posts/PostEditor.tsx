@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { getPost, listPhotos, publishPost, unpublishPost, updatePost } from '../../lib/api';
-import type { PhotoAsset } from '../../lib/api';
+import type { PhotoAsset, Post } from '../../lib/api';
+import { canonicalPostUrl, shareText } from '../../lib/share';
 
 // One editable photo row: photo_id is fixed (a member of the post's snapshot),
 // caption + list position are what the editor mutates. Order is the array
@@ -30,6 +31,10 @@ export function PostEditor({ postId }: { postId: string }) {
   const [visibility, setVisibility] = useState<'public' | 'unlisted'>('public');
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
+  // Share (session 020): one shared, self-reverting confirmation reused by both
+  // buttons ('Copied' on success, 'Copy failed' on a clipboard error).
+  const [copied, setCopied] = useState<string | null>(null);
+  const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     getPost(postId)
@@ -87,11 +92,13 @@ export function PostEditor({ postId }: { postId: string }) {
     }
   }, [postId, title, body, photos]);
 
-  const publish = useCallback(async () => {
+  // Publish/unpublish share the same envelope (x36 #2): toggle publishing, clear
+  // the error, apply the returned status/slug, surface a failure.
+  const runPublishAction = useCallback(async (action: () => Promise<Post>) => {
     setPublishing(true);
     setPublishError(null);
     try {
-      const updated = await publishPost(postId, visibility);
+      const updated = await action();
       setStatus(updated.status);
       setSlug(updated.slug);
     } catch (e: unknown) {
@@ -99,21 +106,38 @@ export function PostEditor({ postId }: { postId: string }) {
     } finally {
       setPublishing(false);
     }
-  }, [postId, visibility]);
+  }, []);
 
-  const unpublish = useCallback(async () => {
-    setPublishing(true);
-    setPublishError(null);
-    try {
-      const updated = await unpublishPost(postId);
-      setStatus(updated.status);
-      setSlug(updated.slug);
-    } catch (e: unknown) {
-      setPublishError(String(e));
-    } finally {
-      setPublishing(false);
-    }
-  }, [postId]);
+  const publish = useCallback(
+    () => runPublishAction(() => publishPost(postId, visibility)),
+    [runPublishAction, postId, visibility]
+  );
+
+  const unpublish = useCallback(() => runPublishAction(() => unpublishPost(postId)), [runPublishAction, postId]);
+
+  // Flash a shared confirmation for ~2s; a single timer (cleared on re-flash and
+  // on unmount) avoids stacking and setState-after-unmount.
+  const flash = useCallback((message: string) => {
+    setCopied(message);
+    if (copiedTimer.current) clearTimeout(copiedTimer.current);
+    copiedTimer.current = setTimeout(() => setCopied(null), 2000);
+  }, []);
+
+  // Copy text to the clipboard; surface success or a failure (e.g. denied
+  // permission / insecure context) rather than silently swallowing the rejection.
+  const copy = useCallback(
+    async (text: string) => {
+      try {
+        await navigator.clipboard.writeText(text);
+        flash('Copied');
+      } catch {
+        flash('Copy failed');
+      }
+    },
+    [flash]
+  );
+
+  useEffect(() => () => { if (copiedTimer.current) clearTimeout(copiedTimer.current); }, []);
 
   if (loadError) {
     return (
@@ -211,12 +235,29 @@ export function PostEditor({ postId }: { postId: string }) {
       <div className="space-y-2 border-t pt-4">
         {status === 'published' ? (
           <>
-            <p className="text-sm">
-              Published ·{' '}
-              <a href={`/posts/${slug}`} className="underline">
-                /posts/{slug}
-              </a>
-            </p>
+            <p className="text-sm text-muted-foreground">Published</p>
+            <a href={canonicalPostUrl(slug)} className="block text-sm underline break-all">
+              {canonicalPostUrl(slug)}
+            </a>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void copy(canonicalPostUrl(slug))}
+                className="border rounded-md px-3 py-1 text-sm"
+              >
+                Copy link
+              </button>
+              <button
+                type="button"
+                onClick={() => void copy(shareText({ title, body, slug }))}
+                className="border rounded-md px-3 py-1 text-sm"
+              >
+                Copy share text
+              </button>
+              <span role="status" aria-live="polite" className="text-sm text-muted-foreground">
+                {copied}
+              </span>
+            </div>
             <button
               type="button"
               onClick={() => void unpublish()}

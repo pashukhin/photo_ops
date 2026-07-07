@@ -484,3 +484,29 @@ async function readErrorMessage(response: Response, fallback: string) {
     return fallback;
   }
 }
+
+// --- Owner post listing (session 020) ---------------------------------------
+
+// A post as it appears in the owner's "My posts" list — the gateway's mapSummary
+// shape. No slug (rows link to the editor); no photos/body.
+export interface PostSummary {
+  id: string;
+  title: string;
+  status: string;
+  visibility: string;
+  dateFrom: string;
+  dateTo: string;
+  photoCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// GET the owner's posts (owner-scoped at the gateway) — the "My posts" listing.
+export async function listPosts(): Promise<{ posts: PostSummary[] }> {
+  const response = await fetch(`${API_BASE_URL}/v1/posts`, { credentials: 'include', cache: 'no-store' });
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, `ListPosts failed: ${response.status}`));
+  }
+  const body = (await response.json()) as { posts?: PostSummary[] };
+  return { posts: body.posts ?? [] };
+}
