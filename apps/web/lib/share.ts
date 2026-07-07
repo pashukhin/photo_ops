@@ -14,9 +14,11 @@ export function canonicalPostUrl(slug: string): string {
 export function shortDescription(body: string, max = 140): string {
   const oneLine = body.replace(/\s+/g, ' ').trim();
   if (!oneLine) return '';
-  // Truncate by code points (spread), not UTF-16 units, so an emoji at the
-  // boundary is never split into a lone surrogate before the ellipsis.
-  return oneLine.length > max ? `${[...oneLine].slice(0, max).join('')}…` : oneLine;
+  // Count AND truncate by code points (not UTF-16 units), so an emoji at the
+  // boundary is never split into a lone surrogate, and a body that fits in `max`
+  // code points is never given a spurious ellipsis.
+  const cps = [...oneLine];
+  return cps.length > max ? `${cps.slice(0, max).join('')}…` : oneLine;
 }
 
 // The generated share text: `New photo story: <title>\n<short desc>\n<link>`.

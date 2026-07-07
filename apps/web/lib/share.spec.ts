@@ -31,6 +31,13 @@ describe('share helpers', () => {
     expect(shortDescription(exact, 140)).toBe(exact);
   });
 
+  it('shortDescription counts by code points — an all-emoji body within max is not truncated', () => {
+    // why: guard + truncation both by code point; a 100-emoji body (200 UTF-16
+    // units) must NOT get a spurious ellipsis, and no surrogate is ever split.
+    const emoji = '😀'.repeat(100);
+    expect(shortDescription(emoji, 140)).toBe(emoji);
+  });
+
   it('shortDescription returns empty string for an empty body', () => {
     expect(shortDescription('')).toBe('');
     expect(shortDescription('   ')).toBe('');
