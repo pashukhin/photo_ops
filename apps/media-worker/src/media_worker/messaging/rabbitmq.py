@@ -35,6 +35,7 @@ import pika.exceptions  # type: ignore[import-untyped]
 import pika.spec  # type: ignore[import-untyped]
 
 from .port import BusMessage
+from .retry import requeue_on, retry_attempt
 
 log = logging.getLogger(__name__)
 
@@ -155,15 +156,36 @@ class RabbitMqBus:
         self._ensure_topology(source)
         self._channel.basic_qos(prefetch_count=1)
 
-        def _on_message(ch, method, props, body):  # type: ignore[no-untyped-def]
+        def _on_message(ch, method, props, body):  # type: ignore[no-untyped-def]  # pragma: no cover - live-broker IO (smoke-verified); retry LOGIC is unit-covered in retry.py
             correlation_id: str = (
                 props.correlation_id if props.correlation_id else ""
             )
-            bus_message = BusMessage(body=body, correlation_id=correlation_id)
+            headers = props.headers or {}
+            bus_message = BusMessage(body=body, correlation_id=correlation_id, headers=headers)
             try:
                 handler(bus_message)
                 ch.basic_ack(delivery_tag=method.delivery_tag)
-            except Exception:
+            except Exception as exc:
+                if requeue_on(exc):
+                    # Bounded transient retry: republish the job with an incremented
+                    # x-attempt counter and ack the original. No time.sleep here — it
+                    # would block the single BlockingConnection (prefetch=1 → head-of-line
+                    # stall). The bound lives in the handler, which gives up (publishes
+                    # FAILED) once x-attempt reaches the cap, so this never loops forever.
+                    new_headers = dict(headers)
+                    new_headers["x-attempt"] = retry_attempt(headers) + 1
+                    ch.basic_publish(
+                        exchange=source,
+                        routing_key=source,
+                        body=body,
+                        properties=pika.BasicProperties(
+                            delivery_mode=2,
+                            correlation_id=props.correlation_id,
+                            headers=new_headers,
+                        ),
+                    )
+                    ch.basic_ack(delivery_tag=method.delivery_tag)
+                    return
                 log.exception(
                     "Unexpected error handling message correlation_id=%r; "
                     "nack-ing to DLQ (requeue=False).",

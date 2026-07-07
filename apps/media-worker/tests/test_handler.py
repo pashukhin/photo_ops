@@ -10,6 +10,7 @@ from PIL import Image
 from src.media_worker.errors import TransientProcessingError
 from src.media_worker.handler import JobHandler
 from src.media_worker.messaging.in_memory import BusMessage, InMemoryBus
+from src.media_worker.messaging.retry import MAX_RETRY_ATTEMPTS
 from src.photoops_proto.photo.v1 import processing_pb2
 from tests.fakes import FakeObjectStore, RaisingObjectStore
 
@@ -245,3 +246,22 @@ class TestHandlerTransientVsPermanent:
         assert len(published) == 1
         _, msg = published[0]
         assert _decode_result(msg).outcome == processing_pb2.PROCESSING_OUTCOME_FAILED
+
+    def test_transient_error_gives_up_as_failed_at_retry_cap(self) -> None:
+        # why (0od): bounded — once x-attempt reaches the cap, a persistent transient
+        # error becomes a permanent FAILED so the photo does not stay in 'processing'.
+        store = RaisingObjectStore(TransientProcessingError("minio still down"))
+        bus = InMemoryBus()
+        handler = JobHandler(store=store, publisher=bus)
+
+        msg = BusMessage(
+            body=_make_job().SerializeToString(),
+            correlation_id="corr-giveup",
+            headers={"x-attempt": MAX_RETRY_ATTEMPTS},
+        )
+        handler.handle(msg)  # must NOT raise at the cap
+
+        published = _drain_results(bus)
+        assert len(published) == 1
+        _, out = published[0]
+        assert _decode_result(out).outcome == processing_pb2.PROCESSING_OUTCOME_FAILED

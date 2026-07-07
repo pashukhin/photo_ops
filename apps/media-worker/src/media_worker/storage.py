@@ -7,6 +7,7 @@ import minio
 import minio.error
 
 from .config import Config
+from .errors import TransientProcessingError, classify_storage_error
 
 _AMZMETA_PREFIX = "x-amz-meta-"
 
@@ -50,13 +51,21 @@ class MinioObjectStore:
             secure=secure,
         )
 
-    def download(self, object_key: str) -> bytes:
-        response = self._client.get_object(self._bucket, object_key)
+    def download(self, object_key: str) -> bytes:  # pragma: no cover - live MinIO IO
         try:
-            return response.read()
-        finally:
-            response.close()
-            response.release_conn()
+            response = self._client.get_object(self._bucket, object_key)
+            try:
+                return response.read()
+            finally:
+                response.close()
+                response.release_conn()
+        except Exception as exc:
+            # Transient storage hiccups (unreachable / 5xx / reset) must not become a
+            # permanent FAILED — re-raise as TransientProcessingError so the transport
+            # bounded-retries; permanent errors (NoSuchKey, ...) propagate as-is.
+            if classify_storage_error(exc):
+                raise TransientProcessingError(str(exc)) from exc
+            raise
 
     def upload(
         self,
@@ -64,16 +73,21 @@ class MinioObjectStore:
         data: bytes,
         content_type: str,
         metadata: dict[str, str],
-    ) -> int:
-        self._client.put_object(
-            self._bucket,
-            object_key,
-            io.BytesIO(data),
-            length=len(data),
-            content_type=content_type,
-            metadata=cast(dict[str, str | list[str] | tuple[str]], metadata),
-        )
-        return len(data)
+    ) -> int:  # pragma: no cover - live MinIO IO (smoke-verified)
+        try:
+            self._client.put_object(
+                self._bucket,
+                object_key,
+                io.BytesIO(data),
+                length=len(data),
+                content_type=content_type,
+                metadata=cast(dict[str, str | list[str] | tuple[str]], metadata),
+            )
+            return len(data)
+        except Exception as exc:
+            if classify_storage_error(exc):
+                raise TransientProcessingError(str(exc)) from exc
+            raise
 
     def head(self, object_key: str) -> dict[str, str] | None:
         try:

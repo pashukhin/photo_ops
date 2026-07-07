@@ -8,6 +8,9 @@ from typing import Callable, Protocol
 class BusMessage:
     body: bytes
     correlation_id: str
+    # Broker headers (e.g. the bounded-retry ``x-attempt`` counter, photo_ops-0od).
+    # Optional so existing constructions and the in-memory bus are unaffected.
+    headers: dict | None = None
 
 
 class MessagePublisher(Protocol):
