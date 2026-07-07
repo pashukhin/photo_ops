@@ -136,6 +136,7 @@ migrate-photo:
 	$(DC) exec -T postgres psql -U "$${POSTGRES_SUPERUSER}" -d postgres < infra/postgres/init/001-create-databases.sql
 	$(DC) exec -T postgres psql "$${PHOTO_DATABASE_URL}" < apps/photo-service/migrations/0001_create_photo_assets.sql
 	$(DC) exec -T postgres psql "$${PHOTO_DATABASE_URL}" < apps/photo-service/migrations/0002_media_processing.sql
+	$(DC) exec -T postgres psql "$${PHOTO_DATABASE_URL}" < apps/photo-service/migrations/0003_location.sql
 
 migrate-usage:
 	$(DC) exec -T postgres psql -U "$${POSTGRES_SUPERUSER}" -d postgres < infra/postgres/init/001-create-databases.sql

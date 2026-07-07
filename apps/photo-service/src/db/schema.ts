@@ -38,10 +38,39 @@ export const photoAssets = pgTable(
     lat: doublePrecision('lat'),
     lon: doublePrecision('lon'),
     metadataJson: jsonb('metadata_json'),
+    // reverse-geocoded place (migration 0003); in-DB FK to locations.id
+    locationId: uuid('location_id'),
   },
   (table) => ({
     userCreatedAtIdx: index('photo_assets_user_created_at_idx').on(table.userId, table.createdAt),
     statusIdx: index('photo_assets_status_idx').on(table.status)
+  })
+);
+
+// Reverse-geocoded place (migration 0003). Tuple columns NOT NULL DEFAULT '' so the
+// UNIQUE dedup key fires (Postgres treats NULL as distinct).
+export const locations = pgTable(
+  'locations',
+  {
+    id: uuid('id').primaryKey(),
+    continent: text('continent').notNull().default(''),
+    country: text('country').notNull().default(''),
+    region: text('region').notNull().default(''),
+    city: text('city').notNull().default(''),
+    district: text('district').notNull().default(''),
+    lat: doublePrecision('lat'),
+    lon: doublePrecision('lon'),
+    rawProviderData: jsonb('raw_provider_data'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    placeUq: uniqueIndex('locations_place_uq').on(
+      table.continent,
+      table.country,
+      table.region,
+      table.city,
+      table.district
+    ),
   })
 );
 

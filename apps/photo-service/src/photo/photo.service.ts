@@ -3,7 +3,7 @@ import { PinoLogger } from 'nestjs-pino';
 import { uuidv7 } from 'uuidv7';
 import { currentTraceparent } from '@photoops/observability';
 import { MessagePublisher } from '../messaging/messaging.port';
-import { CreateUploadIntentInput, ListPhotosParams, ListPhotosResult, PhotoAssetRecord, PhotoVariantRecord, PhotoVariantView, PhotoWithVariants, ProcessingJobRecord, ProcessingResultInput } from './photo.types';
+import { CreateUploadIntentInput, GeoPlaceInput, ListPhotosParams, ListPhotosResult, LocationRecord, NormalizedPlace, PhotoAssetRecord, PhotoVariantRecord, PhotoVariantView, PhotoWithVariants, ProcessingJobRecord, ProcessingResultInput } from './photo.types';
 import { encodeJob } from './processing.codec';
 import { UsageEmitter } from './usage.emitter';
 
@@ -14,6 +14,21 @@ function parseMetadata(raw: string): unknown {
   } catch {
     return null;
   }
+}
+
+// Normalize a geocoded/manual place into the dedup tuple: trim + coalesce
+// null/undefined to ''. NO lower-casing in 022 — all places are geocoded (casing
+// consistent) and the display must stay human-readable ("Buenos Aires"); a
+// case-insensitive lower() index is a 9q4.3 concern once manual entries collide.
+export function normalizePlace(place: GeoPlaceInput): NormalizedPlace {
+  const norm = (v: string | undefined): string => (v ?? '').trim();
+  return {
+    continent: norm(place.continent),
+    country: norm(place.country),
+    region: norm(place.region),
+    city: norm(place.city),
+    district: norm(place.district),
+  };
 }
 
 // Logical destination name for the processing job flow (broker topology lives
@@ -37,8 +52,12 @@ export interface PhotoRepositoryPort {
   finalizeJob(jobId: string, outcome: 'succeeded' | 'failed', errorMessage?: string): Promise<boolean>;
   findJobById(jobId: string): Promise<ProcessingJobRecord | null>;
   upsertVariant(v: { photoId: string; variantType: 'thumbnail' | 'preview'; objectKey: string; width: number; height: number; sizeBytes: bigint; contentType: string }): Promise<void>;
-  applyAttributes(photoId: string, attrs: { width: number | null; height: number | null; takenAtLocal: string | null; takenAtUtc: Date | null; takenAtTzSource: string | null; cameraMake: string | null; cameraModel: string | null; orientation: number | null; lat: number | null; lon: number | null; metadataJson: unknown }): Promise<void>;
+  applyAttributes(photoId: string, attrs: { width: number | null; height: number | null; takenAtLocal: string | null; takenAtUtc: Date | null; takenAtTzSource: string | null; cameraMake: string | null; cameraModel: string | null; orientation: number | null; lat: number | null; lon: number | null; metadataJson: unknown; locationId?: string | null }): Promise<void>;
   setStatus(photoId: string, status: 'ready' | 'failed' | 'processing'): Promise<void>;
+  // Idempotent upsert of a deduped Location by the normalized place tuple; returns its id.
+  upsertLocation(input: NormalizedPlace & { lat: number | null; lon: number | null; rawProviderData: unknown }): Promise<string>;
+  // Batched lookup of locations by id, for composing the gallery place-tag.
+  listLocationsByIds(ids: string[]): Promise<LocationRecord[]>;
   findByIdWithVariantsForUser(userId: string, photoId: string): Promise<{ photo: PhotoAssetRecord; variants: PhotoVariantRecord[] } | null>;
   listVariantsForPhotos(photoIds: string[]): Promise<PhotoVariantRecord[]>;
   // Owner-scoped batched variant lookup (session 019): variants of the owner's

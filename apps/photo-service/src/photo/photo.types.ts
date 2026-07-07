@@ -26,8 +26,41 @@ export interface PhotoAssetRecord {
   lat: number | null;
   lon: number | null;
   metadataJson: unknown | null;
+  locationId: string | null;
   createdAt: Date;
   updatedAt: Date;
+}
+
+// A deduped reverse-geocoded place (migration 0003). Manual editing (9q4.3) and
+// geocoding produce the same shape. lat/lon = the place's representative point.
+export interface LocationRecord {
+  id: string;
+  continent: string;
+  country: string;
+  region: string;
+  city: string;
+  district: string;
+  lat: number | null;
+  lon: number | null;
+}
+
+// The place carried on a processing result (decoded from proto GeoPlace, camelCase)
+// and, after normalization, the dedup tuple written to `locations`.
+export interface GeoPlaceInput {
+  continent?: string;
+  country?: string;
+  region?: string;
+  city?: string;
+  district?: string;
+  rawProviderData?: string;
+}
+
+export interface NormalizedPlace {
+  continent: string;
+  country: string;
+  region: string;
+  city: string;
+  district: string;
 }
 
 export interface CreateUploadIntentInput {
@@ -60,6 +93,7 @@ export interface PhotoVariantView {
 export interface PhotoWithVariants {
   photo: PhotoAssetRecord;
   variants: PhotoVariantView[];
+  location?: LocationRecord | null;
 }
 
 // --- ListPhotos query (session 011) -----------------------------------------
@@ -114,6 +148,7 @@ export interface ProcessingResultAttributes {
   orientation?: number;
   lat?: number | null;
   lon?: number | null;
+  place?: GeoPlaceInput;
 }
 
 export interface ProcessingResultVariant {

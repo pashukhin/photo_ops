@@ -89,4 +89,27 @@ describe('processing.codec', () => {
     expect(result.variants).toHaveLength(0);
     expect(result.attributes).toBeUndefined();
   });
+
+  it('decodeResult maps the proto place into attributes.place', () => {
+    // why (coverage + live path): finalizeResult reads attributes.place, but only if
+    // decodeResult carries it off the wire. Encode a result WITH a place, decode it,
+    // assert the place round-trips (country/city + raw_provider_data).
+    const body = PhotoProcessingResultType.encode(
+      PhotoProcessingResultType.fromObject({
+        jobId: 'job-3',
+        photoId: 'photo-3',
+        outcome: 1, // SUCCEEDED
+        attributes: {
+          width: 100,
+          height: 50,
+          place: { country: 'Argentina', city: 'Buenos Aires', rawProviderData: '{"lat":-34.6,"lon":-58.38}' }
+        }
+      })
+    ).finish();
+
+    const result = decodeResult(body);
+
+    expect(result.attributes?.place).toEqual(expect.objectContaining({ country: 'Argentina', city: 'Buenos Aires' }));
+    expect(result.attributes?.place?.rawProviderData).toContain('lat');
+  });
 });
