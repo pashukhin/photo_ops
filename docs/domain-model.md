@@ -216,7 +216,17 @@ Projected fields:
 
 Rules:
 
-- Location starts as a photo-domain reverse-geocoding cache/reference.
+- Location is a photo-domain reverse-geocoding cache/reference (implemented in
+  session 022, ADR-0007). For an offline provider the deduped `locations` table
+  **is** the cache — no separate per-coordinate cache.
+- Deduped by the normalized place tuple `(continent,country,region,city,district)`;
+  those columns are `NOT NULL DEFAULT ''` with a `UNIQUE` over all five (Postgres
+  treats NULL as distinct, so nullable columns would never dedup). `lat`/`lon` are
+  the matched place's representative point; a photo keeps its exact coords on
+  `photo_assets`. A manual location (`9q4.3`) inserts the same shape → converges by
+  tuple.
+- A photo references it via `photo_assets.location_id` (an in-DB FK — same DB, same
+  owner). Absent when there is no GPS / the geocoder resolves nothing.
 - Do not extract a separate location service until another domain needs independent location ownership.
 
 The clustering result is a **tree**, not a flat grouping: a `ClusteringResult`
@@ -455,7 +465,7 @@ Rules:
 | `Session` | `identity-service` | `identity-db` | Yes |
 | `PhotoAsset` | `photo-service` | `photo-db` | Yes, with `user_id` ownership |
 | `PhotoVariant` | `photo-service` | `photo-db` | No |
-| `Location` | `photo-service` | `photo-db` | No |
+| `Location` | `photo-service` | `photo-db` | Yes (session 022) |
 | `ClusteringResult` | `cluster-service` | `cluster-db` | Yes (session-013 branch) |
 | `ClusterNode` | `cluster-service` | `cluster-db` | Yes (session-013 branch) |
 | `ClusterItem` | `cluster-service` | `cluster-db` | Yes (session-013 branch) |
