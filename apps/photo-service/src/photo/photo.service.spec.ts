@@ -368,6 +368,7 @@ describe('PhotoDomainService', () => {
   it('finalize SUCCEEDED: upserts variants, applies attributes, marks ready', async () => {
     const { service, repository, logger } = createService();
     repository.finalizeJob.mockResolvedValue(true);
+    repository.findJobById.mockResolvedValue({ id: 'j1', userId: 'user-1', status: 'succeeded' });
     await service.finalizeResult({ jobId: 'j1', photoId: 'p1', outcome: 'succeeded',
       attributes: { width: 100, height: 50 }, variants: [{ variantType: 'thumbnail', objectKey: 'variants/p1/thumbnail.jpg', width: 100, height: 50, sizeBytes: 10n, contentType: 'image/jpeg' }], metadataJson: '{}' });
     expect(repository.upsertVariant).toHaveBeenCalledTimes(1);
@@ -379,9 +380,12 @@ describe('PhotoDomainService', () => {
     );
   });
 
-  it('finalize is idempotent: duplicate result (finalizeJob=false) writes nothing', async () => {
+  it('losing/mismatched duplicate (recorded winner != outcome) writes nothing', async () => {
+    // why (opm/M1): a result whose outcome does not match the job's RECORDED winner is a
+    // losing/stale duplicate — it must apply no terminal writes (must not clobber).
     const { service, repository } = createService();
     repository.finalizeJob.mockResolvedValue(false);
+    repository.findJobById.mockResolvedValue({ id: 'j1', userId: 'user-1', status: 'failed' });
     await service.finalizeResult({ jobId: 'j1', photoId: 'p1', outcome: 'succeeded', attributes: {}, variants: [], metadataJson: '{}' });
     expect(repository.upsertVariant).not.toHaveBeenCalled();
     expect(repository.setStatus).not.toHaveBeenCalled();
@@ -390,8 +394,33 @@ describe('PhotoDomainService', () => {
   it('finalize FAILED: marks failed', async () => {
     const { service, repository } = createService();
     repository.finalizeJob.mockResolvedValue(true);
+    repository.findJobById.mockResolvedValue({ id: 'j1', userId: 'user-1', status: 'failed' });
     await service.finalizeResult({ jobId: 'j1', photoId: 'p1', outcome: 'failed', errorMessage: 'bad', variants: [], metadataJson: '' });
     expect(repository.setStatus).toHaveBeenCalledWith('p1', 'failed');
+  });
+
+  it('crash-recovery: redelivery (finalizeJob=false, recorded winner succeeded) re-applies terminal state → ready', async () => {
+    // why (opm): a crash after finalizeJob but before setStatus strands the photo in
+    // 'processing'. Redelivery finds finalizeJob=false; because the RECORDED winner is
+    // 'succeeded', the idempotent terminal writes must still be applied. Current code
+    // early-returns on !applied → nothing applied → RED.
+    const { service, repository } = createService();
+    repository.finalizeJob.mockResolvedValue(false);
+    repository.findJobById.mockResolvedValue({ id: 'j1', userId: 'u1', status: 'succeeded' });
+    await service.finalizeResult({ jobId: 'j1', photoId: 'p1', outcome: 'succeeded',
+      attributes: {}, variants: [{ variantType: 'thumbnail', objectKey: 'variants/p1/thumbnail.jpg', width: 1, height: 1, sizeBytes: 1n, contentType: 'image/jpeg' }], metadataJson: '{}' });
+    expect(repository.upsertVariant).toHaveBeenCalledTimes(1);
+    expect(repository.setStatus).toHaveBeenCalledWith('p1', 'ready');
+  });
+
+  it('regression guard: a losing opposite-outcome duplicate does NOT clobber the winner', async () => {
+    // why (M1): SUCCEEDED won (recorded job.status='succeeded'); a redelivered FAILED for
+    // the same job must be ignored, not flip the good photo to 'failed'.
+    const { service, repository } = createService();
+    repository.finalizeJob.mockResolvedValue(false);
+    repository.findJobById.mockResolvedValue({ id: 'j1', userId: 'u1', status: 'succeeded' });
+    await service.finalizeResult({ jobId: 'j1', photoId: 'p1', outcome: 'failed', errorMessage: 'x', variants: [], metadataJson: '' });
+    expect(repository.setStatus).not.toHaveBeenCalledWith('p1', 'failed');
   });
 
   it('completeUpload success: emits emitOriginalStored once with correct args', async () => {
@@ -426,7 +455,7 @@ describe('PhotoDomainService', () => {
     // why: processing consumption must be reported on success.
     const { service, repository, usageEmitter } = createService();
     repository.finalizeJob.mockResolvedValue(true);
-    repository.findJobById.mockResolvedValue({ id: 'job-1', userId: 'u-2' });
+    repository.findJobById.mockResolvedValue({ id: 'job-1', userId: 'u-2', status: 'succeeded' });
 
     const result = { jobId: 'job-1', photoId: 'p-1', outcome: 'succeeded' as const,
       attributes: {}, variants: [{ variantType: 'thumbnail' as const, objectKey: 'k', width: 10, height: 10, sizeBytes: 100n, contentType: 'image/jpeg' }], metadataJson: '{}' };
@@ -441,6 +470,7 @@ describe('PhotoDomainService', () => {
     // why: failed processing must not generate a usage charge.
     const { service, repository, usageEmitter } = createService();
     repository.finalizeJob.mockResolvedValue(true);
+    repository.findJobById.mockResolvedValue({ id: 'job-1', userId: 'u-2', status: 'failed' });
 
     await service.finalizeResult({ jobId: 'job-1', photoId: 'p-1', outcome: 'failed', errorMessage: 'bad', variants: [], metadataJson: '' });
 

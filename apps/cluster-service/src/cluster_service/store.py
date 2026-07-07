@@ -48,7 +48,7 @@ class Store(Protocol):
 
     def save_tree(
         self, *, result_id: str, tree: ClusterTree, consumption_json: str
-    ) -> None: ...
+    ) -> bool: ...
 
     def mark_ready(self, *, result_id: str) -> None: ...
 
@@ -83,16 +83,22 @@ class InMemoryStore:
         )
         self._order.append(result_id)
 
-    def save_tree(self, *, result_id: str, tree: ClusterTree, consumption_json: str) -> None:
+    def save_tree(self, *, result_id: str, tree: ClusterTree, consumption_json: str) -> bool:
         # Worker persists the computed tree; status stays PENDING until the
         # result-consumer flips it (mirrors photo-service finalizing on the result).
-        r = self._results[result_id]
-        if r.status != "pending":  # already finalized — immutable, don't overwrite
-            return
+        # Returns whether the tree is persisted for a live result (drives the worker's
+        # SUCCEEDED+usage). Idempotent: a redelivery re-persists nothing but still
+        # reports applied so the flip is driven; a missing/failed run reports not-applied.
+        r = self._results.get(result_id)
+        if r is None or r.status == "failed":  # no live result to fill (1m8)
+            return False
+        if r.root is not None:  # tree already persisted — don't re-insert (42b)
+            return True
         r.input_fingerprint = tree.input_fingerprint
         r.photo_count = tree.photo_count
         r.root = tree.root
         r.consumption_json = consumption_json
+        return True
 
     def mark_ready(self, *, result_id: str) -> None:
         r = self._results[result_id]

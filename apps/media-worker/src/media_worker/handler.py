@@ -10,10 +10,12 @@ from src.photoops_proto.photo.v1.processing_pb2 import (
 )
 
 from .codec import VariantResult, decode_job, encode_result
+from .errors import TransientProcessingError
 from .exif import extract_attributes
 from .imaging import RENDITIONS, render_variant
 from .logging_setup import bind_job_context, clear_job_context
 from .messaging.port import BusMessage, MessagePublisher
+from .messaging.retry import MAX_RETRY_ATTEMPTS, should_retry
 from .storage import ObjectStore
 
 log = logging.getLogger(__name__)
@@ -42,51 +44,73 @@ class JobHandler:
     def _handle(self, message: BusMessage) -> None:
         """Handle one BusMessage carrying a serialized ProcessPhotoJob.
 
-        On any exception the failure is caught, a FAILED result is published,
-        and the method returns normally — one photo's failure must not propagate.
+        A permanent/expected failure (bad image, missing object, decode error) is
+        caught and published as a FAILED result, returning normally so one photo's
+        failure does not crash the consumer. A TRANSIENT storage error
+        (photo_ops-0od) instead propagates so the transport can bounded-retry it;
+        only once the retry cap is reached is it given up as a permanent FAILED.
         """
         # Decode first — a malformed body must also be caught and published as FAILED.
         try:
             job = decode_job(message.body)
         except Exception as exc:
             log.error("job.failed", extra={"job_id": "", "photo_id": "", "error": str(exc)})
-            body = encode_result(
+            self._publish_failed(
                 job_id="",
                 photo_id="",
                 correlation_id=message.correlation_id,
-                outcome=PROCESSING_OUTCOME_FAILED,
-                attributes=None,
-                variants=[],
-                metadata_json="",
                 error_message=str(exc),
-            )
-            self._publisher.publish(
-                self._result_dest,
-                BusMessage(body=body, correlation_id=message.correlation_id),
             )
             return
 
         try:
             self._process(job)
+        except TransientProcessingError as exc:
+            # Transient storage error (MinIO unreachable / 5xx / reset). Retry via the
+            # transport (bounded by x-attempt) rather than failing the photo; only after
+            # the cap give up as a permanent FAILED so it does not stay in processing.
+            if should_retry(message.headers, MAX_RETRY_ATTEMPTS):
+                raise  # transport republishes with x-attempt+1 and acks the original
+            log.error(
+                "job.failed.transient_giveup",
+                extra={"job_id": job.job_id, "photo_id": job.photo_id, "error": str(exc)},
+            )
+            self._publish_failed(
+                job_id=job.job_id,
+                photo_id=job.photo_id,
+                correlation_id=job.correlation_id,
+                error_message=f"transient storage error persisted after retries: {exc}",
+            )
         except Exception as exc:
             log.error(
                 "job.failed",
                 extra={"job_id": job.job_id, "photo_id": job.photo_id, "error": str(exc)},
             )
-            body = encode_result(
+            self._publish_failed(
                 job_id=job.job_id,
                 photo_id=job.photo_id,
                 correlation_id=job.correlation_id,
-                outcome=PROCESSING_OUTCOME_FAILED,
-                attributes=None,
-                variants=[],
-                metadata_json="",
                 error_message=str(exc),
             )
-            self._publisher.publish(
-                self._result_dest,
-                BusMessage(body=body, correlation_id=job.correlation_id),
-            )
+
+    def _publish_failed(
+        self, *, job_id: str, photo_id: str, correlation_id: str, error_message: str
+    ) -> None:
+        """Publish a permanent FAILED result (acked by the transport)."""
+        body = encode_result(
+            job_id=job_id,
+            photo_id=photo_id,
+            correlation_id=correlation_id,
+            outcome=PROCESSING_OUTCOME_FAILED,
+            attributes=None,
+            variants=[],
+            metadata_json="",
+            error_message=error_message,
+        )
+        self._publisher.publish(
+            self._result_dest,
+            BusMessage(body=body, correlation_id=correlation_id),
+        )
 
     def _process(self, job: ProcessPhotoJob) -> None:
         """Core processing — raises on any error (caught by _handle())."""

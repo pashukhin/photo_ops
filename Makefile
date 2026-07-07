@@ -1,4 +1,4 @@
-.PHONY: install proto proto-check build build-libs typecheck test lint gate gate-media gate-usage gate-cluster vet-usage lint-usage test-usage lint-cluster test-cluster test-api test-identity test-photo test-web test-media-worker lint-media-worker dev down reset logs status ps-all logs-svc sh restart-svc up-svc migrate migrate-identity migrate-photo migrate-usage migrate-cluster migrate-publication smoke-upload smoke-auth smoke-contract smoke-media smoke-stack smoke-ui smoke-usage smoke-cluster smoke-publication test-publication smoke-coverage coverage coverage-go coverage-py coverage-cluster coverage-ts coverage-diff coverage-selftest skeleton-gate coverage-gate smoke-skeleton-gate smoke-coverage-gate test-guard smoke-test-guard test-guard-selftest lint-hook-selftest
+.PHONY: install proto proto-check build build-libs typecheck test lint gate gate-media gate-usage gate-cluster vet-usage lint-usage test-usage lint-cluster test-cluster test-api test-identity test-photo test-web test-media-worker lint-media-worker dev down reset logs status ps-all logs-svc sh restart-svc up-svc migrate migrate-identity migrate-photo migrate-usage migrate-cluster migrate-publication smoke-upload smoke-auth smoke-contract smoke-media smoke-stack smoke-ui smoke-usage smoke-cluster smoke-publication seed-demo smoke-seed test-publication smoke-coverage coverage coverage-go coverage-py coverage-cluster coverage-ts coverage-diff coverage-selftest skeleton-gate coverage-gate smoke-skeleton-gate smoke-coverage-gate test-guard smoke-test-guard test-guard-selftest lint-hook-selftest
 
 ifneq (,$(wildcard .env))
 include .env
@@ -189,6 +189,16 @@ smoke-cluster:
 # Do NOT add to `gate` or CI targets.
 smoke-publication:
 	scripts/smoke-publication.sh
+
+# Local-only — requires `make dev` + `make migrate` to be running.
+# Idempotently seed the demo dataset; prints `SLUG=<published-slug>`.
+seed-demo:
+	scripts/seed-demo.sh
+
+# Local-only — requires `make dev` + `make migrate` to be running.
+# Do NOT add to `gate` or CI targets. Runs the seed twice; asserts a stable slug.
+smoke-seed:
+	scripts/smoke-seed.sh
 
 # Local-only; regenerates coverage; do NOT add to `gate` or CI.
 smoke-coverage:

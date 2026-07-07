@@ -25,39 +25,10 @@ curl -fsS -c "$COOKIE_PATH" -H 'content-type: application/json' \
   -d "{\"email\":\"pub-smoke-$STAMP@example.com\",\"password\":\"secret123\",\"displayName\":\"Pub Smoke\"}" \
   "$API_BASE_URL/auth/signup" >/dev/null
 
-# ---------------------------------------------------------------------------
-# EXIF-JPEG synth + upload helpers (same shape as smoke-cluster.sh)
-# ---------------------------------------------------------------------------
-gen_jpeg() {
-  "$VENV_PYTHON" - "$1" "$2" "$3" "$4" <<'PY'
-import io, sys
-from PIL import Image
-import piexif
-out, dt, make, model = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
-exif = {"0th": {piexif.ImageIFD.Make: make.encode(), piexif.ImageIFD.Model: model.encode()},
-        "Exif": {}, "GPS": {}, "1st": {}, "thumbnail": None}
-if dt:
-    exif["Exif"][piexif.ExifIFD.DateTimeOriginal] = dt.encode()
-    exif["Exif"][piexif.ExifIFD.OffsetTimeOriginal] = b"+00:00"
-buf = io.BytesIO()
-Image.new("RGB", (640, 480), color=(120, 150, 200)).save(buf, format="JPEG", exif=piexif.dump(exif), quality=80)
-open(out, "wb").write(buf.getvalue())
-PY
-}
-
-upload_photo() {
-  local dt="$1" make="$2" model="$3"
-  local jpeg="$TMP/p.jpg" intent="$TMP/intent.json"
-  gen_jpeg "$jpeg" "$dt" "$make" "$model"
-  local size; size="$(wc -c < "$jpeg" | tr -d ' ')"
-  curl -fsS -b "$COOKIE_PATH" -H 'content-type: application/json' \
-    -d "{\"filename\":\"p.jpg\",\"contentType\":\"image/jpeg\",\"sizeBytes\":\"$size\"}" \
-    "$API_BASE_URL/photos/upload-intents" > "$intent"
-  local pid url; pid="$(jq -r '.photoId' "$intent")"; url="$(jq -r '.uploadUrl' "$intent")"
-  curl -fsS -X PUT -H 'content-type: image/jpeg' --data-binary "@$jpeg" "$url" >/dev/null
-  curl -fsS -b "$COOKIE_PATH" -X POST "$API_BASE_URL/photos/$pid/complete-upload" >/dev/null
-  echo "$pid"
-}
+# EXIF-JPEG synth + upload/cluster/publish helpers, shared with seed-demo.sh.
+# The lib is globals-dependent — API_BASE_URL/VENV_PYTHON/TMP/COOKIE_PATH are set above.
+# shellcheck source=scripts/lib/photoops-e2e.sh
+. "$(dirname "$0")/lib/photoops-e2e.sh"
 
 # ---------------------------------------------------------------------------
 # 2. Fixture: a Canon burst (two photos, one shooting episode)
