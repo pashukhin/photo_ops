@@ -69,16 +69,32 @@ Three exception buckets:
   re-raise transient.
 - `rabbitmq.py:_on_message`: bounded retry with **no `time.sleep` in the pika
   callback** (a sleep would block the single `BlockingConnection`, prefetch=1 →
-  head-of-line stall + heartbeat risk):
-  - On `TransientProcessingError`: read an attempt counter from a stamped header
-    (`x-attempt`, default 0); if `attempt < MAX_ATTEMPTS` (default 5), **republish**
-    the job to `photo.process` with `x-attempt = attempt+1` and `basic_ack` the
-    original (immediate redelivery, bounded, no topology change); if
-    `attempt >= MAX_ATTEMPTS`, publish `FAILED` (give up) + ack.
+  head-of-line stall + heartbeat risk). The attempt counter travels in a
+  per-message header, which the `MessagePublisher` port CANNOT carry — `BusMessage`
+  is `(body, correlation_id)` only, and `publish`/`_on_message` both drop
+  `props.headers`. So the retry is done at the **raw-pika layer inside the
+  callback** (which closes over `ch`, `method`, `props`, `source`), NOT through the
+  port — routing it through `self._publisher.publish` would silently drop the header,
+  every redelivery would read `attempt=0`, and the "bounded" retry would become an
+  infinite loop:
+  - On `TransientProcessingError`: `attempt = (props.headers or {}).get('x-attempt',
+    0)`. If `attempt < MAX_RETRY_ATTEMPTS`, **republish** the same job body via
+    `ch.basic_publish(exchange=source, routing_key=source, body=…,
+    properties=pika.BasicProperties(headers={'x-attempt': attempt+1},
+    delivery_mode=2, correlation_id=props.correlation_id))`, then `basic_ack` the
+    original (immediate bounded redelivery; no topology change; header +
+    correlation_id preserved). If `attempt >= MAX_RETRY_ATTEMPTS`, publish a `FAILED`
+    result (give up) + ack.
   - On any other exception: `nack(requeue=False)` → DLQ (unchanged).
-  - A pure `requeue_on(exc) -> bool = isinstance(exc, TransientProcessingError)`
-    and the attempt-counter arithmetic live in unit-tested helpers; the thin pika
-    `basic_publish`/`basic_ack`/`basic_nack` wiring is `# pragma: no cover`.
+  - `MAX_RETRY_ATTEMPTS` is a **module-level constant** in `rabbitmq.py` (default 5).
+    Not a `Config` field: `config.py` is a frozen dataclass and `RabbitMqBus.__init__`
+    takes only `url` — a knob would need field + `load()` env + constructor + `app.py`
+    factory threading (YAGNI). Name it `MAX_RETRY_ATTEMPTS`, not `MAX_ATTEMPTS`, to
+    avoid colliding with `in_memory.py`'s unrelated `MAX_ATTEMPTS`.
+  - A pure `requeue_on(exc) -> bool = isinstance(exc, TransientProcessingError)` and
+    the attempt-counter arithmetic (`next_attempt`/`should_give_up`) live in
+    unit-tested helpers; the thin pika `basic_publish`/`basic_ack`/`basic_nack`
+    wiring is `# pragma: no cover`.
 
 Rationale for bounded (not unbounded requeue): unbounded native requeue on a
 classic queue is not count-bounded and bypasses the DLX; a misclassified-permanent
@@ -124,19 +140,24 @@ All terminal writes are idempotent (`upsertVariant` = `onConflictDoUpdate`,
 
 ```
 await repo.finalizeJob(jobId, outcome, errorMessage);   // idempotent winner-claim
-const job = await repo.findJobById(jobId);
+const job = await repo.findJobById(jobId);              // reuse this for the userId lookup too (was a 2nd fetch at L248)
 if (!job || job.status !== outcome) return;             // unknown OR losing duplicate → no-op
 if (outcome === 'succeeded') {
   for (v of variants) upsertVariant(v);                 // idempotent
   applyAttributes(...);                                 // idempotent
   setStatus(photoId, 'ready');                          // idempotent
-  emitProcessingConsumption(...);                       // ALWAYS (best-effort); charge-once via jobId dedup
+  emitProcessingConsumption({ result, userId: job.userId ?? 'unknown' });  // ALWAYS (best-effort); charge-once via jobId dedup; log the 'unknown' fallback
 } else {
   setStatus(photoId, 'failed');                         // idempotent
 }
 ```
 
-**Winner-gate (M1 — the review-critical amendment).** The naive "on `failed` →
+`findJobById` is fetched **once** and reused for both the winner-gate and the
+`userId` (the current code fetches it twice — L143 gate + L248 userId). Log when
+`userId` falls back to `'unknown'` (a missing job row silently mis-attributes the
+usage event otherwise).
+
+**Winner-gate (the review-critical amendment).** The naive "on `failed` →
 `setStatus('failed')` always" lets a **losing** opposite-outcome duplicate
 overwrite the winner: SUCCEEDED wins (photo `ready` + variants) → a redelivery
 takes the claim path and the EXIF re-download at `handler.py:154` fails → a FAILED
@@ -153,19 +174,33 @@ created a lost-charge hole (crash after apply, before emit → redelivery has
 `applied=false` → emit skipped forever). Always emit and lean on dedup.
 
 ### Tests
-- **Unit RED** (`photo.service.spec.ts`):
+- **Genuine unit RED** (fails on current code) (`photo.service.spec.ts`):
   - crash-recovery: `finalizeJob` returns false but `job.status='succeeded'`
     (same outcome) → variants+attrs+`setStatus('ready')` ARE applied (currently
     early-returns → nothing applied → RED).
-  - winner-clobber (M1): `finalizeJob` false, `job.status='succeeded'`, incoming
-    `outcome='failed'` → `setStatus('failed')` is NOT called (loser ignored).
-  - genuine duplicate SUCCEEDED (same outcome) → idempotent re-apply; usage
-    emitted (deduped downstream), not double-counted at the service.
-- **test-guard (m8):** the existing test titled *"finalize is idempotent:
-  duplicate result (finalizeJob=false) writes nothing"* (`photo.service.spec.ts:382`)
-  asserts the OLD behavior and its title becomes a lie. **Rename** it to an accurate
-  title and add an `Allow-test-removal: <reason>` trailer on that commit (keeping
-  the lying title, or renaming without the trailer, both fail the guard).
+- **Regression guards** (already GREEN on current code — frame as guards, NOT
+  bug-reproducing REDs; the skeleton-gate expects the REDs above to fail first):
+  - winner-clobber: `finalizeJob` false, `job.status='succeeded'`, incoming
+    `outcome='failed'` → `setStatus('failed')` is NOT called (loser ignored). This
+    passes today (current code early-returns on `!applied`); it guards the *naive
+    intermediate fork* that would clobber.
+  - genuine duplicate SUCCEEDED (same outcome) → idempotent re-apply; usage emitted
+    (deduped downstream), not double-counted at the service.
+- **Required churn in EXISTING tests (C1 — not "just adds tests"):** the winner-gate
+  reads `job.status`, but `createService()`'s default `findJobById` mock returns
+  `{ id, userId }` with **no `status`** (`photo.service.spec.ts:96`). Three passing
+  tests (`:368` succeeded, `:390` failed, `:425` emits-usage) would early-return
+  under the gate and turn `make gate` RED at GREEN. Each must seed
+  `findJobById().status` to match its outcome (a single default cannot cover both
+  `succeeded` and `failed`). These are edits to existing tests, no trailer needed.
+- **test-guard (m8):** the existing test *"finalize is idempotent: duplicate result
+  (finalizeJob=false) writes nothing"* (`photo.service.spec.ts:382`) still *passes*
+  under the gate (statusless mock → early return), but its title is now misleading —
+  the behavior is "a losing/unknown duplicate writes nothing," not "any duplicate."
+  **Repurpose it:** seed a *mismatched* `job.status` so it actually exercises the
+  winner-gate, **rename** to an accurate title, and add an `Allow-test-removal:
+  <reason>` trailer on that commit (a rename without the trailer fails the guard,
+  which keys on the title string).
 - **Live smoke** (`make smoke-media`): happy path reaches `ready` (regression); the
   crash-window is not live-injectable — covered by the unit RED.
 - **Residual (M3 → `photo_ops-55s`, out of scope):** a transient DB fault *inside*
@@ -194,12 +229,17 @@ Return a single boolean `applied`; make insertion idempotent by node existence.
 `Store.save_tree` signature → `-> bool`. Logic (both adapters):
 
 ```
-row = SELECT status FROM clustering_results WHERE id=%s FOR UPDATE   # (InMemory: .get())
+row = SELECT status FROM clustering_results WHERE id=%s FOR UPDATE   # InMemory: self._results.get(id) — the dict .get, NOT Store.get() (which needs user_id + enforces owner-scope)
 if row is None or row.status == 'failed': return False               # 1m8: nothing live to fill
-if nodes already exist for result_id (SELECT 1 / InMemory root is not None):
+if nodes already exist for result_id (Postgres: SELECT 1 FROM cluster_nodes; InMemory: r.root is not None):
     return True                                                      # 42b: idempotent — DO NOT re-insert
 update result aggregates; _insert_node(root); return True
 ```
+
+The InMemory idempotency marker `r.root is not None` assumes a persisted tree
+always has a non-None root — true because the pipeline always yields at least a
+root node (even an all-`not_clusterable` run). The Postgres marker (`SELECT 1 FROM
+cluster_nodes`) is structural and does not rely on that assumption.
 
 `worker.py:_process`:
 
@@ -224,11 +264,23 @@ the locked transaction** is what makes it idempotent for both concurrent (lock
 serializes, second sees nodes) and sequential (second sees nodes) redelivery.
 
 ### Tests
-- **Unit RED** (`test_store.py`, against `InMemoryStore` — the logic tier):
-  - 42b: `save_tree` twice while `pending` → second returns True and the result
-    still has exactly one root / unchanged node set (currently re-inserts).
-  - 1m8: `save_tree` on a missing result → False (must use `.get()` — the current
-    `self._results[result_id]` would `KeyError`, m7); on a `failed` result → False.
+- **Unit RED** (`test_store.py` / `test_worker.py`, against `InMemoryStore` — the
+  logic tier). Two subtleties that make the difference between a real RED and a
+  false-GREEN:
+  - 42b (**must use two DISTINCT trees**): InMemory `save_tree` reassigns the single
+    `r.root` field, so "exactly one root" is *vacuously* always true if the same tree
+    is passed twice — the RED could never fail. Pass a *second, different* tree (fresh
+    node ids, as the real worker recomputes) on the redelivery and assert the stored
+    root is still the **first** tree's. Current code overwrites → RED; "nodes exist →
+    True, skip" → GREEN.
+  - 1m8 (**must use a non-pending EXISTING result**): the bug is `save_tree` silently
+    returning yet the worker publishing SUCCEEDED. A *missing* result is a false-GREEN
+    — current InMemory does `self._results[result_id]` → `KeyError` → `worker.handle`
+    catches → publishes **FAILED** (already "no SUCCEEDED/usage"). Reproduce with an
+    existing result flipped non-pending: `create_pending` → `mark_failed` →
+    `worker.handle(job)` → assert no SUCCEEDED and no usage. Separately assert the
+    `.get()` fix makes a genuinely missing result return False (m7 — the current
+    `self._results[result_id]` KeyErrors).
   - worker: `applied=False` → no SUCCEEDED and no usage published; `applied=True`
     → both published.
 - **Coverage:** `store_postgres.py` is omit-listed + `# pragma: no cover` (thin IO,
@@ -249,18 +301,22 @@ existing publication smoke flow.
 - **New `scripts/lib/photoops-e2e.sh`** — sourced helper library extracted from
   `scripts/smoke-publication.sh`: `gen_jpeg`, `upload_photo`, `wait_photo_ready`,
   `generate_cluster`, `wait_cluster_ready`, `create_post`, `publish_post`, plus
-  `signup` / `login`. **Pure helpers only** — `set -euo pipefail`, `trap 'rm -rf'
-  EXIT`, and the unique-per-run signup stay in the **top-level** scripts (n11), so
-  smoke-publication keeps its isolation/cleanup.
+  `signup` / `login`. These are **globals-dependent** helpers, not pure — they read
+  `$TMP`, `$COOKIE_PATH`, `$API_BASE_URL`, `$VENV_PYTHON` from the caller, which each
+  top-level script must define before sourcing. Script-level policy — `set -euo
+  pipefail`, `trap 'rm -rf' EXIT`, and the unique-per-run signup — stays in the
+  **top-level** scripts (n11), so smoke-publication keeps its isolation/cleanup.
 - **Refactor `scripts/smoke-publication.sh`** to `source` the lib (assertions
   unchanged).
 - **New `scripts/seed-demo.sh`** — idempotent:
   1. `login demo@photoops.local / demo12345`; on failure `signup` (login is a real
      endpoint — `apps/api-gateway/src/http/auth.controller.ts:21`).
-  2. **Idempotency marker (m9):** look for a *published* post owned by demo with the
-     fixed seed **title** (a deterministic marker, e.g. `"PhotoOps demo — first
-     outing"`). If found → print its slug + public URL and `exit 0`. The slug is an
-     opaque random token (`randomBytes`, immutable once set) — stability comes from
+  2. **Idempotency marker (m9):** query `GET /v1/posts` for a post owned by demo with
+     `status=published` and the fixed seed **title** (a deterministic marker, e.g.
+     `"PhotoOps demo — first outing"`). The list returns `title`+`status` but **not
+     `slug`** (slug is only on `GET /v1/posts/:id`), so on a hit, fetch that post by
+     id to read its slug, print slug + public URL, and `exit 0`. The slug is an opaque
+     random token (`randomBytes`, immutable once set) — stability comes from
      detect-and-reuse, not from re-minting.
   3. Else build: upload a small fixed JPEG set → wait ready → `generate_cluster` →
      wait ready → pick a selectable child node → `create_post` → set title (the
@@ -283,7 +339,10 @@ existing publication smoke flow.
   smoke-verified. `make skeleton-gate` before human skeleton review;
   `make coverage-gate` before merge.
 - **test-guard:** only the opm rename (§2, m8) removes a test declaration → needs an
-  `Allow-test-removal:` trailer. Everything else adds tests.
+  `Allow-test-removal:` trailer. Other work mostly adds tests, **except** the C1
+  churn — three existing finalize tests (`photo.service.spec.ts:368/390/425`) must be
+  edited to seed `findJobById().status` or they go RED under the winner-gate (edits,
+  not removals — no trailer, but not "just additions" either).
 - **Full gate:** `make gate` (TS + media-worker + cluster halves) + live
   `make smoke-media` + `make smoke-cluster` + `make smoke-seed` (idempotent re-run)
   green before final review.
