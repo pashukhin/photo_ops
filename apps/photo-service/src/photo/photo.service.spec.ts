@@ -483,6 +483,27 @@ describe('PhotoDomainService', () => {
     expect(repository.applyAttributes).toHaveBeenCalledWith('p1', expect.objectContaining({ locationId: null }));
   });
 
+  it('getPhoto attaches the location when the photo has a location_id', async () => {
+    // why (surface): the gallery tag needs the place on the read path — getPhoto is
+    // what smoke-media reads via GET /photos/:id.
+    const { service, repository } = createService();
+    repository.findByIdWithVariantsForUser.mockResolvedValue({ photo: makePhotoRecord({ locationId: 'loc-1' }), variants: [] });
+    repository.listLocationsByIds.mockResolvedValue([
+      { id: 'loc-1', continent: 'South America', country: 'Argentina', region: '', city: 'Buenos Aires', district: '', lat: -34.6, lon: -58.38 }
+    ]);
+    const pwv = await service.getPhoto('user-1', 'photo-1');
+    expect(pwv?.location).toEqual(expect.objectContaining({ country: 'Argentina', city: 'Buenos Aires' }));
+  });
+
+  it('getPhoto leaves location null when the photo has no location_id', async () => {
+    // why: no-place photos render the fallback tag, not a crash.
+    const { service, repository } = createService();
+    repository.findByIdWithVariantsForUser.mockResolvedValue({ photo: makePhotoRecord({ locationId: null }), variants: [] });
+    const pwv = await service.getPhoto('user-1', 'photo-1');
+    expect(pwv?.location ?? null).toBeNull();
+    expect(repository.listLocationsByIds).not.toHaveBeenCalled();
+  });
+
   it('completeUpload success: emits emitOriginalStored once with correct args', async () => {
     // why: usage accounting requires a usage event per upload completion;
     // emitting is best-effort and must not block the upload flow.

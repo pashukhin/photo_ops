@@ -91,6 +91,20 @@ describe('PhotoGrpcController', () => {
     expect(reply.variants[0].height).toBe(150);
   });
 
+  it('GetPhoto emits the reverse-geocoded location on the wire', async () => {
+    // why (coverage + wire): toProtoPhoto is in coverage scope; the location mapping
+    // runs only when a location is present — assert the reply carries it.
+    const { controller, photoService } = createController();
+    photoService.getPhoto.mockResolvedValue({
+      ...makePhotoWithVariants(),
+      location: { id: 'loc-1', continent: 'South America', country: 'Argentina', region: '', city: 'Buenos Aires', district: '', lat: -34.6, lon: -58.38 }
+    });
+
+    const reply = await controller.getPhoto({ userId: 'user-1', photoId: 'photo-1' });
+
+    expect(reply.location).toEqual(expect.objectContaining({ country: 'Argentina', city: 'Buenos Aires' }));
+  });
+
   it('GetPhoto maps a missing photo to not found', async () => {
     const { controller, photoService } = createController();
     photoService.getPhoto.mockResolvedValue(null);
