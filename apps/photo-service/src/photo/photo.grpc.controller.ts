@@ -179,7 +179,16 @@ export class PhotoGrpcController {
         url: v.url,
         width: v.width,
         height: v.height
-      }))
+      })),
+      ...(pwv.location && {
+        location: {
+          continent: pwv.location.continent,
+          country: pwv.location.country,
+          region: pwv.location.region,
+          city: pwv.location.city,
+          district: pwv.location.district
+        }
+      })
     };
   }
 

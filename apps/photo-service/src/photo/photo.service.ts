@@ -166,7 +166,10 @@ export class PhotoDomainService {
     const result = await this.repository.findByIdWithVariantsForUser(userId, photoId);
     if (!result) return null;
     const variants = await Promise.all(result.variants.map((v) => this.toVariantView(v)));
-    return { photo: result.photo, variants };
+    const location = result.photo.locationId
+      ? (await this.repository.listLocationsByIds([result.photo.locationId]))[0] ?? null
+      : null;
+    return { photo: result.photo, variants, location };
   }
 
   async listPhotos(params: ListPhotosParams): Promise<ListPhotosResult> {
@@ -186,11 +189,21 @@ export class PhotoDomainService {
       }
     }
 
+    // Batched location compose (mirrors the variant compose): one listLocationsByIds
+    // over the distinct location ids, then map back per photo.
+    const locationIds = [...new Set(rows.map((r) => r.locationId).filter((id): id is string => id !== null))];
+    const locationsById = new Map(
+      locationIds.length > 0
+        ? (await this.repository.listLocationsByIds(locationIds)).map((l) => [l.id, l] as const)
+        : []
+    );
+
     const photos = await Promise.all(
       rows.map(async (photo) => {
         const photoVariantRecords = variantsByPhotoId.get(photo.id) ?? [];
         const variants = await Promise.all(photoVariantRecords.map((v) => this.toVariantView(v)));
-        return { photo, variants };
+        const location = photo.locationId ? locationsById.get(photo.locationId) ?? null : null;
+        return { photo, variants, location };
       })
     );
 
