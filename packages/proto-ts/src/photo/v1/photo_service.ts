@@ -10,6 +10,7 @@ import type { handleUnaryCall, UntypedServiceImplementation } from "@grpc/grpc-j
 import { GrpcMethod, GrpcStreamMethod } from "@nestjs/microservices";
 import { Observable } from "rxjs";
 import { HealthCheckRequest, HealthCheckResponse } from "../../common/v1/common";
+import { GeoPlace } from "./processing";
 
 export const protobufPackage = "photoops.photo.v1";
 
@@ -165,6 +166,8 @@ export interface PhotoAsset {
   lat?: number | undefined;
   lon?: number | undefined;
   variants: PhotoVariantView[];
+  /** reverse-geocoded place (022); absent until resolved */
+  location: GeoPlace | undefined;
 }
 
 export const PHOTOOPS_PHOTO_V1_PACKAGE_NAME = "photoops.photo.v1";
@@ -968,6 +971,7 @@ function createBasePhotoAsset(): PhotoAsset {
     cameraModel: "",
     orientation: 0,
     variants: [],
+    location: undefined,
   };
 }
 
@@ -1032,6 +1036,9 @@ export const PhotoAsset: MessageFns<PhotoAsset> = {
     }
     for (const v of message.variants) {
       PhotoVariantView.encode(v!, writer.uint32(162).fork()).join();
+    }
+    if (message.location !== undefined) {
+      GeoPlace.encode(message.location, writer.uint32(170).fork()).join();
     }
     return writer;
   },
@@ -1201,6 +1208,14 @@ export const PhotoAsset: MessageFns<PhotoAsset> = {
           }
 
           message.variants.push(PhotoVariantView.decode(reader, reader.uint32()));
+          continue;
+        }
+        case 21: {
+          if (tag !== 170) {
+            break;
+          }
+
+          message.location = GeoPlace.decode(reader, reader.uint32());
           continue;
         }
       }

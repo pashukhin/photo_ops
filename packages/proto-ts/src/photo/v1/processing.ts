@@ -39,6 +39,22 @@ export interface ProcessPhotoJob {
   correlationId: string;
 }
 
+/**
+ * Reverse-geocoded place (offline, city granularity). Plain string fields —
+ * message-level presence is tracked by the wrapper; "" = unresolved field.
+ * district is "" this session (manual editing fills it later, 9q4.3).
+ * raw_provider_data is JSON of the matched GeoNames record (incl. the city's
+ * representative lat/lon, which photo-service reads back for Location.lat/lon).
+ */
+export interface GeoPlace {
+  continent: string;
+  country: string;
+  region: string;
+  city: string;
+  district: string;
+  rawProviderData: string;
+}
+
 /** Extracted image attributes. Dimensions are oriented (as displayed). */
 export interface ImageAttributes {
   width: number;
@@ -54,7 +70,11 @@ export interface ImageAttributes {
   /** EXIF orientation 1..8; 0 = absent */
   orientation: number;
   lat?: number | undefined;
-  lon?: number | undefined;
+  lon?:
+    | number
+    | undefined;
+  /** absent when no GPS or geocoder yields nothing */
+  place: GeoPlace | undefined;
 }
 
 /** One generated variant produced by a processing run. */
@@ -177,6 +197,98 @@ export const ProcessPhotoJob: MessageFns<ProcessPhotoJob> = {
   },
 };
 
+function createBaseGeoPlace(): GeoPlace {
+  return { continent: "", country: "", region: "", city: "", district: "", rawProviderData: "" };
+}
+
+export const GeoPlace: MessageFns<GeoPlace> = {
+  encode(message: GeoPlace, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.continent !== "") {
+      writer.uint32(10).string(message.continent);
+    }
+    if (message.country !== "") {
+      writer.uint32(18).string(message.country);
+    }
+    if (message.region !== "") {
+      writer.uint32(26).string(message.region);
+    }
+    if (message.city !== "") {
+      writer.uint32(34).string(message.city);
+    }
+    if (message.district !== "") {
+      writer.uint32(42).string(message.district);
+    }
+    if (message.rawProviderData !== "") {
+      writer.uint32(50).string(message.rawProviderData);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): GeoPlace {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseGeoPlace();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.continent = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.country = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.region = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.city = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.district = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.rawProviderData = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
 function createBaseImageAttributes(): ImageAttributes {
   return {
     width: 0,
@@ -187,6 +299,7 @@ function createBaseImageAttributes(): ImageAttributes {
     cameraMake: "",
     cameraModel: "",
     orientation: 0,
+    place: undefined,
   };
 }
 
@@ -221,6 +334,9 @@ export const ImageAttributes: MessageFns<ImageAttributes> = {
     }
     if (message.lon !== undefined) {
       writer.uint32(81).double(message.lon);
+    }
+    if (message.place !== undefined) {
+      GeoPlace.encode(message.place, writer.uint32(90).fork()).join();
     }
     return writer;
   },
@@ -310,6 +426,14 @@ export const ImageAttributes: MessageFns<ImageAttributes> = {
           }
 
           message.lon = reader.double();
+          continue;
+        }
+        case 11: {
+          if (tag !== 90) {
+            break;
+          }
+
+          message.place = GeoPlace.decode(reader, reader.uint32());
           continue;
         }
       }

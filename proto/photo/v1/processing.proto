@@ -32,6 +32,20 @@ message ProcessPhotoJob {
   string correlation_id = 6;  // threaded through logs/trace; not an idempotency key
 }
 
+// Reverse-geocoded place (offline, city granularity). Plain string fields —
+// message-level presence is tracked by the wrapper; "" = unresolved field.
+// district is "" this session (manual editing fills it later, 9q4.3).
+// raw_provider_data is JSON of the matched GeoNames record (incl. the city's
+// representative lat/lon, which photo-service reads back for Location.lat/lon).
+message GeoPlace {
+  string continent = 1;
+  string country = 2;
+  string region = 3;
+  string city = 4;
+  string district = 5;
+  string raw_provider_data = 6;
+}
+
 // Extracted image attributes. Dimensions are oriented (as displayed).
 message ImageAttributes {
   uint32 width = 1;
@@ -44,6 +58,7 @@ message ImageAttributes {
   uint32 orientation = 8;          // EXIF orientation 1..8; 0 = absent
   optional double lat = 9;
   optional double lon = 10;
+  GeoPlace place = 11;             // absent when no GPS or geocoder yields nothing
 }
 
 // One generated variant produced by a processing run.

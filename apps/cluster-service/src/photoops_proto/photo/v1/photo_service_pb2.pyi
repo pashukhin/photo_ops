@@ -1,5 +1,6 @@
 from common.v1 import common_pb2 as _common_pb2
 from google.api import annotations_pb2 as _annotations_pb2
+from photo.v1 import processing_pb2 as _processing_pb2
 from google.protobuf.internal import containers as _containers
 from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
@@ -177,7 +178,7 @@ class PhotoVariantView(_message.Message):
     def __init__(self, variant_type: _Optional[str] = ..., url: _Optional[str] = ..., width: _Optional[int] = ..., height: _Optional[int] = ...) -> None: ...
 
 class PhotoAsset(_message.Message):
-    __slots__ = ("id", "filename", "content_type", "size_bytes", "object_key", "status", "created_at", "updated_at", "user_id", "width", "height", "taken_at_local", "taken_at_utc", "taken_at_tz_source", "camera_make", "camera_model", "orientation", "lat", "lon", "variants")
+    __slots__ = ("id", "filename", "content_type", "size_bytes", "object_key", "status", "created_at", "updated_at", "user_id", "width", "height", "taken_at_local", "taken_at_utc", "taken_at_tz_source", "camera_make", "camera_model", "orientation", "lat", "lon", "variants", "location")
     ID_FIELD_NUMBER: _ClassVar[int]
     FILENAME_FIELD_NUMBER: _ClassVar[int]
     CONTENT_TYPE_FIELD_NUMBER: _ClassVar[int]
@@ -198,6 +199,7 @@ class PhotoAsset(_message.Message):
     LAT_FIELD_NUMBER: _ClassVar[int]
     LON_FIELD_NUMBER: _ClassVar[int]
     VARIANTS_FIELD_NUMBER: _ClassVar[int]
+    LOCATION_FIELD_NUMBER: _ClassVar[int]
     id: str
     filename: str
     content_type: str
@@ -218,4 +220,5 @@ class PhotoAsset(_message.Message):
     lat: float
     lon: float
     variants: _containers.RepeatedCompositeFieldContainer[PhotoVariantView]
-    def __init__(self, id: _Optional[str] = ..., filename: _Optional[str] = ..., content_type: _Optional[str] = ..., size_bytes: _Optional[str] = ..., object_key: _Optional[str] = ..., status: _Optional[_Union[PhotoStatus, str]] = ..., created_at: _Optional[str] = ..., updated_at: _Optional[str] = ..., user_id: _Optional[str] = ..., width: _Optional[int] = ..., height: _Optional[int] = ..., taken_at_local: _Optional[str] = ..., taken_at_utc: _Optional[str] = ..., taken_at_tz_source: _Optional[str] = ..., camera_make: _Optional[str] = ..., camera_model: _Optional[str] = ..., orientation: _Optional[int] = ..., lat: _Optional[float] = ..., lon: _Optional[float] = ..., variants: _Optional[_Iterable[_Union[PhotoVariantView, _Mapping]]] = ...) -> None: ...
+    location: _processing_pb2.GeoPlace
+    def __init__(self, id: _Optional[str] = ..., filename: _Optional[str] = ..., content_type: _Optional[str] = ..., size_bytes: _Optional[str] = ..., object_key: _Optional[str] = ..., status: _Optional[_Union[PhotoStatus, str]] = ..., created_at: _Optional[str] = ..., updated_at: _Optional[str] = ..., user_id: _Optional[str] = ..., width: _Optional[int] = ..., height: _Optional[int] = ..., taken_at_local: _Optional[str] = ..., taken_at_utc: _Optional[str] = ..., taken_at_tz_source: _Optional[str] = ..., camera_make: _Optional[str] = ..., camera_model: _Optional[str] = ..., orientation: _Optional[int] = ..., lat: _Optional[float] = ..., lon: _Optional[float] = ..., variants: _Optional[_Iterable[_Union[PhotoVariantView, _Mapping]]] = ..., location: _Optional[_Union[_processing_pb2.GeoPlace, _Mapping]] = ...) -> None: ...
