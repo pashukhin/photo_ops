@@ -4,12 +4,14 @@ from __future__ import annotations
 import io
 import unittest.mock as mock
 
+import pytest
 from PIL import Image
 
+from src.media_worker.errors import TransientProcessingError
 from src.media_worker.handler import JobHandler
 from src.media_worker.messaging.in_memory import BusMessage, InMemoryBus
 from src.photoops_proto.photo.v1 import processing_pb2
-from tests.fakes import FakeObjectStore
+from tests.fakes import FakeObjectStore, RaisingObjectStore
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -211,3 +213,35 @@ class TestHandlerFailure:
         result = _decode_result(msg)
         assert result.outcome == processing_pb2.PROCESSING_OUTCOME_FAILED
         assert result.error_message, "error_message must not be empty on decode failure"
+
+
+class TestHandlerTransientVsPermanent:
+    """photo_ops-0od: a transient storage error must propagate (redeliverable), not be
+    turned into a permanent FAILED; a permanent error still publishes FAILED."""
+
+    def test_transient_error_propagates_and_publishes_no_failed(self) -> None:
+        # why (0od): a transient storage hiccup must NOT become a permanent FAILED; it
+        # propagates so the transport can bounded-retry. Current _handle catches all →
+        # publishes FAILED and swallows → RED.
+        store = RaisingObjectStore(TransientProcessingError("minio down"))
+        bus = InMemoryBus()
+        handler = JobHandler(store=store, publisher=bus)
+
+        msg = BusMessage(body=_make_job().SerializeToString(), correlation_id="corr-t")
+        with pytest.raises(TransientProcessingError):
+            handler.handle(msg)
+
+        assert _drain_results(bus) == []  # no FAILED result emitted
+
+    def test_permanent_error_publishes_failed(self) -> None:
+        # why (0od): genuinely bad input stays a permanent FAILED (acked, no redelivery).
+        store = RaisingObjectStore(ValueError("cannot identify image file"))
+        bus = InMemoryBus()
+        handler = JobHandler(store=store, publisher=bus)
+
+        handler.handle(BusMessage(body=_make_job().SerializeToString(), correlation_id="corr-p"))
+
+        published = _drain_results(bus)
+        assert len(published) == 1
+        _, msg = published[0]
+        assert _decode_result(msg).outcome == processing_pb2.PROCESSING_OUTCOME_FAILED

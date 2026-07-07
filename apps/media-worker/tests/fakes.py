@@ -27,3 +27,29 @@ class FakeObjectStore:
         if object_key not in self._store:
             return None
         return self._store[object_key][2]
+
+
+class RaisingObjectStore:
+    """ObjectStore double whose ``download`` raises a given exception.
+
+    ``head`` returns None so the claim-check misses and the handler takes the normal
+    download path — used to drive the transient-vs-permanent handling (photo_ops-0od).
+    """
+
+    def __init__(self, exc: BaseException) -> None:
+        self._exc = exc
+
+    def download(self, object_key: str) -> bytes:
+        raise self._exc
+
+    def upload(
+        self,
+        object_key: str,
+        data: bytes,
+        content_type: str,
+        metadata: dict[str, str],
+    ) -> int:
+        return len(data)
+
+    def head(self, object_key: str) -> dict[str, str] | None:
+        return None
