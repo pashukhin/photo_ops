@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from src.photoops_proto.photo.v1 import processing_pb2
 
 from .exif import Attributes
+from .geocode import GeoPlace
 
 
 @dataclass
@@ -37,6 +38,7 @@ def encode_result(
     variants: list[VariantResult],
     metadata_json: str,
     error_message: str = "",
+    place: GeoPlace | None = None,
 ) -> bytes:
     """Serialize a PhotoProcessingResult to bytes."""
     result = processing_pb2.PhotoProcessingResult()

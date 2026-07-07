@@ -8,6 +8,8 @@ import pytest
 from PIL import Image
 
 from src.media_worker.errors import TransientProcessingError
+from src.media_worker.exif import Attributes
+from src.media_worker.geocode import GeoPlace
 from src.media_worker.handler import JobHandler
 from src.media_worker.messaging.in_memory import BusMessage, InMemoryBus
 from src.media_worker.messaging.retry import MAX_RETRY_ATTEMPTS
@@ -265,3 +267,51 @@ class TestHandlerTransientVsPermanent:
         assert len(published) == 1
         _, out = published[0]
         assert _decode_result(out).outcome == processing_pb2.PROCESSING_OUTCOME_FAILED
+
+
+def _attrs(lat: float | None, lon: float | None) -> Attributes:
+    # minimal Attributes with the given coords; other fields are display defaults.
+    return Attributes(
+        width=640, height=480, taken_at_local="", taken_at_utc="",
+        taken_at_tz_source="unknown", camera_make="", camera_model="",
+        orientation=0, lat=lat, lon=lon, metadata_json="{}",
+    )
+
+
+class TestHandlerGeocode:
+    """022: the handler geocodes extracted coords and carries the place in the result."""
+
+    def test_place_present_when_coords_resolve(self) -> None:
+        # why (3iy): GPS coords → reverse_geocode → result.attributes.place populated.
+        store = FakeObjectStore()
+        bus = InMemoryBus()
+        handler = JobHandler(store=store, publisher=bus)
+        store._store["originals/photo-1.jpg"] = (_make_jpeg(), "image/jpeg", {})
+        attrs = _attrs(55.75, 37.62)
+        place = GeoPlace("Europe", "Russia", "Moscow", "Moscow", "", "{}")
+        with (
+            mock.patch("src.media_worker.handler.extract_attributes", return_value=attrs),
+            mock.patch("src.media_worker.handler.reverse_geocode", return_value=place),
+        ):
+            handler.handle(BusMessage(body=_make_job().SerializeToString(), correlation_id="c"))
+        result = _decode_result(_drain_results(bus)[0][1])
+        assert result.outcome == processing_pb2.PROCESSING_OUTCOME_SUCCEEDED
+        assert result.attributes.HasField("place")
+        assert result.attributes.place.country == "Russia"
+        assert result.attributes.place.city == "Moscow"
+
+    def test_no_place_when_no_gps(self) -> None:
+        # why (§3.4): no GPS → geocode None → no place, but still SUCCEEDED.
+        store = FakeObjectStore()
+        bus = InMemoryBus()
+        handler = JobHandler(store=store, publisher=bus)
+        store._store["originals/photo-1.jpg"] = (_make_jpeg(), "image/jpeg", {})
+        attrs = _attrs(None, None)
+        with (
+            mock.patch("src.media_worker.handler.extract_attributes", return_value=attrs),
+            mock.patch("src.media_worker.handler.reverse_geocode", return_value=None),
+        ):
+            handler.handle(BusMessage(body=_make_job().SerializeToString(), correlation_id="c"))
+        result = _decode_result(_drain_results(bus)[0][1])
+        assert result.outcome == processing_pb2.PROCESSING_OUTCOME_SUCCEEDED
+        assert not result.attributes.HasField("place")

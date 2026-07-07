@@ -12,6 +12,7 @@ from src.photoops_proto.photo.v1.processing_pb2 import (
 from .codec import VariantResult, decode_job, encode_result
 from .errors import TransientProcessingError
 from .exif import extract_attributes
+from .geocode import reverse_geocode  # noqa: F401  (wired in GREEN)
 from .imaging import RENDITIONS, render_variant
 from .logging_setup import bind_job_context, clear_job_context
 from .messaging.port import BusMessage, MessagePublisher
