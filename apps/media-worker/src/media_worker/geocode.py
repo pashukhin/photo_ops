@@ -12,9 +12,12 @@ one photo per message (ADR-0007).
 from __future__ import annotations
 
 import json
+import logging
 import math
 import os
 from dataclasses import dataclass
+
+log = logging.getLogger(__name__)
 
 _DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 
@@ -40,7 +43,7 @@ class GeoPlace:
     raw_provider_data: str  # JSON of the matched GeoNames record
 
 
-@dataclass
+@dataclass(slots=True)
 class _City:
     name: str
     lat: float
@@ -87,7 +90,12 @@ def _lookup(lat: float, lon: float) -> GeoPlace:
     cities, admin1_names, countries = _cache
 
     coslat = math.cos(math.radians(lat))
-    nearest = min(cities, key=lambda c: (c.lat - lat) ** 2 + ((c.lon - lon) * coslat) ** 2)
+    # Normalize the longitude delta into [-180, 180) so a photo just across the
+    # antimeridian (±180°) isn't judged ~360° from a city on the other side.
+    nearest = min(
+        cities,
+        key=lambda c: (c.lat - lat) ** 2 + (((c.lon - lon + 180.0) % 360.0 - 180.0) * coslat) ** 2,
+    )
 
     country_name, continent_code = countries.get(nearest.cc, ("", ""))
     region = admin1_names.get(f"{nearest.cc}.{nearest.admin1}", "")
@@ -123,5 +131,9 @@ def reverse_geocode(lat: float | None, lon: float | None) -> GeoPlace | None:
         return None
     try:
         return _lookup(lat, lon)
-    except Exception:
+    except Exception as exc:
+        # Defensive (§3.4): degrade to None so the photo keeps its coordinates and
+        # processing continues — but log it, so a shipped-without-data regression
+        # (the vendored extract missing / unreadable) is visible, not silent.
+        log.warning("reverse_geocode failed for (%s, %s): %s", lat, lon, exc)
         return None

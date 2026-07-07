@@ -206,10 +206,17 @@ print(f"[smoke-media] place = {loc.get('country')} / {loc.get('city')}")
 PY
 
 CITY="$("$VENV_PYTHON" -c 'import json,sys;print((json.load(open(sys.argv[1])).get("location") or {}).get("city",""))' "$PHOTO_PATH")"
+CITY_SQL="${CITY//\'/\'\'}"  # double single-quotes for the SQL literal (e.g. N'Djamena)
 DC="docker compose -f infra/docker/docker-compose.yml --env-file .env"
 loc_count() { $DC exec -T postgres psql "$PHOTO_DATABASE_URL" -tAc "SELECT count(*) FROM locations WHERE city = '$1'" | tr -d '[:space:]'; }
-BEFORE="$(loc_count "$CITY")"
+BEFORE="$(loc_count "$CITY_SQL")"
 [ "${BEFORE:-0}" -ge 1 ] || { echo "ASSERTION FAILED: no locations row for '$CITY' after first photo (got '$BEFORE')" >&2; exit 1; }
+
+# The Location carries a representative point (lat/lon parsed from the geocoder's
+# raw record) — assert it's populated, so a raw_provider_data shape drift can't
+# silently leave the 023 cluster map with an unplaceable point (photo_ops-<geo>).
+LATLON="$($DC exec -T postgres psql "$PHOTO_DATABASE_URL" -tAc "SELECT lat IS NOT NULL AND lon IS NOT NULL FROM locations WHERE city = '$CITY_SQL' LIMIT 1" | tr -d '[:space:]')"
+[ "$LATLON" = "t" ] || { echo "ASSERTION FAILED: Location for '$CITY' has NULL lat/lon (representative point missing: '$LATLON')" >&2; exit 1; }
 
 # Upload a SECOND photo with the SAME Moscow fixture ($JPEG_PATH) → same city → must dedup.
 curl -fsS -b "$COOKIE_PATH" -H 'content-type: application/json' \
@@ -226,7 +233,7 @@ while true; do
   sleep 2
 done
 
-AFTER="$(loc_count "$CITY")"
+AFTER="$(loc_count "$CITY_SQL")"
 [ "$AFTER" = "$BEFORE" ] \
   || { echo "ASSERTION FAILED: dedup broken — a same-city second photo added a row ($BEFORE -> $AFTER)" >&2; exit 1; }
 echo "[smoke-media] OK — geo place present + dedup ('$CITY' rows unchanged: $BEFORE -> $AFTER)"

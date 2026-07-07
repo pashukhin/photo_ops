@@ -40,8 +40,10 @@ executable-spec / skeleton-first SDD; design + plan under
    we **reuse the GeoNames dataset** (not reinventing data) and hand-roll a ~30-line
    equirectangular NN over `cities15000` (`apps/media-worker/src/media_worker/
    geocode.py` + `data/`, CC-BY 4.0, `data/NOTICE`). Region name comes from
-   `admin1CodesASCII`, country name + continent from `countryInfo` (continent from
-   the provider, not a hand-maintained map — Principle 7). `district` is not
+   `admin1CodesASCII`, country name + the continent *code* from `countryInfo`; a
+   fixed 7-entry table maps the code to a name (`EU` → `Europe`). The load-bearing
+   250-country → continent-code assignment stays in the provider data (not
+   hand-maintained); only the 7 continent display names are in code. `district` is not
    resolvable at city granularity → stored `''` (manual `9q4.3` fills it), so the
    tag renders `country / region / city`, not the full five-level §3.4 example.
 
