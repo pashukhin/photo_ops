@@ -31,6 +31,9 @@ login() {
 # --- photo fixture + upload ---------------------------------------------------
 
 # gen_jpeg OUT DATETIME MAKE MODEL — write a 640x480 JPEG with EXIF to OUT.
+# Embeds a fixed Buenos Aires GPS point (session 022) so a fresh seed geocodes via
+# initial processing (no reprocess path exists). Shared by seed-demo.sh and
+# smoke-publication.sh — a constant point is benign for both.
 gen_jpeg() {
   "$VENV_PYTHON" - "$1" "$2" "$3" "$4" <<'PY'
 import io, sys
@@ -38,7 +41,14 @@ from PIL import Image
 import piexif
 out, dt, make, model = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 exif = {"0th": {piexif.ImageIFD.Make: make.encode(), piexif.ImageIFD.Model: model.encode()},
-        "Exif": {}, "GPS": {}, "1st": {}, "thumbnail": None}
+        "Exif": {},
+        "GPS": {
+            piexif.GPSIFD.GPSLatitudeRef: b"S",
+            piexif.GPSIFD.GPSLatitude: ((34, 1), (36, 1), (0, 1)),
+            piexif.GPSIFD.GPSLongitudeRef: b"W",
+            piexif.GPSIFD.GPSLongitude: ((58, 1), (22, 1), (48, 1)),
+        },
+        "1st": {}, "thumbnail": None}
 if dt:
     exif["Exif"][piexif.ExifIFD.DateTimeOriginal] = dt.encode()
     exif["Exif"][piexif.ExifIFD.OffsetTimeOriginal] = b"+00:00"
