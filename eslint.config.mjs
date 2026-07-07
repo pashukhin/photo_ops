@@ -89,6 +89,13 @@ export default tseslint.config(
       // App Router project has no pages/ directory; point the rule at the
       // correct location so it doesn't emit a spurious warning.
       "@next/next/no-html-link-for-pages": ["warn", "apps/web/app"],
+      // Every <img> in apps/web renders a short-lived PRESIGNED MinIO variant URL
+      // on a force-dynamic / no-store surface (see apps/web/CLAUDE.md — "variant
+      // thumbnail ... never originals", re-fetched for a fresh presigned preview).
+      // next/image would proxy + cache those URLs (fighting the presigned-freshness
+      // the pages are force-dynamic to preserve) and needs images.remotePatterns for
+      // a dynamic MinIO host. Raw <img> is the deliberate, correct choice here.
+      "@next/next/no-img-element": "off",
     },
   },
 );
