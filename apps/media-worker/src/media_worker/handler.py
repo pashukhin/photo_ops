@@ -12,7 +12,7 @@ from src.photoops_proto.photo.v1.processing_pb2 import (
 from .codec import VariantResult, decode_job, encode_result
 from .errors import TransientProcessingError
 from .exif import extract_attributes
-from .geocode import reverse_geocode  # noqa: F401  (wired in GREEN)
+from .geocode import reverse_geocode
 from .imaging import RENDITIONS, render_variant
 from .logging_setup import bind_job_context, clear_job_context
 from .messaging.port import BusMessage, MessagePublisher
@@ -188,6 +188,10 @@ class JobHandler:
             },
         )
 
+        # Reverse-geocode the extracted coordinates (offline; None when no GPS or
+        # the geocoder yields nothing — processing continues either way, §3.4).
+        place = reverse_geocode(attrs.lat, attrs.lon)
+
         body = encode_result(
             job_id=job.job_id,
             photo_id=job.photo_id,
@@ -196,6 +200,7 @@ class JobHandler:
             attributes=attrs,
             variants=variants,
             metadata_json=attrs.metadata_json,
+            place=place,
         )
         self._publisher.publish(
             self._result_dest,

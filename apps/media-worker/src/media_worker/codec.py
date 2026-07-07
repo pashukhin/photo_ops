@@ -64,6 +64,16 @@ def encode_result(
         if attributes.lon is not None:
             result.attributes.lon = attributes.lon
 
+        # place is a sub-message; setting any field vivifies it so HasField("place")
+        # is True downstream. Absent (None) when there is no GPS / geocoder result.
+        if place is not None:
+            result.attributes.place.continent = place.continent
+            result.attributes.place.country = place.country
+            result.attributes.place.region = place.region
+            result.attributes.place.city = place.city
+            result.attributes.place.district = place.district
+            result.attributes.place.raw_provider_data = place.raw_provider_data
+
     for v in variants:
         result.variants.add(
             variant_type=v.variant_type,
