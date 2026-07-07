@@ -44,8 +44,11 @@ class JobHandler:
     def _handle(self, message: BusMessage) -> None:
         """Handle one BusMessage carrying a serialized ProcessPhotoJob.
 
-        On any exception the failure is caught, a FAILED result is published,
-        and the method returns normally — one photo's failure must not propagate.
+        A permanent/expected failure (bad image, missing object, decode error) is
+        caught and published as a FAILED result, returning normally so one photo's
+        failure does not crash the consumer. A TRANSIENT storage error
+        (photo_ops-0od) instead propagates so the transport can bounded-retry it;
+        only once the retry cap is reached is it given up as a permanent FAILED.
         """
         # Decode first — a malformed body must also be caught and published as FAILED.
         try:

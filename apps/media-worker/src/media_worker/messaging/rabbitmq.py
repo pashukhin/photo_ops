@@ -11,18 +11,23 @@ Broker topology (canonical — mirrored exactly by the TypeScript adapter in Tas
 
 Error/ack strategy rationale
 ─────────────────────────────
-On a pika callback exception we call basic_nack(requeue=False), sending the
-message straight to the DLQ.  This is a deliberate simplification of the
-"retry N → DLQ" pattern:
+JobHandler catches expected/permanent failures (missing object, bad image, decode
+error) and publishes a FAILED result — it does not raise for those. Two kinds of
+exception DO escape it, handled differently in _on_message:
 
-  • JobHandler already catches all *expected* failure modes (missing object,
-    bad image, decode error) and publishes a FAILED result — it never raises.
-  • An exception that escapes JobHandler is therefore an *unexpected* crash
-    (e.g. an out-of-memory condition, a bug in the handler itself).
-  • For unexpected crashes, retrying on the same consumer is likely to repeat
-    the crash; dead-lettering immediately keeps the queue healthy.
-  • Crash-before-ack redelivery (broker-side) is made idempotent by the
-    MinIO-metadata claim check inside JobHandler.
+  • A TransientProcessingError (photo_ops-0od) signals a retryable storage hiccup
+    (MinIO unreachable / 5xx / reset). We republish the job with an incremented
+    x-attempt header and ack the original — a bounded, immediate retry with NO
+    callback sleep (a sleep would block the single BlockingConnection, prefetch=1 →
+    head-of-line stall). The bound lives in JobHandler, which gives up (publishes
+    FAILED) once x-attempt reaches the cap, so this never loops forever. The
+    republish uses the existing photo.process exchange — no topology change.
+  • Any other escaping exception is an *unexpected* crash (OOM, a handler bug); we
+    basic_nack(requeue=False) straight to the DLQ, since retrying is likely to
+    repeat it.
+
+Crash-before-ack redelivery (broker-side) is made idempotent by the MinIO-metadata
+claim check inside JobHandler.
 """
 from __future__ import annotations
 
