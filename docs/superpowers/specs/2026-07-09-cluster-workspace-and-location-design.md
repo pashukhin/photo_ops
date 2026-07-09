@@ -182,10 +182,11 @@ RED test per new behavior. Proto edits touch two `.proto` files; `make proto` re
   **Rebuild BOTH images** the changed RPC touches — restart drops new fields as unknown):
   - `proto/cluster/v1/cluster_service.proto` — `DeleteClusteringResult` (+ `delete:`
     HTTP `/v1/clustering-results/{result_id}`). Rebuild **cluster-service + gateway**.
-  - `proto/photo/v1/photo_service.proto` — `SetPhotoLocation` (+ `post:`
-    `/photos/{photo_id}/location` — **no `v1`**, matching the existing photo routes;
-    `PhotoController` is `@Controller('photos')`, unlike the cluster `@Controller('v1')`).
-    Rebuild **photo-service + gateway**.
+  - `proto/photo/v1/photo_service.proto` — `SetPhotoLocation` (annotation
+    `post: /v1/photos/{photo_id}/location`, sibling-consistent but **decorative** — the
+    hand-written gateway route is authoritative: `@Post(':photoId/location')` on
+    `@Controller('photos')` → **`/photos/:id/location`**, unlike the cluster
+    `@Controller('v1')`). Rebuild **photo-service + gateway**.
 - **cluster-service** (`apps/cluster-service`, Python): `store.py` port +
   `store_postgres.py` `soft_delete` (+ in-memory fake); `server.py` handler
   (`NOT_FOUND` parity `:94`).
