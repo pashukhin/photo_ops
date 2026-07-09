@@ -1,15 +1,15 @@
 'use client';
-import { useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import PhotoMap from '../map/PhotoMap';
 import { setPhotoLocation } from '../../lib/api';
-import type { PhotoAsset } from '../../lib/api';
+import type { PhotoAsset, Place } from '../../lib/api';
 
 export interface LocationEditorProps {
   photoId: string;
   onSaved: (photo: PhotoAsset) => void;
 }
 
-const FIELDS: [keyof PlaceInput, string][] = [
+const FIELDS: [keyof Place, string][] = [
   ['continent', 'Continent'],
   ['country', 'Country'],
   ['region', 'Region'],
@@ -17,23 +17,22 @@ const FIELDS: [keyof PlaceInput, string][] = [
   ['district', 'District']
 ];
 
-interface PlaceInput {
-  continent?: string;
-  country?: string;
-  region?: string;
-  city?: string;
-  district?: string;
-}
-
 // Shared manual-location control (9q4.3): place-label fields + a map-clicked point,
 // written through setPhotoLocation (the 022 dedup Location + photo_assets.lat/lon).
 // The point is OPTIONAL — a label-only save applies the tag but leaves the photo off
 // the map.
 export default function LocationEditor({ photoId, onSaved }: LocationEditorProps) {
-  const [place, setPlace] = useState<PlaceInput>({});
+  const [place, setPlace] = useState<Place>({});
   const [point, setPoint] = useState<{ lat: number; lon: number } | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Stable references so PhotoMap's mount/marker effects don't churn on each keystroke.
+  const pickPoints = useMemo(() => (point ? [{ photoId, lat: point.lat, lon: point.lon }] : []), [photoId, point]);
+  const handlePick = useCallback((lat: number, lon: number) => setPoint({ lat, lon }), []);
+  // Nothing to save = no place label AND no point; guard against clobbering an existing
+  // (e.g. reverse-geocoded) location with an empty tuple.
+  const nothingToSave = !point && !Object.values(place).some((v) => (v ?? '').trim() !== '');
 
   const save = async () => {
     setSaving(true);
@@ -67,11 +66,7 @@ export default function LocationEditor({ photoId, onSaved }: LocationEditorProps
           </label>
         ))}
       </div>
-      <PhotoMap
-        points={point ? [{ photoId, lat: point.lat, lon: point.lon }] : []}
-        mode="pick"
-        onPick={(lat, lon) => setPoint({ lat, lon })}
-      />
+      <PhotoMap points={pickPoints} mode="pick" onPick={handlePick} />
       {point ? (
         <p className="text-xs text-muted-foreground">
           Point: {point.lat.toFixed(4)}, {point.lon.toFixed(4)}
@@ -81,8 +76,8 @@ export default function LocationEditor({ photoId, onSaved }: LocationEditorProps
       <button
         type="button"
         onClick={() => void save()}
-        disabled={saving}
-        className="rounded border px-2 py-1 text-sm"
+        disabled={saving || nothingToSave}
+        className="rounded border px-2 py-1 text-sm disabled:opacity-50"
       >
         {saving ? 'Saving…' : 'Save location'}
       </button>

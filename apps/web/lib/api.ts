@@ -7,6 +7,16 @@ export interface PhotoVariant {
   height: number;
 }
 
+// The reverse-geocoded / manually-set place labels (session 022/023). One shape,
+// reused by PhotoAsset.location and setPhotoLocation.
+export interface Place {
+  continent?: string;
+  country?: string;
+  region?: string;
+  city?: string;
+  district?: string;
+}
+
 export interface PhotoAsset {
   id: string;
   filename: string;
@@ -28,13 +38,7 @@ export interface PhotoAsset {
   lat?: number;
   lon?: number;
   // Reverse-geocoded place (session 022); absent when no GPS / unresolved.
-  location?: {
-    continent?: string;
-    country?: string;
-    region?: string;
-    city?: string;
-    district?: string;
-  };
+  location?: Place;
   variants?: PhotoVariant[];
 }
 
@@ -359,7 +363,7 @@ export async function deleteClusteringResult(resultId: string): Promise<void> {
 // gateway convention). Returns the updated asset.
 export async function setPhotoLocation(
   photoId: string,
-  input: { place: { continent?: string; country?: string; region?: string; city?: string; district?: string }; lat?: number; lon?: number }
+  input: { place: Place; lat?: number; lon?: number }
 ): Promise<PhotoAsset> {
   const response = await fetch(`${API_BASE_URL}/photos/${photoId}/location`, {
     method: 'POST',

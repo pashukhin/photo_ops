@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   createPost,
@@ -200,10 +200,11 @@ export function ClusterView() {
   }, [selectedMethod, refreshResults]);
 
   // Whole-result photo set for the map + histogram views — pure joins over the
-  // already-loaded photosById (recomputed cheaply per render).
-  const activePhotoIds = active?.root ? collectResultPhotoIds(active.root) : [];
-  const mapPoints = mapPointsFor(activePhotoIds, photosById);
-  const timeBins = binByTime(activePhotoIds, photosById);
+  // already-loaded photosById, memoized so they don't recompute on unrelated renders
+  // (poll ticks, field edits) or hand PhotoMap a fresh array each render.
+  const activePhotoIds = useMemo(() => (active?.root ? collectResultPhotoIds(active.root) : []), [active]);
+  const mapPoints = useMemo(() => mapPointsFor(activePhotoIds, photosById), [activePhotoIds, photosById]);
+  const timeBins = useMemo(() => binByTime(activePhotoIds, photosById), [activePhotoIds, photosById]);
 
   return (
     <div className="space-y-4">
@@ -265,41 +266,51 @@ export function ClusterView() {
 
       {active ? (
         <div className="space-y-2">
-          <div className="flex items-center gap-2" role="group" aria-label="View">
-            {(['tree', 'map', 'histogram'] as const).map((v) => (
-              <button
-                key={v}
-                type="button"
-                onClick={() => setViewMode(v)}
-                aria-pressed={viewMode === v}
-                className="border rounded-md px-2 py-1 text-sm capitalize"
-              >
-                {v}
-              </button>
-            ))}
-          </div>
+          <h2 className="text-lg font-semibold">Result · {active.status}</h2>
           {active.status === 'failed' ? (
             <p className="text-sm text-destructive">{active.errorMessage}</p>
           ) : !active.root ? (
             <p className="text-sm text-muted-foreground">Not ready.</p>
-          ) : viewMode === 'tree' ? (
-            <ul>
-              <TreeNodeView
-                node={active.root}
-                depth={0}
-                photosById={photosById}
-                onCreatePost={(nodeId) => void createPostFromNode(nodeId)}
-              />
-            </ul>
-          ) : viewMode === 'map' ? (
-            <div className="space-y-1">
-              <PhotoMap points={mapPoints} mode="view" />
-              <p className="text-xs text-muted-foreground">
-                {mapPoints.length} of {activePhotoIds.length} photos placed
-              </p>
-            </div>
           ) : (
-            <Histogram bins={timeBins} />
+            <>
+              <div className="flex items-center gap-2" role="group" aria-label="View">
+                {(['tree', 'map', 'histogram'] as const).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setViewMode(v)}
+                    aria-pressed={viewMode === v}
+                    className="border rounded-md px-2 py-1 text-sm capitalize"
+                  >
+                    {v}
+                  </button>
+                ))}
+              </div>
+              {viewMode === 'tree' ? (
+                <ul>
+                  <TreeNodeView
+                    node={active.root}
+                    depth={0}
+                    photosById={photosById}
+                    onCreatePost={(nodeId) => void createPostFromNode(nodeId)}
+                  />
+                </ul>
+              ) : viewMode === 'map' ? (
+                <div className="space-y-1">
+                  <PhotoMap points={mapPoints} mode="view" />
+                  <p className="text-xs text-muted-foreground">
+                    {mapPoints.length} of {activePhotoIds.length} photos placed
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <Histogram bins={timeBins} />
+                  <p className="text-xs text-muted-foreground">
+                    {timeBins.reduce((n, b) => n + b.count, 0)} of {activePhotoIds.length} photos dated
+                  </p>
+                </div>
+              )}
+            </>
           )}
         </div>
       ) : null}

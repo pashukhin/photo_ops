@@ -55,6 +55,16 @@ IDOR="$(curl -s -o /dev/null -w '%{http_code}' -b "$COOKIE_PATH" -H 'content-typ
 [ "$IDOR" = "404" ] || { echo "ERROR: IDOR set-location expected 404, got $IDOR" >&2; exit 1; }
 log "IDOR set-location -> 404 OK"
 
+# --- label-only set-location must NOT clear an existing point (review #1) ------
+BEFORE_LAT="$(curl -fsS -b "$COOKIE_PATH" "$API_BASE_URL/photos/$P2" | jq -r '.lat')"
+curl -fsS -b "$COOKIE_PATH" -H 'content-type: application/json' \
+  -d '{"place":{"country":"Argentina","city":"Buenos Aires"}}' \
+  "$API_BASE_URL/photos/$P2/location" >/dev/null
+AFTER_LAT="$(curl -fsS -b "$COOKIE_PATH" "$API_BASE_URL/photos/$P2" | jq -r '.lat')"
+{ [ "$BEFORE_LAT" = "$AFTER_LAT" ] && [ "$AFTER_LAT" != "null" ]; } \
+  || { echo "ERROR: label-only set-location changed lat ($BEFORE_LAT -> $AFTER_LAT)" >&2; exit 1; }
+log "label-only set-location preserved existing GPS (lat=$AFTER_LAT) OK"
+
 # --- DeleteClusteringResult: soft-delete -> gone ------------------------------
 RID="$(generate_cluster time_only)"
 wait_cluster_ready "$RID" "$TMP/result.json"

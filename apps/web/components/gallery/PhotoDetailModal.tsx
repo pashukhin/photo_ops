@@ -119,7 +119,7 @@ export function PhotoDetailModal({ photoId, onClose }: PhotoDetailModalProps) {
               <dd>{fmt(photo.updatedAt)}</dd>
             </dl>
 
-            <LocationEditor photoId={photo.id} onSaved={(updated) => setPhoto(updated)} />
+            <LocationEditor key={photo.id} photoId={photo.id} onSaved={(updated) => setPhoto(updated)} />
 
             <div className="flex justify-end">
               <Button variant="outline" onClick={onClose}>
