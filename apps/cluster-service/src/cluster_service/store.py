@@ -118,7 +118,7 @@ class InMemoryStore:
 
     def get(self, *, result_id: str, user_id: str) -> StoredResult | None:
         r = self._results.get(result_id)
-        if r is None or r.user_id != user_id:  # owner scope
+        if r is None or r.user_id != user_id or r.deleted_at is not None:  # owner scope + live
             return None
         return r
 
@@ -126,7 +126,7 @@ class InMemoryStore:
         out: list[StoredSummary] = []
         for rid in self._order:
             r = self._results[rid]
-            if r.user_id != user_id:
+            if r.user_id != user_id or r.deleted_at is not None:
                 continue
             lo, hi = time_span_of_root(r.root)
             out.append(
@@ -143,7 +143,11 @@ class InMemoryStore:
         return out
 
     def soft_delete(self, *, result_id: str, user_id: str) -> bool:
-        raise NotImplementedError  # GREEN: owner-scoped set deleted_at; False if not live
+        r = self._results.get(result_id)
+        if r is None or r.user_id != user_id or r.deleted_at is not None:
+            return False
+        r.deleted_at = self._now
+        return True
 
 
 def time_span_of_root(root: TreeNode | None) -> tuple[datetime | None, datetime | None]:
