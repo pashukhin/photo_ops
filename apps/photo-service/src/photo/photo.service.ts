@@ -169,9 +169,18 @@ export class PhotoDomainService {
   // Location (source:manual) -> owner-scoped write of location_id + the captured point ->
   // compose the updated asset. Throws 'photo not found' (-> gRPC NOT_FOUND) when the
   // owner-scoped write matches no row (the IDOR guard).
-  setPhotoLocation(userId: string, photoId: string, place: GeoPlaceInput, lat: number | null, lon: number | null): Promise<PhotoWithVariants> {
-    // GREEN: normalize -> upsert(source:manual) -> owner-scoped write -> compose (getPhoto)
-    return Promise.reject(new Error(`not implemented: setPhotoLocation ${userId}/${photoId} ${place.city ?? ''} ${lat},${lon}`));
+  async setPhotoLocation(userId: string, photoId: string, place: GeoPlaceInput, lat: number | null, lon: number | null): Promise<PhotoWithVariants> {
+    const normalized = normalizePlace(place);
+    const locationId = await this.repository.upsertLocation({ ...normalized, lat, lon, rawProviderData: { source: 'manual' } });
+    const ok = await this.repository.setLocationForUser(userId, photoId, { locationId, lat, lon });
+    if (!ok) {
+      throw new Error('photo not found'); // owner-scoped write matched no row (the IDOR guard)
+    }
+    const pwv = await this.getPhoto(userId, photoId);
+    if (!pwv) {
+      throw new Error('photo not found');
+    }
+    return pwv;
   }
 
   async getPhoto(userId: string, photoId: string): Promise<PhotoWithVariants | null> {
