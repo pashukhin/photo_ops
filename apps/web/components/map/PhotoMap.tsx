@@ -32,7 +32,9 @@ export default function PhotoMap({ points, mode, onPick }: PhotoMapProps) {
       try {
         const L = await import('leaflet');
         if (cancelled || !containerRef.current) return;
-        map = L.map(containerRef.current, { attributionControl: false });
+        // An initial world view is REQUIRED before adding layers / fitBounds — without
+        // it leaflet has no center/zoom to project against and throws (live-smoke caught).
+        map = L.map(containerRef.current, { attributionControl: false }).setView([20, 0], 1);
         const geo = (await (await fetch('/geo/world-110m.geojson')).json()) as GeoJSON.GeoJsonObject;
         const basemap = L.geoJSON(geo, {
           style: () => ({ color: '#94a3b8', weight: 1, fillColor: '#e2e8f0', fillOpacity: 0.4 })
@@ -56,8 +58,10 @@ export default function PhotoMap({ points, mode, onPick }: PhotoMapProps) {
         if (mode === 'pick' && onPick) {
           map.on('click', (e: LeafletMouseEvent) => onPick(e.latlng.lat, e.latlng.lng));
         }
-      } catch {
-        // Smoke-verified; a jsdom/no-network environment is a harmless no-op.
+      } catch (e) {
+        // Smoke-verified; a jsdom/no-network environment is a harmless no-op. Surface
+        // the reason on the element so the live smoke can diagnose a render failure.
+        if (containerRef.current) containerRef.current.dataset.mapError = e instanceof Error ? e.message : String(e);
       }
     })();
 
