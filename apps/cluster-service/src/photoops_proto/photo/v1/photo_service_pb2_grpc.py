@@ -40,6 +40,11 @@ class PhotoServiceStub:
                 request_serializer=photo_dot_v1_dot_photo__service__pb2.GetPhotoRequest.SerializeToString,
                 response_deserializer=photo_dot_v1_dot_photo__service__pb2.PhotoAsset.FromString,
                 _registered_method=True)
+        self.SetPhotoLocation = channel.unary_unary(
+                '/photoops.photo.v1.PhotoService/SetPhotoLocation',
+                request_serializer=photo_dot_v1_dot_photo__service__pb2.SetPhotoLocationRequest.SerializeToString,
+                response_deserializer=photo_dot_v1_dot_photo__service__pb2.PhotoAsset.FromString,
+                _registered_method=True)
         self.ListPhotoSpacetime = channel.unary_unary(
                 '/photoops.photo.v1.PhotoService/ListPhotoSpacetime',
                 request_serializer=photo_dot_v1_dot_photo__service__pb2.ListPhotoSpacetimeRequest.SerializeToString,
@@ -81,6 +86,16 @@ class PhotoServiceServicer:
 
     def GetPhoto(self, request, context):
         """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SetPhotoLocation(self, request, context):
+        """Manually set/override a photo's location: a place label (deduped via the 022
+        Location table) + an OPTIONAL exact point (map-clicked). Owner-scoped; returns
+        the updated asset. (Annotation decorative — the hand-written gateway route is
+        POST /photos/{photo_id}/location.)
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
@@ -132,6 +147,11 @@ def add_PhotoServiceServicer_to_server(servicer, server):
             'GetPhoto': grpc.unary_unary_rpc_method_handler(
                     servicer.GetPhoto,
                     request_deserializer=photo_dot_v1_dot_photo__service__pb2.GetPhotoRequest.FromString,
+                    response_serializer=photo_dot_v1_dot_photo__service__pb2.PhotoAsset.SerializeToString,
+            ),
+            'SetPhotoLocation': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetPhotoLocation,
+                    request_deserializer=photo_dot_v1_dot_photo__service__pb2.SetPhotoLocationRequest.FromString,
                     response_serializer=photo_dot_v1_dot_photo__service__pb2.PhotoAsset.SerializeToString,
             ),
             'ListPhotoSpacetime': grpc.unary_unary_rpc_method_handler(
@@ -279,6 +299,33 @@ class PhotoService:
             target,
             '/photoops.photo.v1.PhotoService/GetPhoto',
             photo_dot_v1_dot_photo__service__pb2.GetPhotoRequest.SerializeToString,
+            photo_dot_v1_dot_photo__service__pb2.PhotoAsset.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def SetPhotoLocation(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/photoops.photo.v1.PhotoService/SetPhotoLocation',
+            photo_dot_v1_dot_photo__service__pb2.SetPhotoLocationRequest.SerializeToString,
             photo_dot_v1_dot_photo__service__pb2.PhotoAsset.FromString,
             options,
             channel_credentials,

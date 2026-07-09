@@ -37,6 +37,13 @@ service ClusterService {
   rpc ListClusteringResults(ListClusteringResultsRequest) returns (ListClusteringResultsResponse) {
     option (google.api.http) = {get: "/v1/clustering-results"};
   }
+
+  // Soft-delete one of the caller's clustering runs. Non-owned / already-deleted /
+  // unknown id -> NOT_FOUND. The immutable tree is untouched — only deleted_at is
+  // set (ADR-0005 seam); restore is deferred.
+  rpc DeleteClusteringResult(DeleteClusteringResultRequest) returns (DeleteClusteringResultResponse) {
+    option (google.api.http) = {delete: "/v1/clustering-results/{result_id}"};
+  }
 }
 
 // ---- method registry --------------------------------------------------------
@@ -85,6 +92,13 @@ message ListClusteringResultsRequest {
 message ListClusteringResultsResponse {
   repeated ClusteringResultSummary results = 1;
 }
+
+message DeleteClusteringResultRequest {
+  string result_id = 1;
+  string user_id = 2;  // owner scope (gateway-validated session)
+}
+
+message DeleteClusteringResultResponse {}
 
 message ClusteringResultSummary {
   string id = 1;
