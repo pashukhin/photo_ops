@@ -61,7 +61,12 @@ executable-spec / skeleton-first SDD; design + plan under
    index then. `Location.lat/lon` = the matched city's representative point (parsed
    from `raw_provider_data`), not the photo's exact coords (those stay on
    `photo_assets`). Manual `9q4.3` inserts the same shape → converges by tuple.
-   *Rejected — dedup by rounded coordinates:* buckets don't align with named places
+   **Amendment (session 023, `9q4.3`):** the manual `SetPhotoLocation` writes the
+   user's clicked point to **`photo_assets.lat/lon`** (not the representative
+   `Location.lat/lon`), so that column now means "the photo's known point: EXIF GPS
+   **or** a manual override" — this is what the cluster map reads, so a no-GPS photo
+   the user places appears on the map without needing typed `GeoPlace.lat/lon` (`irf`
+   stays deferred). *Rejected — dedup by rounded coordinates:* buckets don't align with named places
    (one city → many rows, label duplication) and a manual entry without precise
    coords never converges with a geocoded one.
 

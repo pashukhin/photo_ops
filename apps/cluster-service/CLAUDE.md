@@ -4,7 +4,10 @@ Monolingual **Python** bounded context for deterministic hierarchical photo
 clustering (session 013). Two roles from one image/package:
 
 - **server** (`cluster_service.server_main`): gRPC API (`GenerateClusters`,
-  `GetClusteringResult`, `ListClusteringResults`, `ListClusteringMethods`) +
+  `GetClusteringResult`, `ListClusteringResults`, `ListClusteringMethods`,
+  `DeleteClusteringResult` [023: soft-delete over the `deleted_at` seam — `get`/
+  `list_for_user` filter it, `soft_delete` sets it owner-scoped, → `NOT_FOUND` on 0
+  rows; the immutable tree is untouched]) +
   consumes `cluster.result` to flip a run's status. First Python gRPC service.
 - **worker** (`cluster_service.worker_main`): consumes `cluster.process`, reads
   photo space-time via photo-service `ListPhotoSpacetime`, runs the pipeline,
