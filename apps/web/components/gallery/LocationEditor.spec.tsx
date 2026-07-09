@@ -1,7 +1,11 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as api from '../../lib/api';
 import LocationEditor from './LocationEditor';
+
+beforeEach(() => {
+  vi.clearAllMocks(); // mock.calls[0] must be THIS test's call, not a leaked prior one
+});
 
 vi.mock('../../lib/api', () => ({
   setPhotoLocation: vi.fn()

@@ -11,6 +11,10 @@ import {
   listClusteringResults,
   listPhotos
 } from '../../lib/api';
+import PhotoMap from '../map/PhotoMap';
+import Histogram from './Histogram';
+import { collectResultPhotoIds, mapPointsFor } from '../map/points';
+import { binByTime } from './histogram';
 import type {
   ClusterNode,
   ClusteringMethod,
@@ -195,6 +199,12 @@ export function ClusterView() {
     }
   }, [selectedMethod, refreshResults]);
 
+  // Whole-result photo set for the map + histogram views — pure joins over the
+  // already-loaded photosById (recomputed cheaply per render).
+  const activePhotoIds = active?.root ? collectResultPhotoIds(active.root) : [];
+  const mapPoints = mapPointsFor(activePhotoIds, photosById);
+  const timeBins = binByTime(activePhotoIds, photosById);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
@@ -281,10 +291,15 @@ export function ClusterView() {
                 onCreatePost={(nodeId) => void createPostFromNode(nodeId)}
               />
             </ul>
+          ) : viewMode === 'map' ? (
+            <div className="space-y-1">
+              <PhotoMap points={mapPoints} mode="view" />
+              <p className="text-xs text-muted-foreground">
+                {mapPoints.length} of {activePhotoIds.length} photos placed
+              </p>
+            </div>
           ) : (
-            // GREEN: 'map' -> <PhotoMap points={mapPointsFor(collectResultPhotoIds(active.root), photosById)} mode="view" />;
-            // 'histogram' -> <Histogram bins={binByTime(collectResultPhotoIds(active.root), photosById)} />
-            <p className="text-sm text-muted-foreground">{viewMode} view — coming soon.</p>
+            <Histogram bins={timeBins} />
           )}
         </div>
       ) : null}

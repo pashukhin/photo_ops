@@ -1,0 +1,15 @@
+world-110m.geojson — world country polygons for the offline cluster-map basemap.
+
+Source: https://github.com/johan/world.geo.json (countries.geo.json), derived from
+Natural Earth 1:110m Cultural Vectors (https://www.naturalearthdata.com/).
+
+Natural Earth is in the PUBLIC DOMAIN — no permission or attribution required
+(https://www.naturalearthdata.com/about/terms-of-use/). This NOTICE is courtesy
+attribution.
+
+VENDORED, not fetched at runtime from any external host: the file is served
+same-origin from apps/web/public/, so rendering the map makes NO external call —
+preserving the "web talks only to api-gateway" invariant (spec
+docs/superpowers/specs/2026-07-09-cluster-workspace-and-location-design.md decision 3).
+The map is drawn with Leaflet + L.geoJSON over this basemap and L.circleMarker points,
+with NO tileLayer.
