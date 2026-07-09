@@ -38,7 +38,12 @@ export default function PhotoMap({ points, mode, onPick }: PhotoMapProps) {
           style: () => ({ color: '#94a3b8', weight: 1, fillColor: '#e2e8f0', fillOpacity: 0.4 })
         }).addTo(map);
         points.forEach((p) =>
-          L.circleMarker([p.lat, p.lon], { radius: 5, color: '#2563eb', fillOpacity: 0.85 }).addTo(map as LeafletMap)
+          L.circleMarker([p.lat, p.lon], {
+            radius: 5,
+            color: '#2563eb',
+            fillOpacity: 0.85,
+            className: 'photo-marker' // smoke targets this, not the 180 basemap paths
+          }).addTo(map as LeafletMap)
         );
         if (points.length > 0) {
           map.fitBounds(L.latLngBounds(points.map((p) => [p.lat, p.lon] as [number, number])), {
