@@ -281,6 +281,15 @@ describe('ClusterView', () => {
 
   it('switches the active result between tree, map and histogram', async () => {
     // why: the workspace is one result viewed three ways (switcher over the whole result)
+    // p1/p2 carry DISTINCT valid taken times so binByTime yields >=1 histogram bar at GREEN
+    // (a shared time or no time -> zero span -> []; the default photoAsset has neither).
+    vi.mocked(api.listPhotos).mockResolvedValue({
+      photos: [
+        { ...photoAsset('p1'), takenAtUtc: '2024-06-15T00:00:00Z' },
+        { ...photoAsset('p2'), takenAtUtc: '2024-06-17T00:00:00Z' }
+      ],
+      totalCount: 2
+    });
     render(<ClusterView />);
     fireEvent.click(await screen.findByTestId('result-row'));
     await screen.findByText('Canon EOS R5'); // tree shows by default
@@ -310,5 +319,17 @@ describe('ClusterView', () => {
     await screen.findByTestId('result-row');
     fireEvent.click(screen.getByRole('button', { name: /delete/i }));
     await screen.findByText(/del boom/);
+  });
+
+  it('clears the open result when its run is deleted', async () => {
+    // why: deleting the run currently viewed must close its body (not leave a stale tree)
+    vi.mocked(api.deleteClusteringResult).mockResolvedValue(undefined);
+    vi.mocked(api.listClusteringResults).mockResolvedValueOnce(RESULTS).mockResolvedValue({ results: [] });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<ClusterView />);
+    fireEvent.click(await screen.findByTestId('result-row')); // open r1
+    await screen.findByText('Canon EOS R5'); // its tree/switcher body shows
+    fireEvent.click(screen.getByRole('button', { name: /delete/i }));
+    await waitFor(() => expect(screen.queryByText('Canon EOS R5')).not.toBeInTheDocument());
   });
 });

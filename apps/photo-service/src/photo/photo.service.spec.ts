@@ -151,7 +151,7 @@ describe('PhotoDomainService', () => {
     repository.setLocationForUser.mockResolvedValue(false);
     await expect(
       service.setPhotoLocation('user-1', 'other-photo', { country: 'France', city: 'Paris' }, null, null)
-    ).rejects.toThrow(/not found/i);
+    ).rejects.toThrow('photo not found'); // exact phrase mapDomainError maps to gRPC NOT_FOUND
   });
 
   it('rejects files above 25 MB', async () => {

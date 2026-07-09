@@ -19,6 +19,7 @@ export function collectResultPhotoIds(root: ClusterNode | null): string[] {
 // Photos with no lat/lon (no GPS / beyond the 500 cap / absent) are dropped — the
 // caller surfaces the "N of M placed" gap.
 export function mapPointsFor(ids: string[], photosById: Map<string, PhotoAsset>): MapPoint[] {
-  // GREEN: for each id present in photosById with BOTH lat and lon, emit {photoId,lat,lon}.
+  // GREEN: for each id present in photosById whose lat AND lon are non-null (a PRESENCE
+  // check — `!= null`, so a valid (0, 0) point is kept), emit {photoId, lat, lon}.
   throw new Error(`not implemented: mapPointsFor ${ids.length} ${photosById.size}`);
 }

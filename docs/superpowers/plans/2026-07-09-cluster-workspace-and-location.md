@@ -480,7 +480,7 @@ it('binByTime returns [] when no photo has a time', () => {
 - Vendor: `apps/web/public/geo/world-110m.geojson` (Natural Earth 110m countries, text) + `NOTICE`
 
 **Interfaces:**
-- Produces: `PhotoMap({ points, mode, onPick }: { points: { photoId: string; lat: number; lon: number }[]; mode: 'view' | 'pick'; onPick?: (lat: number, lon: number) => void }): JSX.Element` — a client-only component (`dynamic(() => import(...), { ssr:false })` boundary) that renders the vendored GeoJSON basemap + `L.circleMarker` per point; in `pick` mode a map click calls `onPick(lat, lon)`.
+- Produces: `PhotoMap({ points, mode, onPick }: { points: { photoId: string; lat: number; lon: number }[]; mode: 'view' | 'pick'; onPick?: (lat: number, lon: number) => void }): JSX.Element` — a client-only component the caller **static-imports** (SSR-safe: leaflet is imported inside `useEffect`, so no top-level `window` access; a `vi.mock` intercepts the static import in units — no unproven `next/dynamic`) that renders the vendored GeoJSON basemap + `L.circleMarker` per point; in `pick` mode a map click calls `onPick(lat, lon)`.
 
 **GREEN obligation:** implement the Leaflet mount inside `useEffect` (import leaflet dynamically; `L.geoJSON` basemap, **no `tileLayer`**, `L.circleMarker` markers, `map.on('click', e => onPick(e.latlng.lat, e.latlng.lng))`), branch-free. This file has **no unit RED** — it is coverage-excluded and its render/click behavior is verified by the live smoke (Task 10); that absence is the design (spec decision 3), not a gap.
 
@@ -500,7 +500,7 @@ export interface PhotoMapProps {
   onPick?: (lat: number, lon: number) => void;
 }
 
-// Leaflet glue — mounted via dynamic(ssr:false) by the caller. Coverage-excluded
+// Leaflet glue — static-imported by the caller; SSR-safe (leaflet in useEffect). Coverage-excluded
 // (jsdom gives no layout); render + click verified by smoke-ui.
 export default function PhotoMap(_props: PhotoMapProps): JSX.Element {
   throw new Error('not implemented');  // GREEN: L.geoJSON basemap + circleMarkers + click→onPick
@@ -521,7 +521,7 @@ export default function PhotoMap(_props: PhotoMapProps): JSX.Element {
 - Test: `apps/web/components/clusters/ClusterView.spec.tsx` (RED — switcher + delete)
 
 **Interfaces:**
-- Consumes: `deleteClusteringResult` (Task 5); `collectResultPhotoIds`/`mapPointsFor` + `binByTime` (Task 6); `PhotoMap` (Task 7, via `dynamic(ssr:false)`); existing `active`/`photosById`.
+- Consumes: `deleteClusteringResult` (Task 5); `collectResultPhotoIds`/`mapPointsFor` + `binByTime` (Task 6); `PhotoMap` (Task 7, **static import** — SSR-safe); existing `active`/`photosById`.
 - Produces: a `view: 'tree' | 'map' | 'histogram'` switcher over the active result; a per-`result-row` delete control. `Histogram({ bins }): JSX.Element` renders one `<rect data-testid="histogram-bar">` per non-empty bin.
 
 **GREEN obligation:** add the `view` state + a switcher (`data-testid="view-switcher"`) that swaps the active-result body between the existing tree, `<PhotoMap mode="view" points=… />`, and `<Histogram bins=… />`; add a delete button per result-row that confirms then `deleteClusteringResult(id)` → refresh list + clear `active` if it was the deleted one. Surface "N of M placed" for the map. Do not weaken the REDs.
@@ -562,7 +562,7 @@ export default function Histogram({ bins }: { bins: { startMs: number; count: nu
 }
 ```
 
-In `ClusterView.tsx` add `const [view, setView] = useState<'tree'|'map'|'histogram'>('tree')` and the switcher + delete button as inert markup wired to handlers that `throw new Error('not implemented')` (GREEN fills them). Import `PhotoMap` via `dynamic(() => import('../map/PhotoMap'), { ssr:false })`.
+In `ClusterView.tsx` add `const [viewMode, setViewMode] = useState<'tree'|'map'|'histogram'>('tree')` (NB: `view` is already a fn name here — use `viewMode`) and the switcher + delete button. Map/histogram render a placeholder at skeleton (GREEN swaps for `<PhotoMap>`/`<Histogram>` + the pure logic). Import `PhotoMap` with a plain **static** import (`import PhotoMap from '../map/PhotoMap'`) — SSR-safe since leaflet loads inside its `useEffect`; a `vi.mock('../map/PhotoMap')` intercepts it in units.
 
 - [ ] **Step 4: Confirm still RED + typecheck** — re-run Step 2 (FAIL on behavior). `make typecheck` clean.
 

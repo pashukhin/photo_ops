@@ -34,4 +34,22 @@ describe('LocationEditor', () => {
     );
     await waitFor(() => expect(onSaved).toHaveBeenCalled());
   });
+
+  it('saves a label with no picked point (label-only)', async () => {
+    // why: spec decision 6 — the point is optional; a label-only save is allowed
+    // (it applies the tag but leaves the photo off the map). No "pick here" click here.
+    vi.mocked(api.setPhotoLocation).mockResolvedValue({ id: 'photo-1' } as never);
+    render(<LocationEditor photoId="photo-1" onSaved={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText(/city/i), { target: { value: 'Paris' } });
+    fireEvent.click(screen.getByRole('button', { name: /save location/i }));
+    await waitFor(() =>
+      expect(api.setPhotoLocation).toHaveBeenCalledWith(
+        'photo-1',
+        expect.objectContaining({ place: expect.objectContaining({ city: 'Paris' }) })
+      )
+    );
+    const [, arg] = vi.mocked(api.setPhotoLocation).mock.calls[0];
+    expect(arg.lat).toBeUndefined();
+    expect(arg.lon).toBeUndefined();
+  });
 });
