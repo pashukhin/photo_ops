@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   createPost,
+  deleteClusteringResult,
   generateClusters,
   getClusteringResult,
   listClusteringMethods,
@@ -108,6 +109,7 @@ export function ClusterView() {
   const [error, setError] = useState<string | null>(null);
   // Resolves cluster item ids → photos so the tree can render thumbnails.
   const [photosById, setPhotosById] = useState<Map<string, PhotoAsset>>(new Map());
+  const [viewMode, setViewMode] = useState<'tree' | 'map' | 'histogram'>('tree');
   const router = useRouter();
 
   // Draft a post from a cluster node (session 018) and jump to its editor. A
@@ -149,6 +151,21 @@ export function ClusterView() {
   const view = useCallback(async (resultId: string) => {
     setActive(await getClusteringResult(resultId));
   }, []);
+
+  // Soft-delete a run (confirmed), then refresh the list and clear it if active.
+  const handleDelete = useCallback(
+    async (resultId: string) => {
+      if (!window.confirm('Delete this clustering run? This cannot be undone.')) return;
+      try {
+        await deleteClusteringResult(resultId);
+        setActive((cur) => (cur?.id === resultId ? null : cur));
+        await refreshResults();
+      } catch (e: unknown) {
+        setError(String(e));
+      }
+    },
+    [refreshResults]
+  );
 
   const generate = useCallback(async () => {
     if (!selectedMethod) return;
@@ -212,7 +229,7 @@ export function ClusterView() {
         ) : (
           <ul className="space-y-1">
             {results.map((r) => (
-              <li key={r.id}>
+              <li key={r.id} className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => void view(r.id)}
@@ -222,6 +239,14 @@ export function ClusterView() {
                   {r.method} · {r.status} · {r.photoCount} photos
                   {r.dateFrom ? ` · ${r.dateFrom} – ${r.dateTo}` : ''}
                 </button>
+                <button
+                  type="button"
+                  onClick={() => void handleDelete(r.id)}
+                  className="border rounded-md px-2 py-0.5 text-xs text-destructive"
+                  aria-label={`Delete result ${r.id}`}
+                >
+                  Delete
+                </button>
               </li>
             ))}
           </ul>
@@ -229,11 +254,25 @@ export function ClusterView() {
       </div>
 
       {active ? (
-        <div>
-          <h2 className="text-lg font-semibold">Tree · {active.status}</h2>
+        <div className="space-y-2">
+          <div className="flex items-center gap-2" role="group" aria-label="View">
+            {(['tree', 'map', 'histogram'] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setViewMode(v)}
+                aria-pressed={viewMode === v}
+                className="border rounded-md px-2 py-1 text-sm capitalize"
+              >
+                {v}
+              </button>
+            ))}
+          </div>
           {active.status === 'failed' ? (
             <p className="text-sm text-destructive">{active.errorMessage}</p>
-          ) : active.root ? (
+          ) : !active.root ? (
+            <p className="text-sm text-muted-foreground">Not ready.</p>
+          ) : viewMode === 'tree' ? (
             <ul>
               <TreeNodeView
                 node={active.root}
@@ -242,8 +281,12 @@ export function ClusterView() {
                 onCreatePost={(nodeId) => void createPostFromNode(nodeId)}
               />
             </ul>
+          ) : viewMode === 'map' ? (
+            // GREEN: swap for <PhotoMap points={mapPointsFor(collectResultPhotoIds(active.root), photosById)} mode="view" />
+            <p className="text-sm text-muted-foreground">Map view — coming soon.</p>
           ) : (
-            <p className="text-sm text-muted-foreground">Not ready.</p>
+            // GREEN: swap for <Histogram bins={binByTime(collectResultPhotoIds(active.root), photosById)} />
+            <p className="text-sm text-muted-foreground">Histogram — coming soon.</p>
           )}
         </div>
       ) : null}

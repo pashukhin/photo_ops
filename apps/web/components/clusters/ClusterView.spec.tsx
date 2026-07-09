@@ -9,7 +9,14 @@ vi.mock('../../lib/api', () => ({
   getClusteringResult: vi.fn(),
   generateClusters: vi.fn(),
   listPhotos: vi.fn(),
-  createPost: vi.fn()
+  createPost: vi.fn(),
+  deleteClusteringResult: vi.fn()
+}));
+
+// PhotoMap is Leaflet glue (no layout in jsdom) — stub it to a marker div so the
+// map switcher is assertable in units; the real render is smoke-verified.
+vi.mock('../map/PhotoMap', () => ({
+  default: ({ points }: { points: unknown[] }) => <div data-testid="photo-map">{points.length}</div>
 }));
 
 // Router push for the create-post affordance (session 018). Referenced lazily
@@ -270,5 +277,28 @@ describe('ClusterView', () => {
       CLUSTER_POLL_MAX_ATTEMPTS + 2
     );
     vi.useRealTimers();
+  });
+
+  it('switches the active result between tree, map and histogram', async () => {
+    // why: the workspace is one result viewed three ways (switcher over the whole result)
+    render(<ClusterView />);
+    fireEvent.click(await screen.findByTestId('result-row'));
+    await screen.findByText('Canon EOS R5'); // tree shows by default
+    fireEvent.click(screen.getByRole('button', { name: /^map$/i }));
+    expect(await screen.findByTestId('photo-map')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /histogram/i }));
+    expect(await screen.findAllByTestId('histogram-bar')).not.toHaveLength(0);
+  });
+
+  it('deletes a run after confirm and drops it from the list', async () => {
+    // why: delete is confirmed (no one-click loss) and the row disappears on success
+    vi.mocked(api.deleteClusteringResult).mockResolvedValue(undefined);
+    vi.mocked(api.listClusteringResults).mockResolvedValueOnce(RESULTS).mockResolvedValue({ results: [] });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<ClusterView />);
+    await screen.findByTestId('result-row');
+    fireEvent.click(screen.getByRole('button', { name: /delete/i }));
+    await waitFor(() => expect(api.deleteClusteringResult).toHaveBeenCalledWith('r1'));
+    await waitFor(() => expect(screen.queryByTestId('result-row')).not.toBeInTheDocument());
   });
 });
