@@ -203,6 +203,11 @@ export class PhotoRepository implements PhotoRepositoryPort {
     }));
   }
 
+  setLocationForUser(userId: string, photoId: string, patch: { locationId: string; lat: number | null; lon: number | null }): Promise<boolean> {
+    // GREEN: UPDATE photo_assets SET location_id/lat/lon WHERE id AND user_id -> rowCount>0
+    return Promise.reject(new Error(`not implemented: setLocationForUser ${userId}/${photoId}/${patch.locationId}`));
+  }
+
   async setStatus(photoId: string, status: 'ready' | 'failed' | 'processing'): Promise<void> {
     await this.db
       .update(photoAssets)

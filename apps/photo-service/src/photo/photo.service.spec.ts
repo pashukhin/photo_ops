@@ -78,6 +78,7 @@ function createService() {
     upsertVariant: vi.fn(),
     applyAttributes: vi.fn(),
     setStatus: vi.fn(),
+    setLocationForUser: vi.fn(),
     findByIdWithVariantsForUser: vi.fn(),
     listVariantsForPhotos: vi.fn(),
     findVariantsByIdsForUser: vi.fn(),
@@ -114,6 +115,43 @@ describe('PhotoDomainService', () => {
     await expect(
       service.createUploadIntent({ userId: 'user-1', filename: 'notes.txt', contentType: 'text/plain', sizeBytes: 10n })
     ).rejects.toThrow('unsupported content type');
+  });
+
+  it('setPhotoLocation upserts the normalized place with the captured point, owner-scoped', async () => {
+    // why: manual set writes the 022 dedup Location (source:manual) AND photo_assets.lat/lon,
+    // scoped to the caller — the composed reply carries the new place.
+    const { service, repository } = createService();
+    repository.upsertLocation.mockResolvedValue('loc-9');
+    repository.setLocationForUser.mockResolvedValue(true);
+    repository.findByIdWithVariantsForUser.mockResolvedValue({
+      photo: makePhotoRecord({ id: 'photo-1', locationId: 'loc-9', lat: 48.85, lon: 2.35 }),
+      variants: []
+    });
+    repository.listLocationsByIds.mockResolvedValue([
+      { id: 'loc-9', continent: 'Europe', country: 'France', region: 'Île-de-France', city: 'Paris', district: '', lat: 48.85, lon: 2.35 }
+    ]);
+
+    const out = await service.setPhotoLocation(
+      'user-1', 'photo-1',
+      { continent: 'Europe', country: 'France', region: 'Île-de-France', city: 'Paris', district: '' },
+      48.85, 2.35
+    );
+
+    expect(repository.upsertLocation).toHaveBeenCalledWith(expect.objectContaining({
+      country: 'France', city: 'Paris', lat: 48.85, lon: 2.35, rawProviderData: { source: 'manual' }
+    }));
+    expect(repository.setLocationForUser).toHaveBeenCalledWith('user-1', 'photo-1', { locationId: 'loc-9', lat: 48.85, lon: 2.35 });
+    expect(out?.photo.locationId).toBe('loc-9');
+  });
+
+  it('setPhotoLocation throws NOT_FOUND when the photo is not the caller\'s', async () => {
+    // why: the IDOR fix — a foreign/unknown photo_id must not write; false -> not-found
+    const { service, repository } = createService();
+    repository.upsertLocation.mockResolvedValue('loc-9');
+    repository.setLocationForUser.mockResolvedValue(false);
+    await expect(
+      service.setPhotoLocation('user-1', 'other-photo', { country: 'France', city: 'Paris' }, null, null)
+    ).rejects.toThrow(/not found/i);
   });
 
   it('rejects files above 25 MB', async () => {
