@@ -12,7 +12,23 @@ export interface TimeBin {
 // time OR the span is zero (min == max — no meaningful distribution). The photo whose
 // time equals `max` falls in the last bin (not an overflow bin).
 export function binByTime(ids: string[], photosById: Map<string, PhotoAsset>, binCount = 24): TimeBin[] {
-  // GREEN: resolve each photo's time (utc->local->createdAt), find [min,max], place each
-  // into floor((t-min)/width) clamped to binCount-1; empty span/no-time -> [].
-  throw new Error(`not implemented: binByTime ${ids.length} ${photosById.size} ${binCount}`);
+  const times: number[] = [];
+  for (const id of ids) {
+    const p = photosById.get(id);
+    if (!p) continue;
+    const raw = p.takenAtUtc || p.takenAtLocal || p.createdAt;
+    const t = raw ? Date.parse(raw) : Number.NaN;
+    if (!Number.isNaN(t)) times.push(t);
+  }
+  if (times.length === 0) return [];
+  const min = Math.min(...times);
+  const max = Math.max(...times);
+  if (min === max) return []; // zero span — no meaningful distribution
+  const width = (max - min) / binCount;
+  const bins: TimeBin[] = Array.from({ length: binCount }, (_, i) => ({ startMs: min + i * width, count: 0 }));
+  for (const t of times) {
+    const idx = Math.min(Math.floor((t - min) / width), binCount - 1); // max falls in the last bin
+    bins[idx].count += 1;
+  }
+  return bins;
 }

@@ -11,15 +11,32 @@ export interface MapPoint {
 // on the WHOLE result, gathered from the immutable tree. De-duplicated, in traversal
 // order.
 export function collectResultPhotoIds(root: ClusterNode | null): string[] {
-  // GREEN: DFS the tree, collect each node.items (photo ids), dedup preserving order.
-  throw new Error(`not implemented: collectResultPhotoIds ${root?.id ?? 'null'}`);
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const walk = (node: ClusterNode): void => {
+    for (const id of node.items) {
+      if (!seen.has(id)) {
+        seen.add(id);
+        out.push(id);
+      }
+    }
+    for (const child of node.children) walk(child);
+  };
+  if (root) walk(root);
+  return out;
 }
 
 // Photos with a plottable point, joined from the already-loaded photosById map.
 // Photos with no lat/lon (no GPS / beyond the 500 cap / absent) are dropped — the
 // caller surfaces the "N of M placed" gap.
 export function mapPointsFor(ids: string[], photosById: Map<string, PhotoAsset>): MapPoint[] {
-  // GREEN: for each id present in photosById whose lat AND lon are non-null (a PRESENCE
-  // check — `!= null`, so a valid (0, 0) point is kept), emit {photoId, lat, lon}.
-  throw new Error(`not implemented: mapPointsFor ${ids.length} ${photosById.size}`);
+  const out: MapPoint[] = [];
+  for (const id of ids) {
+    const p = photosById.get(id);
+    // presence check (`!= null`) so a valid (0, 0) point is kept, not dropped as falsy
+    if (p && p.lat != null && p.lon != null) {
+      out.push({ photoId: id, lat: p.lat, lon: p.lon });
+    }
+  }
+  return out;
 }
