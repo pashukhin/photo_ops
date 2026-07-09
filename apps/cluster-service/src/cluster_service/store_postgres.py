@@ -102,6 +102,9 @@ class PostgresStore:  # pragma: no cover - live DB IO adapter (smoke-verified)
                 (error_message, result_id),
             )
 
+    def soft_delete(self, *, result_id: str, user_id: str) -> bool:  # pragma: no cover
+        raise NotImplementedError  # GREEN: owner-scoped UPDATE ... deleted_at RETURNING id
+
     def get(self, *, result_id: str, user_id: str) -> StoredResult | None:
         with psycopg.connect(self._dsn, row_factory=dict_row) as conn:
             r = conn.execute(

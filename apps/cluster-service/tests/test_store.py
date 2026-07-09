@@ -55,6 +55,25 @@ def test_failed_run_never_becomes_ready() -> None:
     assert s.get(result_id="r1", user_id="u1").status == "failed"
 
 
+def test_soft_delete_hides_from_get_and_list() -> None:
+    # why: delete is a read-filter over deleted_at; the run must vanish from both readers
+    s = InMemoryStore()
+    _pending(s, result_id="r1", user_id="u1")
+    assert s.soft_delete(result_id="r1", user_id="u1") is True
+    assert s.get(result_id="r1", user_id="u1") is None
+    assert [r.id for r in s.list_for_user(user_id="u1")] == []
+
+
+def test_soft_delete_is_owner_scoped_and_idempotent() -> None:
+    # why: a non-owner or a second delete must not succeed -> maps to NOT_FOUND, not 200
+    s = InMemoryStore()
+    _pending(s, result_id="r1", user_id="u1")
+    assert s.soft_delete(result_id="r1", user_id="u2") is False  # non-owner
+    assert s.soft_delete(result_id="r1", user_id="u1") is True  # owner
+    assert s.soft_delete(result_id="r1", user_id="u1") is False  # already deleted
+    assert s.soft_delete(result_id="missing", user_id="u1") is False
+
+
 def test_finalized_result_is_immutable() -> None:
     s = InMemoryStore()
     _pending(s)

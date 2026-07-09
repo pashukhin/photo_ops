@@ -28,6 +28,7 @@ class StoredResult:
     created_at: str = ""
     consumption_json: str = ""
     root: TreeNode | None = None
+    deleted_at: str | None = None  # seam: soft-delete timestamp (ADR-0005); None = live
 
 
 @dataclass
@@ -57,6 +58,8 @@ class Store(Protocol):
     def get(self, *, result_id: str, user_id: str) -> StoredResult | None: ...
 
     def list_for_user(self, *, user_id: str) -> list[StoredSummary]: ...
+
+    def soft_delete(self, *, result_id: str, user_id: str) -> bool: ...
 
 
 class InMemoryStore:
@@ -138,6 +141,9 @@ class InMemoryStore:
                 )
             )
         return out
+
+    def soft_delete(self, *, result_id: str, user_id: str) -> bool:
+        raise NotImplementedError  # GREEN: owner-scoped set deleted_at; False if not live
 
 
 def time_span_of_root(root: TreeNode | None) -> tuple[datetime | None, datetime | None]:

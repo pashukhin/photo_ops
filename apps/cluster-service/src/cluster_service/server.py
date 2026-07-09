@@ -102,6 +102,9 @@ class ClusterServicer(pb_grpc.ClusterServiceServicer):
             results=[summary_to_proto(s) for s in summaries]
         )
 
+    def DeleteClusteringResult(self, request, context):  # type: ignore[no-untyped-def]
+        raise NotImplementedError  # GREEN: soft_delete -> NOT_FOUND on False
+
 
 class ResultConsumer:
     """Consume cluster.result → flip the persisted run to READY / FAILED."""
