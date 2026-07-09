@@ -154,6 +154,17 @@ describe('PhotoDomainService', () => {
     ).rejects.toThrow('photo not found'); // exact phrase mapDomainError maps to gRPC NOT_FOUND
   });
 
+  it('setPhotoLocation throws NOT_FOUND if the write succeeds but the re-read is missing', async () => {
+    // why: the compose guard — a concurrent delete between the write and getPhoto -> not found
+    const { service, repository } = createService();
+    repository.upsertLocation.mockResolvedValue('loc-9');
+    repository.setLocationForUser.mockResolvedValue(true);
+    repository.findByIdWithVariantsForUser.mockResolvedValue(null);
+    await expect(
+      service.setPhotoLocation('user-1', 'photo-1', { city: 'Paris' }, null, null)
+    ).rejects.toThrow('photo not found');
+  });
+
   it('rejects files above 25 MB', async () => {
     const { service } = createService();
 

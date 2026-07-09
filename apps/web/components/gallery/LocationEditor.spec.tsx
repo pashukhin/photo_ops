@@ -56,4 +56,13 @@ describe('LocationEditor', () => {
     expect(arg.lat).toBeUndefined();
     expect(arg.lon).toBeUndefined();
   });
+
+  it('surfaces a save failure', async () => {
+    // why: a failed save must not be lost — it shows in the editor's error line
+    vi.mocked(api.setPhotoLocation).mockRejectedValue(new Error('save boom'));
+    render(<LocationEditor photoId="photo-1" onSaved={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText(/city/i), { target: { value: 'Paris' } });
+    fireEvent.click(screen.getByRole('button', { name: /save location/i }));
+    await screen.findByText(/save boom/);
+  });
 });
