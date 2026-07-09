@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { completeUpload, createPost, createUploadIntent, generateClusters, getClusteringResult, getPhoto, getPost, getUsageSummary, listClusteringMethods, listClusteringResults, listPhotos, listPosts, listUsageEvents, signUp, updatePost, uploadFileToPresignedUrl } from './api';
+import { completeUpload, createPost, createUploadIntent, deleteClusteringResult, generateClusters, getClusteringResult, getPhoto, getPost, getUsageSummary, listClusteringMethods, listClusteringResults, listPhotos, listPosts, listUsageEvents, setPhotoLocation, signUp, updatePost, uploadFileToPresignedUrl } from './api';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -26,6 +26,31 @@ describe('web API helper', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ id: 'photo-1', status: 'uploaded' })));
 
     await expect(completeUpload('photo-1')).resolves.toEqual({ id: 'photo-1', status: 'uploaded' });
+  });
+
+  it('deleteClusteringResult DELETEs the run', async () => {
+    // why: first DELETE in the client — path + method are the contract
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ ok: true })));
+    await deleteClusteringResult('r1');
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:3001/v1/clustering-results/r1',
+      expect.objectContaining({ method: 'DELETE', credentials: 'include' })
+    );
+  });
+
+  it('setPhotoLocation POSTs place + point to /photos/:id/location', async () => {
+    // why: matches the hand-written gateway route (/photos, no v1) and carries the picked point
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ id: 'photo-1' })));
+    await setPhotoLocation('photo-1', { place: { country: 'France', city: 'Paris' }, lat: 48.85, lon: 2.35 });
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:3001/photos/photo-1/location',
+      expect.objectContaining({
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ place: { country: 'France', city: 'Paris' }, lat: 48.85, lon: 2.35 })
+      })
+    );
   });
 
   it('listPhotos builds the query string from params and returns photos + totalCount (session 011)', async () => {
