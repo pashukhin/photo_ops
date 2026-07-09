@@ -27,6 +27,14 @@ export interface PhotoAsset {
   orientation?: number;
   lat?: number;
   lon?: number;
+  // Reverse-geocoded place (session 022); absent when no GPS / unresolved.
+  location?: {
+    continent?: string;
+    country?: string;
+    region?: string;
+    city?: string;
+    district?: string;
+  };
   variants?: PhotoVariant[];
 }
 

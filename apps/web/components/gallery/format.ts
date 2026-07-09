@@ -24,3 +24,23 @@ export function fmtDimensions(w?: number, h?: number): string {
   if (!w || !h) return FALLBACK;
   return `${w}×${h}`;
 }
+
+// A reverse-geocoded place attached to a photo (session 022). Same shape the
+// gallery tag renders; continent/district are carried but omitted from the tag.
+export interface PhotoLocation {
+  continent?: string;
+  country?: string;
+  region?: string;
+  city?: string;
+  district?: string;
+}
+
+// Concise place tag: country / region / city of the non-empty parts; FALLBACK when
+// none. continent + district are intentionally omitted from the compact tag.
+export function formatLocation(location?: PhotoLocation): string {
+  if (!location) return FALLBACK;
+  const parts = [location.country, location.region, location.city].filter(
+    (p): p is string => !!p && p.trim() !== ''
+  );
+  return parts.length > 0 ? parts.join(' / ') : FALLBACK;
+}

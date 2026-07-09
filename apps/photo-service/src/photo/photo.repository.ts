@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { and, asc, count, desc, eq, ilike, inArray } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
 import { createDb } from '../db/client';
-import { photoAssets, photoVariants, processingJobs } from '../db/schema';
-import { CreateUploadIntentInput, ListPhotosParams, PhotoAssetRecord, PhotoVariantRecord, ProcessingJobRecord } from './photo.types';
+import { locations, photoAssets, photoVariants, processingJobs } from '../db/schema';
+import { CreateUploadIntentInput, ListPhotosParams, LocationRecord, NormalizedPlace, PhotoAssetRecord, PhotoVariantRecord, ProcessingJobRecord } from './photo.types';
 import { PhotoRepositoryPort } from './photo.service';
 
 @Injectable()
@@ -156,11 +156,51 @@ export class PhotoRepository implements PhotoRepositoryPort {
       });
   }
 
-  async applyAttributes(photoId: string, attrs: { width: number | null; height: number | null; takenAtLocal: string | null; takenAtUtc: Date | null; takenAtTzSource: string | null; cameraMake: string | null; cameraModel: string | null; orientation: number | null; lat: number | null; lon: number | null; metadataJson: unknown }): Promise<void> {
+  async applyAttributes(photoId: string, attrs: { width: number | null; height: number | null; takenAtLocal: string | null; takenAtUtc: Date | null; takenAtTzSource: string | null; cameraMake: string | null; cameraModel: string | null; orientation: number | null; lat: number | null; lon: number | null; metadataJson: unknown; locationId?: string | null }): Promise<void> {
     await this.db
       .update(photoAssets)
       .set({ ...attrs, updatedAt: new Date() })
       .where(eq(photoAssets.id, photoId));
+  }
+
+  // Idempotent upsert by the normalized place tuple. ON CONFLICT DO UPDATE (a no-op
+  // self-assign) so RETURNING yields the existing row's id on a dedup hit; DO NOTHING
+  // would return no row. Concurrency-safe under same-tuple races.
+  async upsertLocation(input: NormalizedPlace & { lat: number | null; lon: number | null; rawProviderData: unknown }): Promise<string> {
+    const [row] = await this.db
+      .insert(locations)
+      .values({
+        id: uuidv7(),
+        continent: input.continent,
+        country: input.country,
+        region: input.region,
+        city: input.city,
+        district: input.district,
+        lat: input.lat,
+        lon: input.lon,
+        rawProviderData: input.rawProviderData
+      })
+      .onConflictDoUpdate({
+        target: [locations.continent, locations.country, locations.region, locations.city, locations.district],
+        set: { continent: input.continent }
+      })
+      .returning({ id: locations.id });
+    return row.id;
+  }
+
+  async listLocationsByIds(ids: string[]): Promise<LocationRecord[]> {
+    if (ids.length === 0) return [];
+    const rows = await this.db.select().from(locations).where(inArray(locations.id, ids));
+    return rows.map((r) => ({
+      id: r.id,
+      continent: r.continent,
+      country: r.country,
+      region: r.region,
+      city: r.city,
+      district: r.district,
+      lat: r.lat,
+      lon: r.lon
+    }));
   }
 
   async setStatus(photoId: string, status: 'ready' | 'failed' | 'processing'): Promise<void> {
@@ -244,6 +284,7 @@ export class PhotoRepository implements PhotoRepositoryPort {
       lat: row.lat,
       lon: row.lon,
       metadataJson: row.metadataJson,
+      locationId: row.locationId,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt
     };

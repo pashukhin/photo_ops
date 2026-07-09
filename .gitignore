@@ -24,6 +24,9 @@ __pycache__/
 bin/
 tmp/
 data/
+# ...but the vendored GeoNames extract for offline reverse-geocoding (022) IS tracked.
+!apps/media-worker/src/media_worker/data/
+!apps/media-worker/src/media_worker/data/**
 
 # subagent-driven-development scratch
 .superpowers/

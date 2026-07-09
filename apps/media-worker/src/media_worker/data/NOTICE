@@ -1,0 +1,11 @@
+Geographic data in this directory is derived from GeoNames
+(https://www.geonames.org/), used under the Creative Commons Attribution 4.0
+License (CC BY 4.0, https://creativecommons.org/licenses/by/4.0/).
+
+Source files (https://download.geonames.org/export/dump/):
+  - cities15000.txt      → cities15000.tsv     (name, lat, lon, country code, admin1 code)
+  - admin1CodesASCII.txt → admin1.tsv          (admin1 key → region name)
+  - countryInfo.txt      → countries.tsv        (country code → country name, continent code)
+
+The vendored files are compact projections of the above (selected columns only);
+no GeoNames data was altered. © GeoNames, CC BY 4.0.

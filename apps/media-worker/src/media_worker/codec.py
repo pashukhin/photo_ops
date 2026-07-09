@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from src.photoops_proto.photo.v1 import processing_pb2
 
 from .exif import Attributes
+from .geocode import GeoPlace
 
 
 @dataclass
@@ -37,6 +38,7 @@ def encode_result(
     variants: list[VariantResult],
     metadata_json: str,
     error_message: str = "",
+    place: GeoPlace | None = None,
 ) -> bytes:
     """Serialize a PhotoProcessingResult to bytes."""
     result = processing_pb2.PhotoProcessingResult()
@@ -61,6 +63,16 @@ def encode_result(
             result.attributes.lat = attributes.lat
         if attributes.lon is not None:
             result.attributes.lon = attributes.lon
+
+        # place is a sub-message; setting any field vivifies it so HasField("place")
+        # is True downstream. Absent (None) when there is no GPS / geocoder result.
+        if place is not None:
+            result.attributes.place.continent = place.continent
+            result.attributes.place.country = place.country
+            result.attributes.place.region = place.region
+            result.attributes.place.city = place.city
+            result.attributes.place.district = place.district
+            result.attributes.place.raw_provider_data = place.raw_provider_data
 
     for v in variants:
         result.variants.add(

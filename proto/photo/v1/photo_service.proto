@@ -4,6 +4,7 @@ package photoops.photo.v1;
 
 import "common/v1/common.proto";
 import "google/api/annotations.proto";
+import "photo/v1/processing.proto";
 
 service PhotoService {
   rpc Health(photoops.common.v1.HealthCheckRequest) returns (photoops.common.v1.HealthCheckResponse) {
@@ -154,6 +155,7 @@ message PhotoAsset {
   optional double lat = 18;
   optional double lon = 19;
   repeated PhotoVariantView variants = 20;
+  GeoPlace location = 21;         // reverse-geocoded place (022); absent until resolved
 }
 
 enum PhotoStatus {

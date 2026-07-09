@@ -24,6 +24,7 @@ const READY_PHOTO: PhotoAsset = {
   takenAtLocal: '2024-07-01T12:00:00',
   cameraMake: 'Apple',
   cameraModel: 'iPhone 15',
+  location: { continent: 'South America', country: 'Argentina', region: '', city: 'Buenos Aires', district: '' },
   variants: [
     { variantType: 'thumbnail', url: 'http://img/thumb1.jpg', width: 200, height: 150 },
     { variantType: 'preview', url: 'http://img/preview1.jpg', width: 1200, height: 900 }
@@ -81,6 +82,8 @@ describe('PhotoGallery (session 011)', () => {
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByRole('img')).toHaveAttribute('src', 'http://img/preview1.jpg');
     expect(within(dialog).getByText('iPhone 15')).toBeInTheDocument();
+    // session 022: the reverse-geocoded place-tag renders (country / region / city).
+    expect(within(dialog).getByText('Argentina / Buenos Aires')).toBeInTheDocument();
     expect(api.getPhoto).toHaveBeenCalledWith('p1');
   });
 

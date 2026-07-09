@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { context, trace } from '@opentelemetry/api';
-import { PhotoDomainService } from './photo.service';
+import { PhotoDomainService, normalizePlace } from './photo.service';
 import { ListPhotosParams } from './photo.types';
 import { registerTestOtel } from './test-otel';
 
@@ -41,6 +41,7 @@ function makePhotoRecord(overrides: Partial<Record<string, unknown>> = {}) {
     lat: 51.5074,
     lon: -0.1278,
     metadataJson: null,
+    locationId: null,
     createdAt: new Date('2026-06-21T00:00:00.000Z'),
     updatedAt: new Date('2026-06-21T00:00:00.000Z'),
     ...overrides
@@ -79,7 +80,9 @@ function createService() {
     setStatus: vi.fn(),
     findByIdWithVariantsForUser: vi.fn(),
     listVariantsForPhotos: vi.fn(),
-    findVariantsByIdsForUser: vi.fn()
+    findVariantsByIdsForUser: vi.fn(),
+    upsertLocation: vi.fn(),
+    listLocationsByIds: vi.fn()
   };
   const storage = {
     createPresignedPutUrl: vi.fn(),
@@ -94,8 +97,9 @@ function createService() {
   repository.markProcessingForUser.mockResolvedValue(true);
   repository.createProcessingJob.mockResolvedValue({ id: 'job-default' });
   repository.findJobById.mockResolvedValue({ id: 'job-default', userId: 'user-1' });
-  // Default: no variants (so listPhotos tests don't crash).
+  // Default: no variants / no locations (so listPhotos + getPhoto tests don't crash).
   repository.listVariantsForPhotos.mockResolvedValue([]);
+  repository.listLocationsByIds.mockResolvedValue([]);
   storage.createPresignedGetUrl.mockResolvedValue('signed://x');
   usageEmitter.emitOriginalStored.mockResolvedValue(undefined);
   usageEmitter.emitProcessingConsumption.mockResolvedValue(undefined);
@@ -421,6 +425,96 @@ describe('PhotoDomainService', () => {
     repository.findJobById.mockResolvedValue({ id: 'j1', userId: 'u1', status: 'succeeded' });
     await service.finalizeResult({ jobId: 'j1', photoId: 'p1', outcome: 'failed', errorMessage: 'x', variants: [], metadataJson: '' });
     expect(repository.setStatus).not.toHaveBeenCalledWith('p1', 'failed');
+  });
+
+  it('normalizePlace trims and coalesces missing fields to empty string', () => {
+    // why (B1): the UNIQUE dedup key needs real '' (not null/undefined) — Postgres
+    // treats NULL as distinct, so nullable columns would never dedup.
+    expect(normalizePlace({ continent: '  South America ', country: 'Argentina', city: 'Buenos Aires ' })).toEqual({
+      continent: 'South America',
+      country: 'Argentina',
+      region: '',
+      city: 'Buenos Aires',
+      district: ''
+    });
+  });
+
+  it('normalizePlace preserves display case (no lower-casing in 022)', () => {
+    // why: geocoded places are consistently cased; the tag must read "Buenos Aires".
+    expect(normalizePlace({ city: 'Buenos Aires' }).city).toBe('Buenos Aires');
+  });
+
+  it('finalizeResult upserts a Location and links it when the result carries a place', async () => {
+    // why (3iy): a geocoded place → one deduped Location → photo.location_id.
+    const { service, repository } = createService();
+    repository.finalizeJob.mockResolvedValue(true);
+    repository.findJobById.mockResolvedValue({ id: 'j1', userId: 'u1', status: 'succeeded' });
+    repository.upsertLocation.mockResolvedValue('loc-1');
+    await service.finalizeResult({
+      jobId: 'j1',
+      photoId: 'p1',
+      outcome: 'succeeded',
+      attributes: {
+        lat: -34.6,
+        lon: -58.38,
+        place: { continent: 'South America', country: 'Argentina', region: '', city: 'Buenos Aires', district: '', rawProviderData: '{"lat":-34.6,"lon":-58.38}' }
+      },
+      variants: [],
+      metadataJson: '{}'
+    });
+    expect(repository.upsertLocation).toHaveBeenCalledWith(expect.objectContaining({ country: 'Argentina', city: 'Buenos Aires' }));
+    expect(repository.applyAttributes).toHaveBeenCalledWith('p1', expect.objectContaining({ locationId: 'loc-1' }));
+  });
+
+  it('finalizeResult sets no location when the result carries no place', async () => {
+    // why (§3.4): no GPS / geocoder-down → location_id null, photo still ready.
+    const { service, repository } = createService();
+    repository.finalizeJob.mockResolvedValue(true);
+    repository.findJobById.mockResolvedValue({ id: 'j1', userId: 'u1', status: 'succeeded' });
+    await service.finalizeResult({
+      jobId: 'j1',
+      photoId: 'p1',
+      outcome: 'succeeded',
+      attributes: { lat: null, lon: null },
+      variants: [],
+      metadataJson: '{}'
+    });
+    expect(repository.upsertLocation).not.toHaveBeenCalled();
+    expect(repository.applyAttributes).toHaveBeenCalledWith('p1', expect.objectContaining({ locationId: null }));
+  });
+
+  it('getPhoto attaches the location when the photo has a location_id', async () => {
+    // why (surface): the gallery tag needs the place on the read path — getPhoto is
+    // what smoke-media reads via GET /photos/:id.
+    const { service, repository } = createService();
+    repository.findByIdWithVariantsForUser.mockResolvedValue({ photo: makePhotoRecord({ locationId: 'loc-1' }), variants: [] });
+    repository.listLocationsByIds.mockResolvedValue([
+      { id: 'loc-1', continent: 'South America', country: 'Argentina', region: '', city: 'Buenos Aires', district: '', lat: -34.6, lon: -58.38 }
+    ]);
+    const pwv = await service.getPhoto('user-1', 'photo-1');
+    expect(pwv?.location).toEqual(expect.objectContaining({ country: 'Argentina', city: 'Buenos Aires' }));
+  });
+
+  it('getPhoto leaves location null when the photo has no location_id', async () => {
+    // why: no-place photos render the fallback tag, not a crash.
+    const { service, repository } = createService();
+    repository.findByIdWithVariantsForUser.mockResolvedValue({ photo: makePhotoRecord({ locationId: null }), variants: [] });
+    const pwv = await service.getPhoto('user-1', 'photo-1');
+    expect(pwv?.location ?? null).toBeNull();
+    expect(repository.listLocationsByIds).not.toHaveBeenCalled();
+  });
+
+  it('listPhotos attaches locations for photos that have a location_id', async () => {
+    // why (surface + coverage): the batched list compose (locationIds.length > 0
+    // branch) attaches the place to each located photo via one listLocationsByIds.
+    const { service, repository } = createService();
+    repository.list.mockResolvedValue({ rows: [makePhotoRecord({ id: 'p1', locationId: 'loc-1' })], totalCount: 1 });
+    repository.listLocationsByIds.mockResolvedValue([
+      { id: 'loc-1', continent: 'South America', country: 'Argentina', region: '', city: 'Buenos Aires', district: '', lat: -34.6, lon: -58.38 }
+    ]);
+    const res = await service.listPhotos(makeListParams());
+    expect(repository.listLocationsByIds).toHaveBeenCalledWith(['loc-1']);
+    expect(res.photos[0].location).toEqual(expect.objectContaining({ country: 'Argentina', city: 'Buenos Aires' }));
   });
 
   it('completeUpload success: emits emitOriginalStored once with correct args', async () => {

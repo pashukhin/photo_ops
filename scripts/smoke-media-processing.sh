@@ -192,6 +192,53 @@ print("SMOKE OK — status=ready, 2 variants (thumbnail+preview), EXIF+GPS attrs
 PY
 
 # ---------------------------------------------------------------------------
+# 7b. Geo (3iy): the resolved place is on the photo, and a SECOND photo at the SAME
+#     coordinates DEDUPs to the same Location row. Place strings can't prove dedup
+#     (two rows render identical text); a count DELTA is the honest oracle AND is
+#     robust to rows left by prior smoke runs / seeds.
+# ---------------------------------------------------------------------------
+"$VENV_PYTHON" - "$PHOTO_PATH" <<'PY'
+import json, sys
+loc = (json.load(open(sys.argv[1])).get("location") or {})
+if not loc.get("country") or not loc.get("city"):
+    print(f"ASSERTION FAILED: photo.location incomplete: {loc!r}", file=sys.stderr); sys.exit(1)
+print(f"[smoke-media] place = {loc.get('country')} / {loc.get('city')}")
+PY
+
+CITY="$("$VENV_PYTHON" -c 'import json,sys;print((json.load(open(sys.argv[1])).get("location") or {}).get("city",""))' "$PHOTO_PATH")"
+CITY_SQL="${CITY//\'/\'\'}"  # double single-quotes for the SQL literal (e.g. N'Djamena)
+DC="docker compose -f infra/docker/docker-compose.yml --env-file .env"
+loc_count() { $DC exec -T postgres psql "$PHOTO_DATABASE_URL" -tAc "SELECT count(*) FROM locations WHERE city = '$1'" | tr -d '[:space:]'; }
+BEFORE="$(loc_count "$CITY_SQL")"
+[ "${BEFORE:-0}" -ge 1 ] || { echo "ASSERTION FAILED: no locations row for '$CITY' after first photo (got '$BEFORE')" >&2; exit 1; }
+
+# The Location carries a representative point (lat/lon parsed from the geocoder's
+# raw record) — assert it's populated, so a raw_provider_data shape drift can't
+# silently leave the 023 cluster map with an unplaceable point (photo_ops-<geo>).
+LATLON="$($DC exec -T postgres psql "$PHOTO_DATABASE_URL" -tAc "SELECT lat IS NOT NULL AND lon IS NOT NULL FROM locations WHERE city = '$CITY_SQL' LIMIT 1" | tr -d '[:space:]')"
+[ "$LATLON" = "t" ] || { echo "ASSERTION FAILED: Location for '$CITY' has NULL lat/lon (representative point missing: '$LATLON')" >&2; exit 1; }
+
+# Upload a SECOND photo with the SAME Moscow fixture ($JPEG_PATH) → same city → must dedup.
+curl -fsS -b "$COOKIE_PATH" -H 'content-type: application/json' \
+  -d "{\"filename\":\"sample2.jpg\",\"contentType\":\"image/jpeg\",\"sizeBytes\":\"$SIZE_BYTES\"}" \
+  "$API_BASE_URL/photos/upload-intents" > "$INTENT_PATH"
+PID2="$(jq -r '.photoId' "$INTENT_PATH")"; UP2="$(jq -r '.uploadUrl' "$INTENT_PATH")"
+curl -fsS -X PUT -H 'content-type: image/jpeg' --data-binary "@$JPEG_PATH" "$UP2" >/dev/null
+curl -fsS -b "$COOKIE_PATH" -X POST "$API_BASE_URL/photos/$PID2/complete-upload" >/dev/null
+DEADLINE=$(( $(date +%s) + 60 ))
+while true; do
+  ST2="$(curl -fsS -b "$COOKIE_PATH" "$API_BASE_URL/photos/$PID2" | jq -r '.status')"
+  [ "$ST2" = "ready" ] && break
+  { [ "$ST2" = "failed" ] || [ "$(date +%s)" -ge "$DEADLINE" ]; } && { echo "ASSERTION FAILED: second photo status=$ST2" >&2; exit 1; }
+  sleep 2
+done
+
+AFTER="$(loc_count "$CITY_SQL")"
+[ "$AFTER" = "$BEFORE" ] \
+  || { echo "ASSERTION FAILED: dedup broken — a same-city second photo added a row ($BEFORE -> $AFTER)" >&2; exit 1; }
+echo "[smoke-media] OK — geo place present + dedup ('$CITY' rows unchanged: $BEFORE -> $AFTER)"
+
+# ---------------------------------------------------------------------------
 # 8. Permanent failure (photo_ops-0od): a corrupt (non-image) object is a genuinely
 #    permanent error — it must reach 'failed', NOT stay stuck in 'processing' and NOT
 #    falsely become 'ready'. (Transient storage hiccups are retried, not failed; that
