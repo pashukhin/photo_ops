@@ -53,6 +53,18 @@ describe('web API helper', () => {
     );
   });
 
+  it('deleteClusteringResult throws on a non-ok response', async () => {
+    // why: a failed delete surfaces an error, not a silent success
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('nope', { status: 500 }));
+    await expect(deleteClusteringResult('r1')).rejects.toThrow();
+  });
+
+  it('setPhotoLocation throws on a non-ok response', async () => {
+    // why: a failed set surfaces an error, not a silent success
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('nope', { status: 404 }));
+    await expect(setPhotoLocation('photo-1', { place: { city: 'Paris' } })).rejects.toThrow();
+  });
+
   it('listPhotos builds the query string from params and returns photos + totalCount (session 011)', async () => {
     // why: the gallery drives sort/filter/pagination server-side; each control
     // must reach the gateway as a query param, and the total is needed for "page

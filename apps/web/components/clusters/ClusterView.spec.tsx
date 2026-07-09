@@ -301,4 +301,14 @@ describe('ClusterView', () => {
     await waitFor(() => expect(api.deleteClusteringResult).toHaveBeenCalledWith('r1'));
     await waitFor(() => expect(screen.queryByTestId('result-row')).not.toBeInTheDocument());
   });
+
+  it('surfaces a delete failure in the error banner', async () => {
+    // why: a failed delete must not be lost — it shows in the shared error state
+    vi.mocked(api.deleteClusteringResult).mockRejectedValue(new Error('del boom'));
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<ClusterView />);
+    await screen.findByTestId('result-row');
+    fireEvent.click(screen.getByRole('button', { name: /delete/i }));
+    await screen.findByText(/del boom/);
+  });
 });

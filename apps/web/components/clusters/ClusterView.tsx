@@ -281,12 +281,10 @@ export function ClusterView() {
                 onCreatePost={(nodeId) => void createPostFromNode(nodeId)}
               />
             </ul>
-          ) : viewMode === 'map' ? (
-            // GREEN: swap for <PhotoMap points={mapPointsFor(collectResultPhotoIds(active.root), photosById)} mode="view" />
-            <p className="text-sm text-muted-foreground">Map view — coming soon.</p>
           ) : (
-            // GREEN: swap for <Histogram bins={binByTime(collectResultPhotoIds(active.root), photosById)} />
-            <p className="text-sm text-muted-foreground">Histogram — coming soon.</p>
+            // GREEN: 'map' -> <PhotoMap points={mapPointsFor(collectResultPhotoIds(active.root), photosById)} mode="view" />;
+            // 'histogram' -> <Histogram bins={binByTime(collectResultPhotoIds(active.root), photosById)} />
+            <p className="text-sm text-muted-foreground">{viewMode} view — coming soon.</p>
           )}
         </div>
       ) : null}
