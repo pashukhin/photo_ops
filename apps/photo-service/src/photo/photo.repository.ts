@@ -203,6 +203,22 @@ export class PhotoRepository implements PhotoRepositoryPort {
     }));
   }
 
+  async setLocationForUser(userId: string, photoId: string, patch: { locationId: string; lat: number | null; lon: number | null }): Promise<boolean> {
+    // A label-only save (no captured point → lat/lon null) links the place but MUST
+    // NOT clear a pre-existing EXIF/manual point — only write lat/lon when a point was
+    // actually captured (clearing a location is out of scope this session).
+    const set =
+      patch.lat != null && patch.lon != null
+        ? { locationId: patch.locationId, lat: patch.lat, lon: patch.lon, updatedAt: new Date() }
+        : { locationId: patch.locationId, updatedAt: new Date() };
+    const rows = await this.db
+      .update(photoAssets)
+      .set(set)
+      .where(and(eq(photoAssets.id, photoId), eq(photoAssets.userId, userId)))
+      .returning({ id: photoAssets.id });
+    return rows.length > 0;
+  }
+
   async setStatus(photoId: string, status: 'ready' | 'failed' | 'processing'): Promise<void> {
     await this.db
       .update(photoAssets)

@@ -102,6 +102,15 @@ class PostgresStore:  # pragma: no cover - live DB IO adapter (smoke-verified)
                 (error_message, result_id),
             )
 
+    def soft_delete(self, *, result_id: str, user_id: str) -> bool:  # pragma: no cover
+        with psycopg.connect(self._dsn) as conn:
+            row = conn.execute(
+                "UPDATE clustering_results SET deleted_at = now() "
+                "WHERE id = %s AND user_id = %s AND deleted_at IS NULL RETURNING id",
+                (result_id, user_id),
+            ).fetchone()
+            return row is not None
+
     def get(self, *, result_id: str, user_id: str) -> StoredResult | None:
         with psycopg.connect(self._dsn, row_factory=dict_row) as conn:
             r = conn.execute(

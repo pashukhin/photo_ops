@@ -9,7 +9,14 @@ vi.mock('../../lib/api', () => ({
   getClusteringResult: vi.fn(),
   generateClusters: vi.fn(),
   listPhotos: vi.fn(),
-  createPost: vi.fn()
+  createPost: vi.fn(),
+  deleteClusteringResult: vi.fn()
+}));
+
+// PhotoMap is Leaflet glue (no layout in jsdom) — stub it to a marker div so the
+// map switcher is assertable in units; the real render is smoke-verified.
+vi.mock('../map/PhotoMap', () => ({
+  default: ({ points }: { points: unknown[] }) => <div data-testid="photo-map">{points.length}</div>
 }));
 
 // Router push for the create-post affordance (session 018). Referenced lazily
@@ -270,5 +277,59 @@ describe('ClusterView', () => {
       CLUSTER_POLL_MAX_ATTEMPTS + 2
     );
     vi.useRealTimers();
+  });
+
+  it('switches the active result between tree, map and histogram', async () => {
+    // why: the workspace is one result viewed three ways (switcher over the whole result)
+    // p1/p2 carry DISTINCT valid taken times so binByTime yields >=1 histogram bar at GREEN
+    // (a shared time or no time -> zero span -> []; the default photoAsset has neither).
+    vi.mocked(api.listPhotos).mockResolvedValue({
+      photos: [
+        { ...photoAsset('p1'), takenAtUtc: '2024-06-15T00:00:00Z' },
+        { ...photoAsset('p2'), takenAtUtc: '2024-06-17T00:00:00Z' }
+      ],
+      totalCount: 2
+    });
+    render(<ClusterView />);
+    fireEvent.click(await screen.findByTestId('result-row'));
+    await screen.findByText('Canon EOS R5'); // tree shows by default
+    fireEvent.click(screen.getByRole('button', { name: /^map$/i }));
+    expect(await screen.findByTestId('photo-map')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /histogram/i }));
+    expect(await screen.findAllByTestId('histogram-bar')).not.toHaveLength(0);
+  });
+
+  it('deletes a run after confirm and drops it from the list', async () => {
+    // why: delete is confirmed (no one-click loss) and the row disappears on success
+    vi.mocked(api.deleteClusteringResult).mockResolvedValue(undefined);
+    vi.mocked(api.listClusteringResults).mockResolvedValueOnce(RESULTS).mockResolvedValue({ results: [] });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<ClusterView />);
+    await screen.findByTestId('result-row');
+    fireEvent.click(screen.getByRole('button', { name: /delete/i }));
+    await waitFor(() => expect(api.deleteClusteringResult).toHaveBeenCalledWith('r1'));
+    await waitFor(() => expect(screen.queryByTestId('result-row')).not.toBeInTheDocument());
+  });
+
+  it('surfaces a delete failure in the error banner', async () => {
+    // why: a failed delete must not be lost — it shows in the shared error state
+    vi.mocked(api.deleteClusteringResult).mockRejectedValue(new Error('del boom'));
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<ClusterView />);
+    await screen.findByTestId('result-row');
+    fireEvent.click(screen.getByRole('button', { name: /delete/i }));
+    await screen.findByText(/del boom/);
+  });
+
+  it('clears the open result when its run is deleted', async () => {
+    // why: deleting the run currently viewed must close its body (not leave a stale tree)
+    vi.mocked(api.deleteClusteringResult).mockResolvedValue(undefined);
+    vi.mocked(api.listClusteringResults).mockResolvedValueOnce(RESULTS).mockResolvedValue({ results: [] });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<ClusterView />);
+    fireEvent.click(await screen.findByTestId('result-row')); // open r1
+    await screen.findByText('Canon EOS R5'); // its tree/switcher body shows
+    fireEvent.click(screen.getByRole('button', { name: /delete/i }));
+    await waitFor(() => expect(screen.queryByText('Canon EOS R5')).not.toBeInTheDocument());
   });
 });

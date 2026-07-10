@@ -8,7 +8,8 @@ function createController() {
     generateClusters: vi.fn(),
     getClusteringResult: vi.fn(),
     listClusteringResults: vi.fn(),
-    listClusteringMethods: vi.fn()
+    listClusteringMethods: vi.fn(),
+    deleteClusteringResult: vi.fn()
   } as unknown as ClusterClient;
   const authService = { requireSession: vi.fn().mockResolvedValue({ userId: 'user-1' }) };
   return {
@@ -49,6 +50,14 @@ describe('ClusterController', () => {
       method: 'time_only',
       paramsJson: ''
     });
+  });
+
+  it('delete: soft-deletes the run scoped to the session user', async () => {
+    // why: delete is owner-scoped via the validated session, not the path alone
+    const { controller, clusterClient } = createController();
+    vi.mocked(clusterClient.deleteClusteringResult).mockResolvedValue({});
+    await controller.deleteResult('photoops_session=s', 'r1');
+    expect(clusterClient.deleteClusteringResult).toHaveBeenCalledWith({ resultId: 'r1', userId: 'user-1' });
   });
 
   it('generate: rejects unauthenticated requests with 401', async () => {

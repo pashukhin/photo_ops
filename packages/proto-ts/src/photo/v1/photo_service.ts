@@ -129,6 +129,24 @@ export interface GetPhotoRequest {
 }
 
 /**
+ * Manual location set/override (9q4.3). Reuses GeoPlace (022) for the place labels;
+ * the point rides as optional request fields (GeoPlace carries no lat/lon — irf
+ * dropped). Absent lat/lon = label-only (photo stays off the map).
+ */
+export interface SetPhotoLocationRequest {
+  photoId: string;
+  /** owner scope */
+  userId: string;
+  /** place labels (022 message, reused) */
+  place:
+    | GeoPlace
+    | undefined;
+  /** captured point (map-click) */
+  lat?: number | undefined;
+  lon?: number | undefined;
+}
+
+/**
  * A generated variant rendition surfaced to the UI, with a short-lived,
  * owner-scoped presigned GET url.
  */
@@ -881,6 +899,87 @@ export const GetPhotoRequest: MessageFns<GetPhotoRequest> = {
   },
 };
 
+function createBaseSetPhotoLocationRequest(): SetPhotoLocationRequest {
+  return { photoId: "", userId: "", place: undefined };
+}
+
+export const SetPhotoLocationRequest: MessageFns<SetPhotoLocationRequest> = {
+  encode(message: SetPhotoLocationRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.photoId !== "") {
+      writer.uint32(10).string(message.photoId);
+    }
+    if (message.userId !== "") {
+      writer.uint32(18).string(message.userId);
+    }
+    if (message.place !== undefined) {
+      GeoPlace.encode(message.place, writer.uint32(26).fork()).join();
+    }
+    if (message.lat !== undefined) {
+      writer.uint32(33).double(message.lat);
+    }
+    if (message.lon !== undefined) {
+      writer.uint32(41).double(message.lon);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): SetPhotoLocationRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSetPhotoLocationRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.photoId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.userId = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.place = GeoPlace.decode(reader, reader.uint32());
+          continue;
+        }
+        case 4: {
+          if (tag !== 33) {
+            break;
+          }
+
+          message.lat = reader.double();
+          continue;
+        }
+        case 5: {
+          if (tag !== 41) {
+            break;
+          }
+
+          message.lon = reader.double();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
 function createBasePhotoVariantView(): PhotoVariantView {
   return { variantType: "", url: "", width: 0, height: 0 };
 }
@@ -1240,6 +1339,15 @@ export interface PhotoServiceClient {
   getPhoto(request: GetPhotoRequest): Observable<PhotoAsset>;
 
   /**
+   * Manually set/override a photo's location: a place label (deduped via the 022
+   * Location table) + an OPTIONAL exact point (map-clicked). Owner-scoped; returns
+   * the updated asset. (Annotation decorative — the hand-written gateway route is
+   * POST /photos/{photo_id}/location.)
+   */
+
+  setPhotoLocation(request: SetPhotoLocationRequest): Observable<PhotoAsset>;
+
+  /**
    * Internal service-to-service read-RPC: the space-time + device attributes of
    * the caller's `ready` photos, for clustering. Deliberately NOT gateway-exposed
    * (no http annotation) and lean — it must not carry the gallery ListPhotos
@@ -1277,6 +1385,15 @@ export interface PhotoServiceController {
   getPhoto(request: GetPhotoRequest): Promise<PhotoAsset> | Observable<PhotoAsset> | PhotoAsset;
 
   /**
+   * Manually set/override a photo's location: a place label (deduped via the 022
+   * Location table) + an OPTIONAL exact point (map-clicked). Owner-scoped; returns
+   * the updated asset. (Annotation decorative — the hand-written gateway route is
+   * POST /photos/{photo_id}/location.)
+   */
+
+  setPhotoLocation(request: SetPhotoLocationRequest): Promise<PhotoAsset> | Observable<PhotoAsset> | PhotoAsset;
+
+  /**
    * Internal service-to-service read-RPC: the space-time + device attributes of
    * the caller's `ready` photos, for clustering. Deliberately NOT gateway-exposed
    * (no http annotation) and lean — it must not carry the gallery ListPhotos
@@ -1308,6 +1425,7 @@ export function PhotoServiceControllerMethods() {
       "completeUpload",
       "listPhotos",
       "getPhoto",
+      "setPhotoLocation",
       "listPhotoSpacetime",
       "getVariantsByIds",
     ];
@@ -1376,6 +1494,22 @@ export const PhotoServiceService = {
     responseDeserialize: (value: Buffer): PhotoAsset => PhotoAsset.decode(value),
   },
   /**
+   * Manually set/override a photo's location: a place label (deduped via the 022
+   * Location table) + an OPTIONAL exact point (map-clicked). Owner-scoped; returns
+   * the updated asset. (Annotation decorative — the hand-written gateway route is
+   * POST /photos/{photo_id}/location.)
+   */
+  setPhotoLocation: {
+    path: "/photoops.photo.v1.PhotoService/SetPhotoLocation" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: SetPhotoLocationRequest): Buffer =>
+      Buffer.from(SetPhotoLocationRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): SetPhotoLocationRequest => SetPhotoLocationRequest.decode(value),
+    responseSerialize: (value: PhotoAsset): Buffer => Buffer.from(PhotoAsset.encode(value).finish()),
+    responseDeserialize: (value: Buffer): PhotoAsset => PhotoAsset.decode(value),
+  },
+  /**
    * Internal service-to-service read-RPC: the space-time + device attributes of
    * the caller's `ready` photos, for clustering. Deliberately NOT gateway-exposed
    * (no http annotation) and lean — it must not carry the gallery ListPhotos
@@ -1418,6 +1552,13 @@ export interface PhotoServiceServer extends UntypedServiceImplementation {
   completeUpload: handleUnaryCall<CompleteUploadRequest, PhotoAsset>;
   listPhotos: handleUnaryCall<ListPhotosRequest, ListPhotosResponse>;
   getPhoto: handleUnaryCall<GetPhotoRequest, PhotoAsset>;
+  /**
+   * Manually set/override a photo's location: a place label (deduped via the 022
+   * Location table) + an OPTIONAL exact point (map-clicked). Owner-scoped; returns
+   * the updated asset. (Annotation decorative — the hand-written gateway route is
+   * POST /photos/{photo_id}/location.)
+   */
+  setPhotoLocation: handleUnaryCall<SetPhotoLocationRequest, PhotoAsset>;
   /**
    * Internal service-to-service read-RPC: the space-time + device attributes of
    * the caller's `ready` photos, for clustering. Deliberately NOT gateway-exposed

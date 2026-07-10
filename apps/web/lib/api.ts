@@ -7,6 +7,16 @@ export interface PhotoVariant {
   height: number;
 }
 
+// The reverse-geocoded / manually-set place labels (session 022/023). One shape,
+// reused by PhotoAsset.location and setPhotoLocation.
+export interface Place {
+  continent?: string;
+  country?: string;
+  region?: string;
+  city?: string;
+  district?: string;
+}
+
 export interface PhotoAsset {
   id: string;
   filename: string;
@@ -28,13 +38,7 @@ export interface PhotoAsset {
   lat?: number;
   lon?: number;
   // Reverse-geocoded place (session 022); absent when no GPS / unresolved.
-  location?: {
-    continent?: string;
-    country?: string;
-    region?: string;
-    city?: string;
-    district?: string;
-  };
+  location?: Place;
   variants?: PhotoVariant[];
 }
 
@@ -341,6 +345,36 @@ export async function generateClusters(input: {
     throw new Error(await readErrorMessage(response, `GenerateClusters failed: ${response.status}`));
   }
   return response.json() as Promise<{ resultId: string; status: string }>;
+}
+
+// Soft-delete a clustering run (023). First DELETE in this client.
+export async function deleteClusteringResult(resultId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/v1/clustering-results/${resultId}`, {
+    method: 'DELETE',
+    credentials: 'include'
+  });
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, `DeleteClusteringResult failed: ${response.status}`));
+  }
+}
+
+// Manually set/override a photo's location (023): place labels + an optional
+// map-clicked point. Route is /photos/:id/location (no v1 — the hand-written
+// gateway convention). Returns the updated asset.
+export async function setPhotoLocation(
+  photoId: string,
+  input: { place: Place; lat?: number; lon?: number }
+): Promise<PhotoAsset> {
+  const response = await fetch(`${API_BASE_URL}/photos/${photoId}/location`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(input)
+  });
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, `SetPhotoLocation failed: ${response.status}`));
+  }
+  return response.json() as Promise<PhotoAsset>;
 }
 
 // --- Publication (session 018) ----------------------------------------------

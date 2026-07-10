@@ -89,6 +89,15 @@ export interface ListClusteringResultsResponse {
   results: ClusteringResultSummary[];
 }
 
+export interface DeleteClusteringResultRequest {
+  resultId: string;
+  /** owner scope (gateway-validated session) */
+  userId: string;
+}
+
+export interface DeleteClusteringResultResponse {
+}
+
 export interface ClusteringResultSummary {
   id: string;
   method: string;
@@ -520,6 +529,80 @@ export const ListClusteringResultsResponse: MessageFns<ListClusteringResultsResp
           message.results.push(ClusteringResultSummary.decode(reader, reader.uint32()));
           continue;
         }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBaseDeleteClusteringResultRequest(): DeleteClusteringResultRequest {
+  return { resultId: "", userId: "" };
+}
+
+export const DeleteClusteringResultRequest: MessageFns<DeleteClusteringResultRequest> = {
+  encode(message: DeleteClusteringResultRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.resultId !== "") {
+      writer.uint32(10).string(message.resultId);
+    }
+    if (message.userId !== "") {
+      writer.uint32(18).string(message.userId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DeleteClusteringResultRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDeleteClusteringResultRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.resultId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.userId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
+function createBaseDeleteClusteringResultResponse(): DeleteClusteringResultResponse {
+  return {};
+}
+
+export const DeleteClusteringResultResponse: MessageFns<DeleteClusteringResultResponse> = {
+  encode(_: DeleteClusteringResultResponse, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): DeleteClusteringResultResponse {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDeleteClusteringResultResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -980,6 +1063,14 @@ export interface ClusterServiceClient {
   /** The caller's clustering results (metadata only, no tree). */
 
   listClusteringResults(request: ListClusteringResultsRequest): Observable<ListClusteringResultsResponse>;
+
+  /**
+   * Soft-delete one of the caller's clustering runs. Non-owned / already-deleted /
+   * unknown id -> NOT_FOUND. The immutable tree is untouched — only deleted_at is
+   * set (ADR-0005 seam); restore is deferred.
+   */
+
+  deleteClusteringResult(request: DeleteClusteringResultRequest): Observable<DeleteClusteringResultResponse>;
 }
 
 /**
@@ -1020,6 +1111,19 @@ export interface ClusterServiceController {
   listClusteringResults(
     request: ListClusteringResultsRequest,
   ): Promise<ListClusteringResultsResponse> | Observable<ListClusteringResultsResponse> | ListClusteringResultsResponse;
+
+  /**
+   * Soft-delete one of the caller's clustering runs. Non-owned / already-deleted /
+   * unknown id -> NOT_FOUND. The immutable tree is untouched — only deleted_at is
+   * set (ADR-0005 seam); restore is deferred.
+   */
+
+  deleteClusteringResult(
+    request: DeleteClusteringResultRequest,
+  ):
+    | Promise<DeleteClusteringResultResponse>
+    | Observable<DeleteClusteringResultResponse>
+    | DeleteClusteringResultResponse;
 }
 
 export function ClusterServiceControllerMethods() {
@@ -1030,6 +1134,7 @@ export function ClusterServiceControllerMethods() {
       "generateClusters",
       "getClusteringResult",
       "listClusteringResults",
+      "deleteClusteringResult",
     ];
     for (const method of grpcMethods) {
       const descriptor: any = Reflect.getOwnPropertyDescriptor(constructor.prototype, method);
@@ -1112,6 +1217,23 @@ export const ClusterServiceService = {
       Buffer.from(ListClusteringResultsResponse.encode(value).finish()),
     responseDeserialize: (value: Buffer): ListClusteringResultsResponse => ListClusteringResultsResponse.decode(value),
   },
+  /**
+   * Soft-delete one of the caller's clustering runs. Non-owned / already-deleted /
+   * unknown id -> NOT_FOUND. The immutable tree is untouched — only deleted_at is
+   * set (ADR-0005 seam); restore is deferred.
+   */
+  deleteClusteringResult: {
+    path: "/photoops.cluster.v1.ClusterService/DeleteClusteringResult" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: DeleteClusteringResultRequest): Buffer =>
+      Buffer.from(DeleteClusteringResultRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): DeleteClusteringResultRequest => DeleteClusteringResultRequest.decode(value),
+    responseSerialize: (value: DeleteClusteringResultResponse): Buffer =>
+      Buffer.from(DeleteClusteringResultResponse.encode(value).finish()),
+    responseDeserialize: (value: Buffer): DeleteClusteringResultResponse =>
+      DeleteClusteringResultResponse.decode(value),
+  },
 } as const;
 
 export interface ClusterServiceServer extends UntypedServiceImplementation {
@@ -1127,6 +1249,12 @@ export interface ClusterServiceServer extends UntypedServiceImplementation {
   getClusteringResult: handleUnaryCall<GetClusteringResultRequest, ClusteringResult>;
   /** The caller's clustering results (metadata only, no tree). */
   listClusteringResults: handleUnaryCall<ListClusteringResultsRequest, ListClusteringResultsResponse>;
+  /**
+   * Soft-delete one of the caller's clustering runs. Non-owned / already-deleted /
+   * unknown id -> NOT_FOUND. The immutable tree is untouched — only deleted_at is
+   * set (ADR-0005 seam); restore is deferred.
+   */
+  deleteClusteringResult: handleUnaryCall<DeleteClusteringResultRequest, DeleteClusteringResultResponse>;
 }
 
 export interface MessageFns<T> {

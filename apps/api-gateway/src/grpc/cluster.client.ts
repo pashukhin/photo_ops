@@ -69,11 +69,17 @@ export interface GetClusteringResultInput {
   userId: string;
 }
 
+export interface DeleteClusteringResultInput {
+  resultId: string;
+  userId: string;
+}
+
 export interface ClusterGatewayClient {
   generateClusters(input: GenerateClustersInput): Promise<GenerateClustersResult>;
   getClusteringResult(input: GetClusteringResultInput): Promise<ClusteringResultRaw>;
   listClusteringResults(userId: string): Promise<{ results: ClusteringResultSummaryRaw[] }>;
   listClusteringMethods(): Promise<{ methods: ClusteringMethodDescriptorRaw[] }>;
+  deleteClusteringResult(input: DeleteClusteringResultInput): Promise<Record<string, never>>;
 }
 
 type Callback<T> = (error: Error | null, value: T) => void;
@@ -88,6 +94,10 @@ interface GrpcClusterServiceClient {
   ListClusteringMethods(
     input: Record<string, never>,
     callback: Callback<{ methods: ClusteringMethodDescriptorRaw[] }>
+  ): void;
+  DeleteClusteringResult(
+    input: DeleteClusteringResultInput,
+    callback: Callback<Record<string, never>>
   ): void;
 }
 
@@ -136,6 +146,18 @@ export class ClusterClient implements ClusterGatewayClient {
   getClusteringResult(input: GetClusteringResultInput): Promise<ClusteringResultRaw> {
     return new Promise((resolve, reject) => {
       this.client.GetClusteringResult(input, (error, value) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve(value);
+      });
+    });
+  }
+
+  deleteClusteringResult(input: DeleteClusteringResultInput): Promise<Record<string, never>> {
+    return new Promise((resolve, reject) => {
+      this.client.DeleteClusteringResult(input, (error, value) => {
         if (error) {
           reject(error);
           return;
