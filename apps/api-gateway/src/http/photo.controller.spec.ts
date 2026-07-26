@@ -40,7 +40,8 @@ function createController() {
     createUploadIntent: vi.fn(),
     completeUpload: vi.fn(),
     listPhotos: vi.fn(),
-    getPhoto: vi.fn()
+    getPhoto: vi.fn(),
+    setPhotoLocation: vi.fn()
   } as unknown as PhotoClient;
   const authService = { requireSession: vi.fn().mockResolvedValue({ userId: 'user-1' }) };
   return { controller: new PhotoController(photoClient, authService as never), photoClient, authService };
@@ -61,6 +62,16 @@ describe('PhotoController', () => {
 
     await expect(controller.completeUpload('photoops_session=session-1', 'photo-1')).resolves.toMatchObject({ id: 'photo-1', status: 'uploaded' });
     expect(photoClient.completeUpload).toHaveBeenCalledWith({ userId: 'user-1', photoId: 'photo-1' });
+  });
+
+  it('setLocation: passes body place/point + session userId, maps the returned photo', async () => {
+    // why: set-location carries the picked point + session userId (owner scope), returns mapped photo
+    const { controller, photoClient } = createController();
+    vi.mocked(photoClient.setPhotoLocation).mockResolvedValue({ ...FULL_PHOTO });
+    const body = { place: { country: 'France', city: 'Paris' }, lat: 48.85, lon: 2.35 };
+    const out = await controller.setLocation('photoops_session=s', 'photo-1', body);
+    expect(photoClient.setPhotoLocation).toHaveBeenCalledWith({ photoId: 'photo-1', userId: 'user-1', place: body.place, lat: 48.85, lon: 2.35 });
+    expect(out).toMatchObject({ id: 'photo-1', status: 'ready' });
   });
 
   it('maps gallery query params onto the gRPC ListPhotos request (session 011)', async () => {

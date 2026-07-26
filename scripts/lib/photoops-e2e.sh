@@ -30,23 +30,33 @@ login() {
 
 # --- photo fixture + upload ---------------------------------------------------
 
-# gen_jpeg OUT DATETIME MAKE MODEL — write a 640x480 JPEG with EXIF to OUT.
-# Embeds a fixed Buenos Aires GPS point (session 022) so a fresh seed geocodes via
-# initial processing (no reprocess path exists). Shared by seed-demo.sh and
-# smoke-publication.sh — a constant point is benign for both.
+# gen_jpeg OUT DATETIME MAKE MODEL [LAT] [LON] — write a 640x480 JPEG with EXIF to OUT.
+# LAT/LON are decimal degrees; absent -> a fixed Buenos Aires point (session 022, so a
+# fresh seed geocodes via initial processing). Session 023 passes distinct points so the
+# cluster map spreads. Shared by seed-demo.sh / smoke-publication.sh (default is benign).
 gen_jpeg() {
-  "$VENV_PYTHON" - "$1" "$2" "$3" "$4" <<'PY'
+  "$VENV_PYTHON" - "$1" "$2" "$3" "$4" "${5:-}" "${6:-}" <<'PY'
 import io, sys
 from PIL import Image
 import piexif
 out, dt, make, model = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+lat = float(sys.argv[5]) if len(sys.argv) > 5 and sys.argv[5] else -34.60  # Buenos Aires
+lon = float(sys.argv[6]) if len(sys.argv) > 6 and sys.argv[6] else -58.38
+
+def dms(v):
+    v = abs(v)
+    d = int(v)
+    m = int((v - d) * 60)
+    s = round((v - d - m / 60) * 3600)
+    return ((d, 1), (m, 1), (s, 1))
+
 exif = {"0th": {piexif.ImageIFD.Make: make.encode(), piexif.ImageIFD.Model: model.encode()},
         "Exif": {},
         "GPS": {
-            piexif.GPSIFD.GPSLatitudeRef: b"S",
-            piexif.GPSIFD.GPSLatitude: ((34, 1), (36, 1), (0, 1)),
-            piexif.GPSIFD.GPSLongitudeRef: b"W",
-            piexif.GPSIFD.GPSLongitude: ((58, 1), (22, 1), (48, 1)),
+            piexif.GPSIFD.GPSLatitudeRef: (b"N" if lat >= 0 else b"S"),
+            piexif.GPSIFD.GPSLatitude: dms(lat),
+            piexif.GPSIFD.GPSLongitudeRef: (b"E" if lon >= 0 else b"W"),
+            piexif.GPSIFD.GPSLongitude: dms(lon),
         },
         "1st": {}, "thumbnail": None}
 if dt:
@@ -58,11 +68,11 @@ open(out, "wb").write(buf.getvalue())
 PY
 }
 
-# upload_photo DATETIME MAKE MODEL — gen a JPEG, run intent→PUT→complete; echo photo id.
+# upload_photo DATETIME MAKE MODEL [LAT] [LON] — gen a JPEG, run intent→PUT→complete; echo photo id.
 upload_photo() {
-  local dt="$1" make="$2" model="$3"
+  local dt="$1" make="$2" model="$3" lat="${4:-}" lon="${5:-}"
   local jpeg="$TMP/p.jpg" intent="$TMP/intent.json"
-  gen_jpeg "$jpeg" "$dt" "$make" "$model"
+  gen_jpeg "$jpeg" "$dt" "$make" "$model" "$lat" "$lon"
   local size; size="$(wc -c < "$jpeg" | tr -d ' ')"
   curl -fsS -b "$COOKIE_PATH" -H 'content-type: application/json' \
     -d "{\"filename\":\"p.jpg\",\"contentType\":\"image/jpeg\",\"sizeBytes\":\"$size\"}" \

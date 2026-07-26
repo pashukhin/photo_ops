@@ -99,6 +99,18 @@ class ListClusteringResultsResponse(_message.Message):
     results: _containers.RepeatedCompositeFieldContainer[ClusteringResultSummary]
     def __init__(self, results: _Optional[_Iterable[_Union[ClusteringResultSummary, _Mapping]]] = ...) -> None: ...
 
+class DeleteClusteringResultRequest(_message.Message):
+    __slots__ = ("result_id", "user_id")
+    RESULT_ID_FIELD_NUMBER: _ClassVar[int]
+    USER_ID_FIELD_NUMBER: _ClassVar[int]
+    result_id: str
+    user_id: str
+    def __init__(self, result_id: _Optional[str] = ..., user_id: _Optional[str] = ...) -> None: ...
+
+class DeleteClusteringResultResponse(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
 class ClusteringResultSummary(_message.Message):
     __slots__ = ("id", "method", "status", "photo_count", "date_from", "date_to", "created_at")
     ID_FIELD_NUMBER: _ClassVar[int]

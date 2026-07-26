@@ -32,12 +32,23 @@ export interface GetVariantsByIdsResult {
   results: PhotoVariantsForId[];
 }
 
+// Manual location set/override (9q4.3). `place` is the GeoPlace labels; lat/lon are
+// the optional captured point (absent = label-only).
+export interface SetPhotoLocationInput {
+  userId: string;
+  photoId: string;
+  place: { continent?: string; country?: string; region?: string; city?: string; district?: string };
+  lat?: number;
+  lon?: number;
+}
+
 export interface PhotoGatewayClient {
   createUploadIntent(input: { userId: string; filename: string; contentType: string; sizeBytes: string }): Promise<unknown>;
   completeUpload(input: { userId: string; photoId: string }): Promise<unknown>;
   listPhotos(input: ListPhotosInput): Promise<unknown>;
   getPhoto(input: { userId: string; photoId: string }): Promise<unknown>;
   getVariantsByIds(input: { userId: string; photoIds: string[] }): Promise<GetVariantsByIdsResult>;
+  setPhotoLocation(input: SetPhotoLocationInput): Promise<unknown>;
 }
 
 type Callback<T> = (error: Error | null, value: T) => void;
@@ -49,6 +60,7 @@ interface GrpcPhotoServiceClient {
   GetPhoto(input: { userId: string; photoId: string }, callback: Callback<unknown>): void;
   // Wire field is `photoId` (repeated), NOT `photoIds` — see getVariantsByIds.
   GetVariantsByIds(input: { userId: string; photoId: string[] }, callback: Callback<GetVariantsByIdsResult>): void;
+  SetPhotoLocation(input: SetPhotoLocationInput, callback: Callback<unknown>): void;
 }
 
 @Injectable()
@@ -86,6 +98,10 @@ export class PhotoClient implements PhotoGatewayClient {
 
   async getPhoto(input: { userId: string; photoId: string }) {
     return this.call((callback) => this.client.GetPhoto(input, callback));
+  }
+
+  async setPhotoLocation(input: SetPhotoLocationInput) {
+    return this.call((callback) => this.client.SetPhotoLocation(input, callback));
   }
 
   // Remap the plural `photoIds` to the proto wire field `photoId` (repeated) —

@@ -46,7 +46,7 @@ Sequencing settled 2026-07-07: **integrity → geo → cluster/location → feed
 | --- | --- | --- | --- |
 | 021 | 8 | Pipeline integrity hardening + demo seed script (from the 020 runbook) | `0od`,`opm`,`42b`,`1m8` |
 | **022** ✅ | 5/6 | Geo-normalization: `Location` + offline reverse-geocoding + gallery place-tag — **delivered** (ADR-0007); foundation for the cluster map + manual location | `3iy` |
-| 023 | 5 | User-friendly cluster workspace (create/delete/view: tree + **map** + time **histogram**) + manual **location** editing (cluster + photo, deduped) | `9q4.2`,`9q4.3` |
+| **023** ✅ | 5 | User-friendly cluster workspace (delete + view: tree + **map** [Leaflet, vendored offline basemap, ADR-0008] + time **histogram**) + manual **photo** location (owner-scoped `SetPhotoLocation`, map-clicked point) — **delivered**; cluster-level location deferred | `9q4.2`,`9q4.3` |
 | 024 | 8 | Public user posts **feed** (pagination + calendar) + consistent **filter/sort/pagination** everywhere | `9q4.1`,`9q4.4` (absorbs `nst`,`jfv`) |
 | **DEMO** ⭐ | — | **Release-quality demo recording** — all P1 (`9q4.1`–`9q4.4`) landed | — |
 | 025 | 7 | Telegram-channel **publisher** (connector) + per-user settings | `9q4.5` |

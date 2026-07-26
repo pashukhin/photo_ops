@@ -186,6 +186,11 @@ smoke-usage:
 smoke-cluster:
 	scripts/smoke-cluster.sh
 
+# Local-only (session 023): cluster workspace + manual location, incl. the Playwright
+# UI render. Requires `make dev` + `make migrate` on the session-023 images.
+smoke-clusters:
+	scripts/smoke-clusters.sh
+
 # Local-only — requires `make dev` + `make migrate` to be running.
 # Do NOT add to `gate` or CI targets.
 smoke-publication:

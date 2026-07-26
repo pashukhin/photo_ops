@@ -1,8 +1,9 @@
 version: v2
 managed:
   enabled: true
+# Plugins PINNED (photo_ops-643) — see buf.gen.cluster-python.yaml for the why.
 plugins:
-  - remote: buf.build/protocolbuffers/python
+  - remote: buf.build/protocolbuffers/python:v35.1
     out: ../apps/media-worker/src/photoops_proto
-  - remote: buf.build/protocolbuffers/pyi
+  - remote: buf.build/protocolbuffers/pyi:v35.1
     out: ../apps/media-worker/src/photoops_proto

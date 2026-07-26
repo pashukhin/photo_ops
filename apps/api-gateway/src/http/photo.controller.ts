@@ -59,6 +59,20 @@ export class PhotoController {
     return this.mapPhoto(await this.photoClient.getPhoto({ userId: auth.userId, photoId }));
   }
 
+  // Manual location set/override (9q4.3): POST /photos/:id/location. Owner-scoped
+  // (session userId, never the body). Body: { place, lat?, lon? }.
+  @Post(':photoId/location')
+  async setLocation(
+    @Headers('cookie') cookieHeader: string | undefined,
+    @Param('photoId') photoId: string,
+    @Body() body: { place: { continent?: string; country?: string; region?: string; city?: string; district?: string }; lat?: number; lon?: number }
+  ) {
+    const auth = await this.authService.requireSession(cookieHeader);
+    return this.mapPhoto(
+      await this.photoClient.setPhotoLocation({ photoId, userId: auth.userId, place: body.place, lat: body.lat, lon: body.lon })
+    );
+  }
+
   private mapPhoto(photo: unknown) {
     if (!photo || typeof photo !== 'object') {
       return photo;

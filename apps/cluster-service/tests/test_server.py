@@ -66,6 +66,29 @@ def test_generate_invalid_params_json_aborts() -> None:
     assert ctx.code == grpc.StatusCode.INVALID_ARGUMENT
 
 
+def test_delete_clustering_result_not_found_aborts() -> None:
+    # why: parity with GetClusteringResult — a 0-row delete is NOT_FOUND, never a blanket OK
+    svc, _, _ = _servicer()
+    ctx = FakeContext()
+    with pytest.raises(_Abort):
+        svc.DeleteClusteringResult(
+            pb.DeleteClusteringResultRequest(result_id="missing", user_id="u1"), ctx
+        )
+    assert ctx.code == grpc.StatusCode.NOT_FOUND
+
+
+def test_delete_clustering_result_soft_deletes_owned_run() -> None:
+    # why: an owned run is removed from the caller's list after delete
+    svc, store, _ = _servicer()
+    store.create_pending(
+        result_id="r1", user_id="u1", method="time_only", params_json="{}", scope="all"
+    )
+    svc.DeleteClusteringResult(
+        pb.DeleteClusteringResultRequest(result_id="r1", user_id="u1"), FakeContext()
+    )
+    assert store.list_for_user(user_id="u1") == []
+
+
 def test_get_result_is_owner_scoped() -> None:
     svc, _, _ = _servicer()
     req = pb.GenerateClustersRequest(user_id="u1", method="time_only")

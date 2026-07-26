@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Param, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, Param, Post } from '@nestjs/common';
 import { AuthService } from '../auth/auth.service';
 import {
   ClusterClient,
@@ -120,5 +120,17 @@ export class ClusterController {
     const auth = await this.authService.requireSession(cookieHeader);
     const raw = await this.clusterClient.getClusteringResult({ resultId, userId: auth.userId });
     return mapResult(raw);
+  }
+
+  // Soft-delete a run. Owner-scoped: a foreign / already-deleted id surfaces the
+  // gRPC NOT_FOUND -> HTTP 404 via HttpErrorFilter (no IDOR).
+  @Delete('clustering-results/:resultId')
+  async deleteResult(
+    @Headers('cookie') cookieHeader: string | undefined,
+    @Param('resultId') resultId: string
+  ) {
+    const auth = await this.authService.requireSession(cookieHeader);
+    await this.clusterClient.deleteClusteringResult({ resultId, userId: auth.userId });
+    return { ok: true };
   }
 }

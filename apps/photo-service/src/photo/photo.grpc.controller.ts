@@ -2,7 +2,7 @@ import { Controller } from '@nestjs/common';
 import { status } from '@grpc/grpc-js';
 import { GrpcMethod, RpcException } from '@nestjs/microservices';
 import { PhotoDomainService } from './photo.service';
-import { PhotoWithVariants } from './photo.types';
+import { GeoPlaceInput, PhotoWithVariants } from './photo.types';
 
 @Controller()
 export class PhotoGrpcController {
@@ -102,6 +102,22 @@ export class PhotoGrpcController {
       if (!pwv) {
         throw new Error('photo not found');
       }
+      return this.toProtoPhoto(pwv);
+    } catch (error) {
+      throw this.mapDomainError(error);
+    }
+  }
+
+  @GrpcMethod('PhotoService', 'SetPhotoLocation')
+  async setPhotoLocation(request: { photoId: string; userId: string; place: GeoPlaceInput; lat?: number; lon?: number }) {
+    try {
+      const pwv = await this.photoService.setPhotoLocation(
+        request.userId,
+        request.photoId,
+        request.place ?? {},
+        request.lat ?? null,
+        request.lon ?? null
+      );
       return this.toProtoPhoto(pwv);
     } catch (error) {
       throw this.mapDomainError(error);

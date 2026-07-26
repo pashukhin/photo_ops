@@ -44,6 +44,11 @@ class ClusterServiceStub:
                 request_serializer=cluster_dot_v1_dot_cluster__service__pb2.ListClusteringResultsRequest.SerializeToString,
                 response_deserializer=cluster_dot_v1_dot_cluster__service__pb2.ListClusteringResultsResponse.FromString,
                 _registered_method=True)
+        self.DeleteClusteringResult = channel.unary_unary(
+                '/photoops.cluster.v1.ClusterService/DeleteClusteringResult',
+                request_serializer=cluster_dot_v1_dot_cluster__service__pb2.DeleteClusteringResultRequest.SerializeToString,
+                response_deserializer=cluster_dot_v1_dot_cluster__service__pb2.DeleteClusteringResultResponse.FromString,
+                _registered_method=True)
 
 
 class ClusterServiceServicer:
@@ -88,6 +93,15 @@ class ClusterServiceServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def DeleteClusteringResult(self, request, context):
+        """Soft-delete one of the caller's clustering runs. Non-owned / already-deleted /
+        unknown id -> NOT_FOUND. The immutable tree is untouched — only deleted_at is
+        set (ADR-0005 seam); restore is deferred.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_ClusterServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -115,6 +129,11 @@ def add_ClusterServiceServicer_to_server(servicer, server):
                     servicer.ListClusteringResults,
                     request_deserializer=cluster_dot_v1_dot_cluster__service__pb2.ListClusteringResultsRequest.FromString,
                     response_serializer=cluster_dot_v1_dot_cluster__service__pb2.ListClusteringResultsResponse.SerializeToString,
+            ),
+            'DeleteClusteringResult': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteClusteringResult,
+                    request_deserializer=cluster_dot_v1_dot_cluster__service__pb2.DeleteClusteringResultRequest.FromString,
+                    response_serializer=cluster_dot_v1_dot_cluster__service__pb2.DeleteClusteringResultResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -256,6 +275,33 @@ class ClusterService:
             '/photoops.cluster.v1.ClusterService/ListClusteringResults',
             cluster_dot_v1_dot_cluster__service__pb2.ListClusteringResultsRequest.SerializeToString,
             cluster_dot_v1_dot_cluster__service__pb2.ListClusteringResultsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteClusteringResult(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/photoops.cluster.v1.ClusterService/DeleteClusteringResult',
+            cluster_dot_v1_dot_cluster__service__pb2.DeleteClusteringResultRequest.SerializeToString,
+            cluster_dot_v1_dot_cluster__service__pb2.DeleteClusteringResultResponse.FromString,
             options,
             channel_credentials,
             insecure,

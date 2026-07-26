@@ -5,10 +5,14 @@ managed:
 # CLIENT of photo/v1 (ListPhotoSpacetime), so it needs both message stubs and the
 # grpc servicer/stub. Separate template from buf.gen.python.yaml (media-worker
 # needs message stubs only, and a different output dir).
+# Plugins are PINNED (photo_ops-643): an unpinned remote floats to latest, so an
+# upstream release rewrites the version-comment header and the CI proto-drift check
+# reddens on unrelated PRs. Pinned to the versions the committed photoops_proto
+# artifacts were generated with (mirrors how buf.gen.yaml pins ts-proto).
 plugins:
-  - remote: buf.build/protocolbuffers/python
+  - remote: buf.build/protocolbuffers/python:v35.1
     out: ../apps/cluster-service/src/photoops_proto
-  - remote: buf.build/protocolbuffers/pyi
+  - remote: buf.build/protocolbuffers/pyi:v35.1
     out: ../apps/cluster-service/src/photoops_proto
-  - remote: buf.build/grpc/python
+  - remote: buf.build/grpc/python:v1.82.1
     out: ../apps/cluster-service/src/photoops_proto

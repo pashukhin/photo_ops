@@ -1,15 +1,20 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   createPost,
+  deleteClusteringResult,
   generateClusters,
   getClusteringResult,
   listClusteringMethods,
   listClusteringResults,
   listPhotos
 } from '../../lib/api';
+import PhotoMap from '../map/PhotoMap';
+import Histogram from './Histogram';
+import { collectResultPhotoIds, mapPointsFor } from '../map/points';
+import { binByTime } from './histogram';
 import type {
   ClusterNode,
   ClusteringMethod,
@@ -108,6 +113,7 @@ export function ClusterView() {
   const [error, setError] = useState<string | null>(null);
   // Resolves cluster item ids → photos so the tree can render thumbnails.
   const [photosById, setPhotosById] = useState<Map<string, PhotoAsset>>(new Map());
+  const [viewMode, setViewMode] = useState<'tree' | 'map' | 'histogram'>('tree');
   const router = useRouter();
 
   // Draft a post from a cluster node (session 018) and jump to its editor. A
@@ -150,6 +156,21 @@ export function ClusterView() {
     setActive(await getClusteringResult(resultId));
   }, []);
 
+  // Soft-delete a run (confirmed), then refresh the list and clear it if active.
+  const handleDelete = useCallback(
+    async (resultId: string) => {
+      if (!window.confirm('Delete this clustering run? This cannot be undone.')) return;
+      try {
+        await deleteClusteringResult(resultId);
+        setActive((cur) => (cur?.id === resultId ? null : cur));
+        await refreshResults();
+      } catch (e: unknown) {
+        setError(String(e));
+      }
+    },
+    [refreshResults]
+  );
+
   const generate = useCallback(async () => {
     if (!selectedMethod) return;
     setGenerating(true);
@@ -177,6 +198,13 @@ export function ClusterView() {
       setGenerating(false);
     }
   }, [selectedMethod, refreshResults]);
+
+  // Whole-result photo set for the map + histogram views — pure joins over the
+  // already-loaded photosById, memoized so they don't recompute on unrelated renders
+  // (poll ticks, field edits) or hand PhotoMap a fresh array each render.
+  const activePhotoIds = useMemo(() => (active?.root ? collectResultPhotoIds(active.root) : []), [active]);
+  const mapPoints = useMemo(() => mapPointsFor(activePhotoIds, photosById), [activePhotoIds, photosById]);
+  const timeBins = useMemo(() => binByTime(activePhotoIds, photosById), [activePhotoIds, photosById]);
 
   return (
     <div className="space-y-4">
@@ -212,7 +240,7 @@ export function ClusterView() {
         ) : (
           <ul className="space-y-1">
             {results.map((r) => (
-              <li key={r.id}>
+              <li key={r.id} className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => void view(r.id)}
@@ -222,6 +250,14 @@ export function ClusterView() {
                   {r.method} · {r.status} · {r.photoCount} photos
                   {r.dateFrom ? ` · ${r.dateFrom} – ${r.dateTo}` : ''}
                 </button>
+                <button
+                  type="button"
+                  onClick={() => void handleDelete(r.id)}
+                  className="border rounded-md px-2 py-0.5 text-xs text-destructive"
+                  aria-label={`Delete result ${r.id}`}
+                >
+                  Delete
+                </button>
               </li>
             ))}
           </ul>
@@ -229,21 +265,52 @@ export function ClusterView() {
       </div>
 
       {active ? (
-        <div>
-          <h2 className="text-lg font-semibold">Tree · {active.status}</h2>
+        <div className="space-y-2">
+          <h2 className="text-lg font-semibold">Result · {active.status}</h2>
           {active.status === 'failed' ? (
             <p className="text-sm text-destructive">{active.errorMessage}</p>
-          ) : active.root ? (
-            <ul>
-              <TreeNodeView
-                node={active.root}
-                depth={0}
-                photosById={photosById}
-                onCreatePost={(nodeId) => void createPostFromNode(nodeId)}
-              />
-            </ul>
-          ) : (
+          ) : !active.root ? (
             <p className="text-sm text-muted-foreground">Not ready.</p>
+          ) : (
+            <>
+              <div className="flex items-center gap-2" role="group" aria-label="View">
+                {(['tree', 'map', 'histogram'] as const).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setViewMode(v)}
+                    aria-pressed={viewMode === v}
+                    className="border rounded-md px-2 py-1 text-sm capitalize"
+                  >
+                    {v}
+                  </button>
+                ))}
+              </div>
+              {viewMode === 'tree' ? (
+                <ul>
+                  <TreeNodeView
+                    node={active.root}
+                    depth={0}
+                    photosById={photosById}
+                    onCreatePost={(nodeId) => void createPostFromNode(nodeId)}
+                  />
+                </ul>
+              ) : viewMode === 'map' ? (
+                <div className="space-y-1">
+                  <PhotoMap points={mapPoints} mode="view" />
+                  <p className="text-xs text-muted-foreground">
+                    {mapPoints.length} of {activePhotoIds.length} photos placed
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <Histogram bins={timeBins} />
+                  <p className="text-xs text-muted-foreground">
+                    {timeBins.reduce((n, b) => n + b.count, 0)} of {activePhotoIds.length} photos dated
+                  </p>
+                </div>
+              )}
+            </>
           )}
         </div>
       ) : null}

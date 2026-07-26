@@ -33,6 +33,17 @@ service PhotoService {
     option (google.api.http) = {get: "/v1/photos/{photo_id}"};
   }
 
+  // Manually set/override a photo's location: a place label (deduped via the 022
+  // Location table) + an OPTIONAL exact point (map-clicked). Owner-scoped; returns
+  // the updated asset. (Annotation decorative — the hand-written gateway route is
+  // POST /photos/{photo_id}/location.)
+  rpc SetPhotoLocation(SetPhotoLocationRequest) returns (PhotoAsset) {
+    option (google.api.http) = {
+      post: "/v1/photos/{photo_id}/location"
+      body: "*"
+    };
+  }
+
   // Internal service-to-service read-RPC: the space-time + device attributes of
   // the caller's `ready` photos, for clustering. Deliberately NOT gateway-exposed
   // (no http annotation) and lean — it must not carry the gallery ListPhotos
@@ -122,6 +133,17 @@ message ListPhotosResponse {
 message GetPhotoRequest {
   string photo_id = 1;
   string user_id = 2;
+}
+
+// Manual location set/override (9q4.3). Reuses GeoPlace (022) for the place labels;
+// the point rides as optional request fields (GeoPlace carries no lat/lon — irf
+// dropped). Absent lat/lon = label-only (photo stays off the map).
+message SetPhotoLocationRequest {
+  string photo_id = 1;
+  string user_id = 2;      // owner scope
+  GeoPlace place = 3;      // place labels (022 message, reused)
+  optional double lat = 4; // captured point (map-click)
+  optional double lon = 5;
 }
 
 // A generated variant rendition surfaced to the UI, with a short-lived,

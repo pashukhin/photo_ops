@@ -54,6 +54,9 @@ export interface PhotoRepositoryPort {
   upsertVariant(v: { photoId: string; variantType: 'thumbnail' | 'preview'; objectKey: string; width: number; height: number; sizeBytes: bigint; contentType: string }): Promise<void>;
   applyAttributes(photoId: string, attrs: { width: number | null; height: number | null; takenAtLocal: string | null; takenAtUtc: Date | null; takenAtTzSource: string | null; cameraMake: string | null; cameraModel: string | null; orientation: number | null; lat: number | null; lon: number | null; metadataJson: unknown; locationId?: string | null }): Promise<void>;
   setStatus(photoId: string, status: 'ready' | 'failed' | 'processing'): Promise<void>;
+  // Owner-scoped manual location set/override (9q4.3): links location_id + writes the
+  // captured point; returns whether a row matched (id AND user_id).
+  setLocationForUser(userId: string, photoId: string, patch: { locationId: string; lat: number | null; lon: number | null }): Promise<boolean>;
   // Idempotent upsert of a deduped Location by the normalized place tuple; returns its id.
   upsertLocation(input: NormalizedPlace & { lat: number | null; lon: number | null; rawProviderData: unknown }): Promise<string>;
   // Batched lookup of locations by id, for composing the gallery place-tag.
@@ -160,6 +163,24 @@ export class PhotoDomainService {
     }
 
     return { ...uploaded, status: 'processing' as const };
+  }
+
+  // Manual location set/override (9q4.3): normalize the place -> upsert the deduped
+  // Location (source:manual) -> owner-scoped write of location_id + the captured point ->
+  // compose the updated asset. Throws 'photo not found' (-> gRPC NOT_FOUND) when the
+  // owner-scoped write matches no row (the IDOR guard).
+  async setPhotoLocation(userId: string, photoId: string, place: GeoPlaceInput, lat: number | null, lon: number | null): Promise<PhotoWithVariants> {
+    const normalized = normalizePlace(place);
+    const locationId = await this.repository.upsertLocation({ ...normalized, lat, lon, rawProviderData: { source: 'manual' } });
+    const ok = await this.repository.setLocationForUser(userId, photoId, { locationId, lat, lon });
+    if (!ok) {
+      throw new Error('photo not found'); // owner-scoped write matched no row (the IDOR guard)
+    }
+    const pwv = await this.getPhoto(userId, photoId);
+    if (!pwv) {
+      throw new Error('photo not found');
+    }
+    return pwv;
   }
 
   async getPhoto(userId: string, photoId: string): Promise<PhotoWithVariants | null> {

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { getPhoto } from '../../lib/api';
 import type { PhotoAsset } from '../../lib/api';
 import { FALLBACK, fmt, formatLocation } from './format';
+import LocationEditor from './LocationEditor';
 
 export interface PhotoDetailModalProps {
   photoId: string | null; // null = closed
@@ -117,6 +118,8 @@ export function PhotoDetailModal({ photoId, onClose }: PhotoDetailModalProps) {
               <dt className="font-medium text-muted-foreground">Updated at</dt>
               <dd>{fmt(photo.updatedAt)}</dd>
             </dl>
+
+            <LocationEditor key={photo.id} photoId={photo.id} onSaved={(updated) => setPhoto(updated)} />
 
             <div className="flex justify-end">
               <Button variant="outline" onClick={onClose}>

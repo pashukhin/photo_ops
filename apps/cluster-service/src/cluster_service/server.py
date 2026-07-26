@@ -102,6 +102,13 @@ class ClusterServicer(pb_grpc.ClusterServiceServicer):
             results=[summary_to_proto(s) for s in summaries]
         )
 
+    def DeleteClusteringResult(self, request, context):  # type: ignore[no-untyped-def]
+        ok = self._store.soft_delete(result_id=request.result_id, user_id=request.user_id)
+        if not ok:
+            context.abort(grpc.StatusCode.NOT_FOUND, "clustering result not found")
+            raise AssertionError("unreachable")  # pragma: no cover
+        return pb.DeleteClusteringResultResponse()
+
 
 class ResultConsumer:
     """Consume cluster.result → flip the persisted run to READY / FAILED."""

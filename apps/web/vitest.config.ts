@@ -29,7 +29,11 @@ export default defineConfig({
         'postcss.config.mjs',
         'playwright.config.ts',
         'next-env.d.ts',
-        'smoke/**'
+        'smoke/**',
+        // Leaflet mount glue: no layout in jsdom, so its render/click are verified
+        // by the live smoke-ui, not units (spec 2026-07-09 decision 3, coverage R1).
+        // All testable map logic lives in components/map/points.ts (covered).
+        'components/map/PhotoMap.tsx'
       ]
     }
   }
