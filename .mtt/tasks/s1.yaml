@@ -1,7 +1,7 @@
 id: s1
 type: story
 title: manual location editing
-status: plan_review
+status: in_progress
 created: "2026-07-26T17:14:49Z"
 updated: "2026-07-26T17:16:42Z"
 history:
@@ -28,3 +28,8 @@ history:
       checks:
         - cmd: ls docs/superpowers/plans/s1-*.md >/dev/null 2>&1 || { echo "no plan docs/superpowers/plans/s1-*.md" >&2; false; }
           exit: 0
+    - at: "2026-07-26T17:16:42Z"
+      by: Grigorii Pashukhin
+      why: plan reviewed (operator; pilot)
+      from: plan_review
+      to: in_progress
