@@ -65,27 +65,6 @@ AFTER_LAT="$(curl -fsS -b "$COOKIE_PATH" "$API_BASE_URL/photos/$P2" | jq -r '.la
   || { echo "ERROR: label-only set-location changed lat ($BEFORE_LAT -> $AFTER_LAT)" >&2; exit 1; }
 log "label-only set-location preserved existing GPS (lat=$AFTER_LAT) OK"
 
-# --- ClearPhotoLocation: DELETE -> gRPC -> photo-db -> read back (zvc) ---------
-log "ClearPhotoLocation on $P1 (was Paris + point)"
-curl -fsS -X DELETE -b "$COOKIE_PATH" "$API_BASE_URL/photos/$P1/location" > "$TMP/clearloc.json"
-CLEARED_CITY="$(jq -r '.location.city // "null"' "$TMP/clearloc.json")"
-CLEARED_LAT="$(jq -r '.lat // "null"' "$TMP/clearloc.json")"
-{ [ "$CLEARED_CITY" = "null" ] && [ "$CLEARED_LAT" = "null" ]; } \
-  || { echo "ERROR: clear reply still has location (city=$CLEARED_CITY lat=$CLEARED_LAT)" >&2; cat "$TMP/clearloc.json" >&2; exit 1; }
-GET_AFTER_CLEAR="$(curl -fsS -b "$COOKIE_PATH" "$API_BASE_URL/photos/$P1" | jq -r '.location.city // "null"')"
-[ "$GET_AFTER_CLEAR" = "null" ] || { echo "ERROR: GET after clear still city=$GET_AFTER_CLEAR" >&2; exit 1; }
-log "clear-location OK (Paris + point gone, persists on GET)"
-
-# --- idempotent re-clear of an already-cleared photo -> still 200 -------------
-RECLEAR="$(curl -s -o /dev/null -w '%{http_code}' -X DELETE -b "$COOKIE_PATH" "$API_BASE_URL/photos/$P1/location")"
-[ "$RECLEAR" = "200" ] || { echo "ERROR: idempotent re-clear expected 200, got $RECLEAR" >&2; exit 1; }
-log "idempotent re-clear -> 200 OK"
-
-# --- negative IDOR: clear-location on an unknown photo id -> 404 ---------------
-IDOR_CLEAR="$(curl -s -o /dev/null -w '%{http_code}' -X DELETE -b "$COOKIE_PATH" "$API_BASE_URL/photos/00000000-0000-7000-8000-000000000000/location")"
-[ "$IDOR_CLEAR" = "404" ] || { echo "ERROR: IDOR clear-location expected 404, got $IDOR_CLEAR" >&2; exit 1; }
-log "IDOR clear-location -> 404 OK"
-
 # --- DeleteClusteringResult: soft-delete -> gone ------------------------------
 RID="$(generate_cluster time_only)"
 wait_cluster_ready "$RID" "$TMP/result.json"
@@ -109,5 +88,28 @@ log "driving the workspace UI render (Playwright)"
 pnpm --filter @photoops/web exec playwright install chromium >/dev/null 2>&1 || true
 SMOKE_CLUSTERS_COOKIE="$SESSION_COOKIE" SMOKE_WEB_URL="$SMOKE_WEB_URL" \
   pnpm --filter @photoops/web exec playwright test smoke/clusters.smoke.ts
+
+# --- ClearPhotoLocation: DELETE -> gRPC -> photo-db -> read back (zvc) ---------
+# Runs LAST: clearing $P1 drops its map point, and the Playwright render above
+# asserts both $P1 and $P2 markers — so clear only after the UI render smoke.
+log "ClearPhotoLocation on $P1 (was Paris + point)"
+curl -fsS -X DELETE -b "$COOKIE_PATH" "$API_BASE_URL/photos/$P1/location" > "$TMP/clearloc.json"
+CLEARED_CITY="$(jq -r '.location.city // "null"' "$TMP/clearloc.json")"
+CLEARED_LAT="$(jq -r '.lat // "null"' "$TMP/clearloc.json")"
+{ [ "$CLEARED_CITY" = "null" ] && [ "$CLEARED_LAT" = "null" ]; } \
+  || { echo "ERROR: clear reply still has location (city=$CLEARED_CITY lat=$CLEARED_LAT)" >&2; cat "$TMP/clearloc.json" >&2; exit 1; }
+GET_AFTER_CLEAR="$(curl -fsS -b "$COOKIE_PATH" "$API_BASE_URL/photos/$P1" | jq -r '.location.city // "null"')"
+[ "$GET_AFTER_CLEAR" = "null" ] || { echo "ERROR: GET after clear still city=$GET_AFTER_CLEAR" >&2; exit 1; }
+log "clear-location OK (Paris + point gone, persists on GET)"
+
+# idempotent re-clear of an already-cleared photo -> still 200
+RECLEAR="$(curl -s -o /dev/null -w '%{http_code}' -X DELETE -b "$COOKIE_PATH" "$API_BASE_URL/photos/$P1/location")"
+[ "$RECLEAR" = "200" ] || { echo "ERROR: idempotent re-clear expected 200, got $RECLEAR" >&2; exit 1; }
+log "idempotent re-clear -> 200 OK"
+
+# negative IDOR: clear-location on an unknown photo id -> 404
+IDOR_CLEAR="$(curl -s -o /dev/null -w '%{http_code}' -X DELETE -b "$COOKIE_PATH" "$API_BASE_URL/photos/00000000-0000-7000-8000-000000000000/location")"
+[ "$IDOR_CLEAR" = "404" ] || { echo "ERROR: IDOR clear-location expected 404, got $IDOR_CLEAR" >&2; exit 1; }
+log "IDOR clear-location -> 404 OK"
 
 log "ALL cluster-workspace + manual-location smoke checks passed"
