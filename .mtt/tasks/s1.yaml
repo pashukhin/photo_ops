@@ -1,6 +1,11 @@
 id: s1
 type: story
 title: manual location editing
-status: tbd
+status: speccing
 created: "2026-07-26T17:14:49Z"
 updated: "2026-07-26T17:14:49Z"
+history:
+    - at: "2026-07-26T17:14:49Z"
+      by: Grigorii Pashukhin
+      from: tbd
+      to: speccing
