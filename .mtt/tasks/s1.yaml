@@ -1,11 +1,18 @@
 id: s1
 type: story
 title: manual location editing
-status: speccing
+status: spec_review
 created: "2026-07-26T17:14:49Z"
-updated: "2026-07-26T17:14:49Z"
+updated: "2026-07-26T17:15:42Z"
 history:
     - at: "2026-07-26T17:14:49Z"
       by: Grigorii Pashukhin
       from: tbd
       to: speccing
+    - at: "2026-07-26T17:15:42Z"
+      by: Grigorii Pashukhin
+      from: speccing
+      to: spec_review
+      checks:
+        - cmd: ls docs/superpowers/specs/s1-*.md >/dev/null 2>&1 || { echo "no spec docs/superpowers/specs/s1-*.md (author it, incl. the e2e-scenario section)" >&2; false; }
+          exit: 0
