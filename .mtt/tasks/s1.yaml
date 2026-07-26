@@ -1,7 +1,7 @@
 id: s1
 type: story
 title: 'selftest: story gates'
-status: speccing
+status: spec_review
 created: "2026-07-26T16:04:55Z"
 updated: "2026-07-26T16:04:55Z"
 history:
@@ -9,3 +9,10 @@ history:
       by: Grigorii Pashukhin
       from: tbd
       to: speccing
+    - at: "2026-07-26T16:04:55Z"
+      by: Grigorii Pashukhin
+      from: speccing
+      to: spec_review
+      checks:
+        - cmd: ls docs/superpowers/specs/s1-*.md >/dev/null 2>&1 || { echo "no spec docs/superpowers/specs/s1-*.md (author it, incl. the e2e-scenario section)" >&2; false; }
+          exit: 0
