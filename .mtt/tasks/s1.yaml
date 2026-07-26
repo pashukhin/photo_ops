@@ -1,7 +1,7 @@
 id: s1
 type: story
 title: 'selftest: story gates'
-status: plan_review
+status: in_progress
 created: "2026-07-26T16:04:55Z"
 updated: "2026-07-26T16:04:55Z"
 history:
@@ -27,3 +27,7 @@ history:
       checks:
         - cmd: ls docs/superpowers/plans/s1-*.md >/dev/null 2>&1 || { echo "no plan docs/superpowers/plans/s1-*.md" >&2; false; }
           exit: 0
+    - at: "2026-07-26T16:04:55Z"
+      by: Grigorii Pashukhin
+      from: plan_review
+      to: in_progress
