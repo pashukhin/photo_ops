@@ -1,10 +1,10 @@
 id: t1
 type: task
 title: clear/unset a photo location
-status: approved
+status: done
 parent: s1
 created: "2026-07-26T17:17:17Z"
-updated: "2026-07-26T17:51:50Z"
+updated: "2026-07-26T17:55:53Z"
 history:
     - at: "2026-07-26T17:17:17Z"
       by: Grigorii Pashukhin
@@ -56,4 +56,13 @@ history:
       to: approved
       checks:
         - cmd: out=$(git status --porcelain -- ":(exclude).mtt") && test -z "$out" || { echo "working tree not clean" >&2; false; }
+          exit: 0
+    - at: "2026-07-26T17:55:53Z"
+      by: Grigorii Pashukhin
+      from: approved
+      to: done
+      checks:
+        - cmd: git switch session-026-migrate-beads-to-mtt
+          exit: 0
+        - cmd: 'git log -n 1000 --format=%s | grep -v "^mtt: " | head -200 | grep "^t1: " || { echo "no squash commit \"t1: …\" on the integration branch: pull/merge the PR first" >&2; false; }'
           exit: 0
