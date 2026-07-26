@@ -1,0 +1,39 @@
+#!/usr/bin/env sh
+# Path-aware dqb smoke selector (spec §4 of the beads→mtt migration).
+#
+# mtt has no native path-aware auto-dqb, so this gate picks which `make smoke-*`
+# to run from the files a task branch changed vs the integration branch. It is
+# hung on the big-gate edges (task/bugfix implementing→review, fix→review) and on
+# the story acceptance edge. A change that crosses no known boundary (e.g. a
+# #tech task, which by definition doesn't touch the UI boundary) is exempt.
+#
+#   MTT_INT_BRANCH   integration branch to diff against (default: the session branch)
+#   MTT_SMOKE_DRYRUN=1  print the decision instead of running the smoke (selftest)
+set -eu
+
+base="${MTT_INT_BRANCH:-session-026-migrate-beads-to-mtt}"
+
+# base...HEAD = changes introduced on this branch since it forked from base.
+# Fall back to the working-tree diff if the three-dot base can't be resolved.
+changed=$(git diff --name-only "$base"...HEAD 2>/dev/null || git diff --name-only HEAD)
+
+# --- path → smoke table (minimal for the pilot; extend as boundaries grow) ---
+select_smoke() {
+  if printf '%s\n' "$changed" | grep -q '^apps/web/'; then echo smoke-ui; return; fi
+  echo ''
+}
+
+smoke=$(select_smoke)
+
+if [ -z "$smoke" ]; then
+  echo "mtt-smoke-gate: no integration boundary crossed → smoke exempt" >&2
+  exit 0
+fi
+
+if [ "${MTT_SMOKE_DRYRUN:-0}" = "1" ]; then
+  echo "mtt-smoke-gate: would run make $smoke" >&2
+  exit 0
+fi
+
+echo "mtt-smoke-gate: running make $smoke" >&2
+exec make "$smoke"
