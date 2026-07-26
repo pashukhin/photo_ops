@@ -86,10 +86,14 @@ red = your repro). Follow-up issue: a targeted re-check once a `make test-one T=
 exists. Execution check: confirm `make skeleton-gate` computes coverage even with failing
 tests (so it composes with `! make test`); if not, reorder/adjust.
 
-### 3.3 `story` (prefix `s`, `parents: [story]`, **no branch**)
+### 3.3 `story` (prefix `s`, `parents: []` — root, **no branch**)
 
-Top-level stories are created with `mtt add --type story --no-parent`. Story-under-story
-nesting is available (bounded depth by convention) but unused by the pilot.
+**Engine constraint (found in execution):** mtt v0.11.0 rejects a type that lists itself as a
+parent (`type "story": cannot be its own parent`), so **story-under-story nesting is not
+expressible** in this version — the locked taxonomy's "optional story parent (bounded depth)"
+is deferred, the same class of deferral as End-state 2's `{{.Parent}}`. `story` is therefore a
+root type; top-level stories are created with plain `mtt add --type story`. The pilot uses a
+single flat story, so nothing is lost now.
 
 | edge | from → to | phase | commands |
 |---|---|---|---|
@@ -217,7 +221,8 @@ story's spec/plan, so their flows stay thin (no per-task spec gate).
 
 ## 11. Out of scope
 
-- End-state 2 (`{{.Parent}}`), path-aware auto-dqb as first-class config, typed dependency kinds.
+- End-state 2 (`{{.Parent}}`), story-under-story nesting (engine forbids self-parent in v0.11.0),
+  path-aware auto-dqb as first-class config, typed dependency kinds.
 - Product work beyond the single pilot story.
 - Bulk re-file of the full backlog before the go-gate.
 
