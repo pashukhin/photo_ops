@@ -1,6 +1,36 @@
 id: b1
 type: bugfix
 title: 'scratch: prove RED-repro gate'
-status: tbd
+status: cancelled
 created: "2026-07-26T17:57:17Z"
-updated: "2026-07-26T17:57:17Z"
+updated: "2026-07-26T17:59:09Z"
+history:
+    - at: "2026-07-26T17:57:17Z"
+      by: Grigorii Pashukhin
+      from: tbd
+      to: skeleton
+      checks:
+        - cmd: git switch task/b1 || (git switch session-026-migrate-beads-to-mtt && git switch -c task/b1)
+          exit: 0
+    - at: "2026-07-26T17:59:08Z"
+      by: Grigorii Pashukhin
+      from: skeleton
+      to: skeleton_review
+      checks:
+        - cmd: out=$(git status --porcelain -- ":(exclude).mtt") && test -z "$out" || { echo "working tree not clean — commit your repro first" >&2; false; }
+          exit: 0
+        - cmd: make skeleton-gate
+          exit: 0
+        - cmd: '! make test'
+          exit: 0
+    - at: "2026-07-26T17:59:08Z"
+      by: Grigorii Pashukhin
+      from: skeleton_review
+      to: skeleton
+    - at: "2026-07-26T17:59:09Z"
+      by: Grigorii Pashukhin
+      from: skeleton
+      to: cancelled
+      checks:
+        - cmd: git switch session-026-migrate-beads-to-mtt
+          exit: 0
