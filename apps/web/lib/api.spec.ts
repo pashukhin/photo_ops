@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { completeUpload, createPost, createUploadIntent, deleteClusteringResult, generateClusters, getClusteringResult, getPhoto, getPost, getUsageSummary, listClusteringMethods, listClusteringResults, listPhotos, listPosts, listUsageEvents, setPhotoLocation, signUp, updatePost, uploadFileToPresignedUrl } from './api';
+import { clearPhotoLocation, completeUpload, createPost, createUploadIntent, deleteClusteringResult, generateClusters, getClusteringResult, getPhoto, getPost, getUsageSummary, listClusteringMethods, listClusteringResults, listPhotos, listPosts, listUsageEvents, setPhotoLocation, signUp, updatePost, uploadFileToPresignedUrl } from './api';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -51,6 +51,22 @@ describe('web API helper', () => {
         body: JSON.stringify({ place: { country: 'France', city: 'Paris' }, lat: 48.85, lon: 2.35 })
       })
     );
+  });
+
+  it('clearPhotoLocation DELETEs /photos/:id/location with no body', async () => {
+    // why (zvc): the clear route mirrors set (/photos, no v1) but carries no payload
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ id: 'photo-1' })));
+    await clearPhotoLocation('photo-1');
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:3001/photos/photo-1/location',
+      expect.objectContaining({ method: 'DELETE', credentials: 'include' })
+    );
+  });
+
+  it('clearPhotoLocation throws on a non-ok response', async () => {
+    // why: a failed clear surfaces an error, not a silent success
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('nope', { status: 404 }));
+    await expect(clearPhotoLocation('photo-1')).rejects.toThrow();
   });
 
   it('deleteClusteringResult throws on a non-ok response', async () => {

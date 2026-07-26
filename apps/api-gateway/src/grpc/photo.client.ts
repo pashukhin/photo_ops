@@ -42,6 +42,12 @@ export interface SetPhotoLocationInput {
   lon?: number;
 }
 
+// Manual location clear (zvc). Owner scope; no payload.
+export interface ClearPhotoLocationInput {
+  userId: string;
+  photoId: string;
+}
+
 export interface PhotoGatewayClient {
   createUploadIntent(input: { userId: string; filename: string; contentType: string; sizeBytes: string }): Promise<unknown>;
   completeUpload(input: { userId: string; photoId: string }): Promise<unknown>;
@@ -49,6 +55,7 @@ export interface PhotoGatewayClient {
   getPhoto(input: { userId: string; photoId: string }): Promise<unknown>;
   getVariantsByIds(input: { userId: string; photoIds: string[] }): Promise<GetVariantsByIdsResult>;
   setPhotoLocation(input: SetPhotoLocationInput): Promise<unknown>;
+  clearPhotoLocation(input: ClearPhotoLocationInput): Promise<unknown>;
 }
 
 type Callback<T> = (error: Error | null, value: T) => void;
@@ -61,6 +68,7 @@ interface GrpcPhotoServiceClient {
   // Wire field is `photoId` (repeated), NOT `photoIds` — see getVariantsByIds.
   GetVariantsByIds(input: { userId: string; photoId: string[] }, callback: Callback<GetVariantsByIdsResult>): void;
   SetPhotoLocation(input: SetPhotoLocationInput, callback: Callback<unknown>): void;
+  ClearPhotoLocation(input: ClearPhotoLocationInput, callback: Callback<unknown>): void;
 }
 
 @Injectable()
@@ -102,6 +110,10 @@ export class PhotoClient implements PhotoGatewayClient {
 
   async setPhotoLocation(input: SetPhotoLocationInput) {
     return this.call((callback) => this.client.SetPhotoLocation(input, callback));
+  }
+
+  async clearPhotoLocation(input: ClearPhotoLocationInput) {
+    return this.call((callback) => this.client.ClearPhotoLocation(input, callback));
   }
 
   // Remap the plural `photoIds` to the proto wire field `photoId` (repeated) —

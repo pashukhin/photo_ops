@@ -219,6 +219,18 @@ export class PhotoRepository implements PhotoRepositoryPort {
     return rows.length > 0;
   }
 
+  async clearLocationForUser(userId: string, photoId: string): Promise<boolean> {
+    // Owner-scoped clear (zvc): the inverse of setLocationForUser — unlink the deduped
+    // Location and null the point. Idempotent: an existing owned row matches and is set to
+    // (already-)null; a non-existent / non-owned id matches nothing → false → NOT_FOUND.
+    const rows = await this.db
+      .update(photoAssets)
+      .set({ locationId: null, lat: null, lon: null, updatedAt: new Date() })
+      .where(and(eq(photoAssets.id, photoId), eq(photoAssets.userId, userId)))
+      .returning({ id: photoAssets.id });
+    return rows.length > 0;
+  }
+
   async setStatus(photoId: string, status: 'ready' | 'failed' | 'processing'): Promise<void> {
     await this.db
       .update(photoAssets)

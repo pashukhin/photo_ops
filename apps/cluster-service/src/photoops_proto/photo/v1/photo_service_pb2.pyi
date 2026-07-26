@@ -179,6 +179,14 @@ class SetPhotoLocationRequest(_message.Message):
     lon: float
     def __init__(self, photo_id: _Optional[str] = ..., user_id: _Optional[str] = ..., place: _Optional[_Union[_processing_pb2.GeoPlace, _Mapping]] = ..., lat: _Optional[float] = ..., lon: _Optional[float] = ...) -> None: ...
 
+class ClearPhotoLocationRequest(_message.Message):
+    __slots__ = ("photo_id", "user_id")
+    PHOTO_ID_FIELD_NUMBER: _ClassVar[int]
+    USER_ID_FIELD_NUMBER: _ClassVar[int]
+    photo_id: str
+    user_id: str
+    def __init__(self, photo_id: _Optional[str] = ..., user_id: _Optional[str] = ...) -> None: ...
+
 class PhotoVariantView(_message.Message):
     __slots__ = ("variant_type", "url", "width", "height")
     VARIANT_TYPE_FIELD_NUMBER: _ClassVar[int]

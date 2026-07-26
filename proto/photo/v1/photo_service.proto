@@ -44,6 +44,14 @@ service PhotoService {
     };
   }
 
+  // Remove a photo's manual location entirely (unlink the deduped Location + clear
+  // the point): location_id/lat/lon → NULL, owner-scoped, idempotent. The inverse of
+  // SetPhotoLocation. (Annotation decorative — the hand-written gateway route is
+  // DELETE /photos/{photo_id}/location.)
+  rpc ClearPhotoLocation(ClearPhotoLocationRequest) returns (PhotoAsset) {
+    option (google.api.http) = {delete: "/v1/photos/{photo_id}/location"};
+  }
+
   // Internal service-to-service read-RPC: the space-time + device attributes of
   // the caller's `ready` photos, for clustering. Deliberately NOT gateway-exposed
   // (no http annotation) and lean — it must not carry the gallery ListPhotos
@@ -144,6 +152,12 @@ message SetPhotoLocationRequest {
   GeoPlace place = 3;      // place labels (022 message, reused)
   optional double lat = 4; // captured point (map-click)
   optional double lon = 5;
+}
+
+// Clear a photo's manual location (9q4.3 follow-up zvc). Owner scope; no payload.
+message ClearPhotoLocationRequest {
+  string photo_id = 1;
+  string user_id = 2;      // owner scope
 }
 
 // A generated variant rendition surfaced to the UI, with a short-lived,

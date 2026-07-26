@@ -41,7 +41,8 @@ function createController() {
     completeUpload: vi.fn(),
     listPhotos: vi.fn(),
     getPhoto: vi.fn(),
-    setPhotoLocation: vi.fn()
+    setPhotoLocation: vi.fn(),
+    clearPhotoLocation: vi.fn()
   } as unknown as PhotoClient;
   const authService = { requireSession: vi.fn().mockResolvedValue({ userId: 'user-1' }) };
   return { controller: new PhotoController(photoClient, authService as never), photoClient, authService };
@@ -72,6 +73,22 @@ describe('PhotoController', () => {
     const out = await controller.setLocation('photoops_session=s', 'photo-1', body);
     expect(photoClient.setPhotoLocation).toHaveBeenCalledWith({ photoId: 'photo-1', userId: 'user-1', place: body.place, lat: 48.85, lon: 2.35 });
     expect(out).toMatchObject({ id: 'photo-1', status: 'ready' });
+  });
+
+  it('clearLocation: passes only the session userId + path id, maps the returned photo', async () => {
+    // why: clear carries no body — owner scope is the session userId; returns the mapped photo
+    const { controller, photoClient } = createController();
+    vi.mocked(photoClient.clearPhotoLocation).mockResolvedValue({ ...FULL_PHOTO });
+    const out = await controller.clearLocation('photoops_session=s', 'photo-1');
+    expect(photoClient.clearPhotoLocation).toHaveBeenCalledWith({ photoId: 'photo-1', userId: 'user-1' });
+    expect(out).toMatchObject({ id: 'photo-1', status: 'ready' });
+  });
+
+  it('clearLocation propagates NOT_FOUND gRPC error (becomes HTTP 404 via HttpErrorFilter)', async () => {
+    const { controller, photoClient } = createController();
+    const notFoundError = Object.assign(new Error('not found'), { code: GrpcStatus.NOT_FOUND });
+    vi.mocked(photoClient.clearPhotoLocation).mockRejectedValue(notFoundError);
+    await expect(controller.clearLocation('photoops_session=s', 'missing-photo')).rejects.toMatchObject({ code: GrpcStatus.NOT_FOUND });
   });
 
   it('maps gallery query params onto the gRPC ListPhotos request (session 011)', async () => {

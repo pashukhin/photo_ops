@@ -79,6 +79,7 @@ function createService() {
     applyAttributes: vi.fn(),
     setStatus: vi.fn(),
     setLocationForUser: vi.fn(),
+    clearLocationForUser: vi.fn(),
     findByIdWithVariantsForUser: vi.fn(),
     listVariantsForPhotos: vi.fn(),
     findVariantsByIdsForUser: vi.fn(),
@@ -163,6 +164,38 @@ describe('PhotoDomainService', () => {
     await expect(
       service.setPhotoLocation('user-1', 'photo-1', { city: 'Paris' }, null, null)
     ).rejects.toThrow('photo not found');
+  });
+
+  it('clearPhotoLocation unlinks the location owner-scoped and composes the cleared asset', async () => {
+    // why: the inverse of set — clear the deduped-Location link + point, scoped to the caller;
+    // the re-read reply carries no location. Idempotent: an owned row always matches -> true.
+    const { service, repository } = createService();
+    repository.clearLocationForUser.mockResolvedValue(true);
+    repository.findByIdWithVariantsForUser.mockResolvedValue({
+      photo: makePhotoRecord({ id: 'photo-1', locationId: null, lat: null, lon: null }),
+      variants: []
+    });
+
+    const out = await service.clearPhotoLocation('user-1', 'photo-1');
+
+    expect(repository.clearLocationForUser).toHaveBeenCalledWith('user-1', 'photo-1');
+    expect(repository.upsertLocation).not.toHaveBeenCalled(); // clear does not touch the Location table
+    expect(out?.photo.locationId).toBeNull();
+  });
+
+  it('clearPhotoLocation throws NOT_FOUND when the photo is not the caller\'s', async () => {
+    // why: the IDOR guard — a foreign/unknown photo_id matches no row; false -> not-found
+    const { service, repository } = createService();
+    repository.clearLocationForUser.mockResolvedValue(false);
+    await expect(service.clearPhotoLocation('user-1', 'other-photo')).rejects.toThrow('photo not found');
+  });
+
+  it('clearPhotoLocation throws NOT_FOUND if the write succeeds but the re-read is missing', async () => {
+    // why: the compose guard — a concurrent delete between the write and getPhoto -> not found
+    const { service, repository } = createService();
+    repository.clearLocationForUser.mockResolvedValue(true);
+    repository.findByIdWithVariantsForUser.mockResolvedValue(null);
+    await expect(service.clearPhotoLocation('user-1', 'photo-1')).rejects.toThrow('photo not found');
   });
 
   it('rejects files above 25 MB', async () => {

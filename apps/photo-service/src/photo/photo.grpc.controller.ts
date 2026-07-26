@@ -124,6 +124,16 @@ export class PhotoGrpcController {
     }
   }
 
+  @GrpcMethod('PhotoService', 'ClearPhotoLocation')
+  async clearPhotoLocation(request: { photoId: string; userId: string }) {
+    try {
+      const pwv = await this.photoService.clearPhotoLocation(request.userId, request.photoId);
+      return this.toProtoPhoto(pwv);
+    } catch (error) {
+      throw this.mapDomainError(error);
+    }
+  }
+
   @GrpcMethod('PhotoService', 'ListPhotoSpacetime')
   async listPhotoSpacetime(request: { userId: string }): Promise<{ photos: unknown[] }> {
     const photos = await this.photoService.listSpacetime(request.userId);

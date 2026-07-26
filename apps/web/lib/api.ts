@@ -377,6 +377,19 @@ export async function setPhotoLocation(
   return response.json() as Promise<PhotoAsset>;
 }
 
+// Clear a photo's manual location entirely (zvc): DELETE /photos/:id/location. Owner-scoped
+// by the session cookie; returns the updated (location-absent) asset.
+export async function clearPhotoLocation(photoId: string): Promise<PhotoAsset> {
+  const response = await fetch(`${API_BASE_URL}/photos/${photoId}/location`, {
+    method: 'DELETE',
+    credentials: 'include'
+  });
+  if (!response.ok) {
+    throw new Error(await readErrorMessage(response, `ClearPhotoLocation failed: ${response.status}`));
+  }
+  return response.json() as Promise<PhotoAsset>;
+}
+
 // --- Publication (session 018) ----------------------------------------------
 
 export interface PostPhoto {
