@@ -1,0 +1,76 @@
+#!/usr/bin/env sh
+# scripts/mtt-gate-selftest — executable proof that the novel .mtt/config.yaml
+# story gates BLOCK ON RED (exit 3) and pass on green. Load-bearing evidence for
+# go-criterion #1, and a re-runnable regression check after any config edit.
+#
+# SCOPE: the three novel story gates — spec-existence, plan-existence,
+# child-completeness — all of which run on the integration branch (a story has no
+# branch), so this stays self-contained and fast. The flagship-derived clean-tree
+# gate and the suite-heavy gates (bugfix `! make test`, the big `make gate`) are
+# proven LIVE in the pilot (T9/T10); running the full suite here would defeat
+# "fast + re-runnable".
+#
+# Creates one throwaway story (+ one child) and dummy spec/plan files, then
+# removes them. Never spins docker (MTT_SMOKE_DRYRUN=1). Run from the repo root
+# on the integration branch.
+set -u
+
+export MTT_SMOKE_DRYRUN=1
+PASS=0; FAIL=0
+SID=""; CID=""; DUMMIES=""
+
+log()  { printf '%s\n' "$*" >&2; }
+ok()   { PASS=$((PASS+1)); log "  PASS: $1"; }
+bad()  { FAIL=$((FAIL+1)); log "  FAIL: $1"; }
+
+# expect_exit <expected> <desc> <cmd...>
+expect_exit() {
+  exp=$1; desc=$2; shift 2
+  "$@" >/dev/null 2>&1; got=$?
+  if [ "$got" = "$exp" ]; then ok "$desc (exit $got)"; else bad "$desc (expected $exp, got $got)"; fi
+}
+
+cleanup() {
+  log ""
+  log "cleanup…"
+  for f in $DUMMIES; do rm -f "$f"; done
+  [ -n "$CID" ] && mtt rm "$CID" >/dev/null 2>&1
+  [ -n "$SID" ] && mtt rm "$SID" >/dev/null 2>&1
+  log "self-test: $PASS passed, $FAIL failed"
+}
+trap cleanup EXIT
+
+log "mtt gate self-test — novel story gates (block-on-red + pass-on-green)"
+log ""
+
+# --- set up a throwaway story ------------------------------------------------
+SID=$(mtt add --type story --no-parent "selftest: story gates" --json | jq -r .id)
+[ -n "$SID" ] || { log "FATAL: could not create throwaway story"; exit 2; }
+log "throwaway story = $SID"
+mtt start "$SID" >/dev/null 2>&1   # → speccing
+
+# --- gate 1: spec-existence (speccing → spec_review) -------------------------
+log "gate 1 — spec-existence:"
+expect_exit 3 "blocks when docs/superpowers/specs/$SID-*.md is absent" mtt submit "$SID"
+SPEC="docs/superpowers/specs/$SID-selftest.md"; DUMMIES="$DUMMIES $SPEC"
+printf '# selftest spec\n' > "$SPEC"
+expect_exit 0 "passes once the spec exists" mtt submit "$SID"   # → spec_review
+mtt approve "$SID" >/dev/null 2>&1                              # → planning
+
+# --- gate 2: plan-existence (planning → plan_review) -------------------------
+log "gate 2 — plan-existence:"
+expect_exit 3 "blocks when docs/superpowers/plans/$SID-*.md is absent" mtt submit "$SID"
+PLAN="docs/superpowers/plans/$SID-selftest.md"; DUMMIES="$DUMMIES $PLAN"
+printf '# selftest plan\n' > "$PLAN"
+expect_exit 0 "passes once the plan exists" mtt submit "$SID"   # → plan_review
+mtt approve "$SID" >/dev/null 2>&1                              # → in_progress
+
+# --- gate 3: child-completeness (in_progress → acceptance) -------------------
+log "gate 3 — child-completeness:"
+CID=$(mtt add --type task --parent "$SID" "selftest: unfinished child" --json | jq -r .id)
+log "throwaway child = $CID (status tbd)"
+expect_exit 3 "blocks while child $CID is not done/cancelled" mtt submit "$SID"
+mtt cancel "$CID" >/dev/null 2>&1                               # child → cancelled
+expect_exit 0 "passes once the child is cancelled (+ smoke exempt + mtt check)" mtt submit "$SID"  # → acceptance
+
+exit 0

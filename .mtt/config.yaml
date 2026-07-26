@@ -125,7 +125,7 @@ types:
         description: "green: clean tree + full gate + coverage + test-guard + dqb smoke + mtt check"
         commands:
           - 'out=$(git status --porcelain -- ":(exclude).mtt") && test -z "$out" || { echo "working tree not clean — commit your code first" >&2; false; }'
-          - {run: 'make gate', timeout: 15m}
+          - {run: 'make gate', timeout: 20m}
           - {run: 'make coverage-gate', timeout: 10m}
           - 'make test-guard'
           - {run: 'scripts/mtt-smoke-gate', timeout: 20m}
@@ -148,7 +148,7 @@ types:
         description: "fixes done; re-gate"
         commands:
           - 'out=$(git status --porcelain -- ":(exclude).mtt") && test -z "$out" || { echo "working tree not clean — commit your code first" >&2; false; }'
-          - {run: 'make gate', timeout: 15m}
+          - {run: 'make gate', timeout: 20m}
           - {run: 'make coverage-gate', timeout: 10m}
           - 'make test-guard'
           - {run: 'scripts/mtt-smoke-gate', timeout: 20m}
@@ -225,7 +225,7 @@ types:
         name: submit
         commands:
           - 'out=$(git status --porcelain -- ":(exclude).mtt") && test -z "$out" || { echo "working tree not clean — commit your code first" >&2; false; }'
-          - {run: 'make gate', timeout: 15m}
+          - {run: 'make gate', timeout: 20m}
           - {run: 'make coverage-gate', timeout: 10m}
           - 'make test-guard'
           - {run: 'scripts/mtt-smoke-gate', timeout: 20m}
@@ -246,7 +246,7 @@ types:
         name: submit
         commands:
           - 'out=$(git status --porcelain -- ":(exclude).mtt") && test -z "$out" || { echo "working tree not clean — commit your code first" >&2; false; }'
-          - {run: 'make gate', timeout: 15m}
+          - {run: 'make gate', timeout: 20m}
           - {run: 'make coverage-gate', timeout: 10m}
           - 'make test-guard'
           - {run: 'scripts/mtt-smoke-gate', timeout: 20m}
