@@ -1,7 +1,7 @@
 id: s1
 type: story
 title: 'selftest: story gates'
-status: planning
+status: plan_review
 created: "2026-07-26T16:04:55Z"
 updated: "2026-07-26T16:04:55Z"
 history:
@@ -20,3 +20,10 @@ history:
       by: Grigorii Pashukhin
       from: spec_review
       to: planning
+    - at: "2026-07-26T16:04:55Z"
+      by: Grigorii Pashukhin
+      from: planning
+      to: plan_review
+      checks:
+        - cmd: ls docs/superpowers/plans/s1-*.md >/dev/null 2>&1 || { echo "no plan docs/superpowers/plans/s1-*.md" >&2; false; }
+          exit: 0
