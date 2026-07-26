@@ -1,10 +1,10 @@
 id: t1
 type: task
 title: clear/unset a photo location
-status: skeleton_review
+status: implementing
 parent: s1
 created: "2026-07-26T17:17:17Z"
-updated: "2026-07-26T17:38:07Z"
+updated: "2026-07-26T17:38:29Z"
 history:
     - at: "2026-07-26T17:17:17Z"
       by: Grigorii Pashukhin
@@ -22,3 +22,8 @@ history:
           exit: 0
         - cmd: make skeleton-gate
           exit: 0
+    - at: "2026-07-26T17:38:29Z"
+      by: Grigorii Pashukhin
+      why: skeleton reviewed (operator; pilot)
+      from: skeleton_review
+      to: implementing
