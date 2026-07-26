@@ -1,7 +1,7 @@
 id: t1
 type: task
 title: clear/unset a photo location
-status: human_review
+status: approved
 parent: s1
 created: "2026-07-26T17:17:17Z"
 updated: "2026-07-26T17:51:50Z"
@@ -49,3 +49,11 @@ history:
       why: 'agent review: clean mirror of SetPhotoLocation; 100% cov, make gate + live smoke green (operator; pilot)'
       from: review
       to: human_review
+    - at: "2026-07-26T17:51:50Z"
+      by: Grigorii Pashukhin
+      why: human sign-off (operator; pilot)
+      from: human_review
+      to: approved
+      checks:
+        - cmd: out=$(git status --porcelain -- ":(exclude).mtt") && test -z "$out" || { echo "working tree not clean" >&2; false; }
+          exit: 0
