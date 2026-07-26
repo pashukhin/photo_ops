@@ -1,7 +1,12 @@
 id: t1
 type: task
 title: 'selftest: unfinished child'
-status: tbd
+status: cancelled
 parent: s1
 created: "2026-07-26T16:04:55Z"
 updated: "2026-07-26T16:04:55Z"
+history:
+    - at: "2026-07-26T16:04:55Z"
+      by: Grigorii Pashukhin
+      from: tbd
+      to: cancelled
