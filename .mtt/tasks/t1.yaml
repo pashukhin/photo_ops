@@ -1,10 +1,10 @@
 id: t1
 type: task
 title: clear/unset a photo location
-status: implementing
+status: review
 parent: s1
 created: "2026-07-26T17:17:17Z"
-updated: "2026-07-26T17:38:29Z"
+updated: "2026-07-26T17:49:56Z"
 history:
     - at: "2026-07-26T17:17:17Z"
       by: Grigorii Pashukhin
@@ -27,3 +27,20 @@ history:
       why: skeleton reviewed (operator; pilot)
       from: skeleton_review
       to: implementing
+    - at: "2026-07-26T17:49:56Z"
+      by: Grigorii Pashukhin
+      from: implementing
+      to: review
+      checks:
+        - cmd: out=$(git status --porcelain -- ":(exclude).mtt") && test -z "$out" || { echo "working tree not clean — commit your code first" >&2; false; }
+          exit: 0
+        - cmd: make gate
+          exit: 0
+        - cmd: make coverage-gate
+          exit: 0
+        - cmd: make test-guard
+          exit: 0
+        - cmd: scripts/mtt-smoke-gate
+          exit: 0
+        - cmd: mtt check
+          exit: 0
