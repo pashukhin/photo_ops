@@ -1,7 +1,7 @@
 id: s1
 type: story
 title: manual location editing
-status: acceptance
+status: done
 created: "2026-07-26T17:14:49Z"
 updated: "2026-07-26T17:59:30Z"
 history:
@@ -44,3 +44,8 @@ history:
           exit: 0
         - cmd: mtt check
           exit: 0
+    - at: "2026-07-26T17:59:30Z"
+      by: Grigorii Pashukhin
+      why: 'story accepted: ClearPhotoLocation delivered + e2e green (operator; pilot)'
+      from: acceptance
+      to: done
