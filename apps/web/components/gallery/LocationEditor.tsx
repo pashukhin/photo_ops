@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useMemo, useState } from 'react';
 import PhotoMap from '../map/PhotoMap';
-import { setPhotoLocation } from '../../lib/api';
+import { clearPhotoLocation, setPhotoLocation } from '../../lib/api';
 import type { PhotoAsset, Place } from '../../lib/api';
 
 export interface LocationEditorProps {
@@ -50,6 +50,21 @@ export default function LocationEditor({ photoId, onSaved }: LocationEditorProps
     }
   };
 
+  // Clear (zvc): remove any manual location. Always available; clearing a location-less
+  // photo is a harmless idempotent no-op (the gateway/photo-service handle it).
+  const clear = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const updated = await clearPhotoLocation(photoId);
+      onSaved(updated);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Clear failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="space-y-2 border-t pt-3">
       <p className="text-sm font-medium">Set location</p>
@@ -73,14 +88,24 @@ export default function LocationEditor({ photoId, onSaved }: LocationEditorProps
         </p>
       ) : null}
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
-      <button
-        type="button"
-        onClick={() => void save()}
-        disabled={saving || nothingToSave}
-        className="rounded border px-2 py-1 text-sm disabled:opacity-50"
-      >
-        {saving ? 'Saving…' : 'Save location'}
-      </button>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => void save()}
+          disabled={saving || nothingToSave}
+          className="rounded border px-2 py-1 text-sm disabled:opacity-50"
+        >
+          {saving ? 'Saving…' : 'Save location'}
+        </button>
+        <button
+          type="button"
+          onClick={() => void clear()}
+          disabled={saving}
+          className="rounded border px-2 py-1 text-sm disabled:opacity-50"
+        >
+          Clear location
+        </button>
+      </div>
     </div>
   );
 }

@@ -1,0 +1,35 @@
+id: s1
+type: story
+title: manual location editing
+status: in_progress
+created: "2026-07-26T17:14:49Z"
+updated: "2026-07-26T17:16:42Z"
+history:
+    - at: "2026-07-26T17:14:49Z"
+      by: Grigorii Pashukhin
+      from: tbd
+      to: speccing
+    - at: "2026-07-26T17:15:42Z"
+      by: Grigorii Pashukhin
+      from: speccing
+      to: spec_review
+      checks:
+        - cmd: ls docs/superpowers/specs/s1-*.md >/dev/null 2>&1 || { echo "no spec docs/superpowers/specs/s1-*.md (author it, incl. the e2e-scenario section)" >&2; false; }
+          exit: 0
+    - at: "2026-07-26T17:15:42Z"
+      by: Grigorii Pashukhin
+      why: spec reviewed (operator; pilot)
+      from: spec_review
+      to: planning
+    - at: "2026-07-26T17:16:42Z"
+      by: Grigorii Pashukhin
+      from: planning
+      to: plan_review
+      checks:
+        - cmd: ls docs/superpowers/plans/s1-*.md >/dev/null 2>&1 || { echo "no plan docs/superpowers/plans/s1-*.md" >&2; false; }
+          exit: 0
+    - at: "2026-07-26T17:16:42Z"
+      by: Grigorii Pashukhin
+      why: plan reviewed (operator; pilot)
+      from: plan_review
+      to: in_progress

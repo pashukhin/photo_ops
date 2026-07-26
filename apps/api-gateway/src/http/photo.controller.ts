@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Headers, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, Param, Post, Query } from '@nestjs/common';
 import { AuthService } from '../auth/auth.service';
 import { PhotoClient } from '../grpc/photo.client';
 
@@ -71,6 +71,14 @@ export class PhotoController {
     return this.mapPhoto(
       await this.photoClient.setPhotoLocation({ photoId, userId: auth.userId, place: body.place, lat: body.lat, lon: body.lon })
     );
+  }
+
+  // Manual location clear (zvc): DELETE /photos/:id/location. Owner-scoped (session
+  // userId). A foreign/unknown id → gRPC NOT_FOUND → HTTP 404 (HttpErrorFilter).
+  @Delete(':photoId/location')
+  async clearLocation(@Headers('cookie') cookieHeader: string | undefined, @Param('photoId') photoId: string) {
+    const auth = await this.authService.requireSession(cookieHeader);
+    return this.mapPhoto(await this.photoClient.clearPhotoLocation({ photoId, userId: auth.userId }));
   }
 
   private mapPhoto(photo: unknown) {

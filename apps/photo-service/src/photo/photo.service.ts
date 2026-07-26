@@ -57,6 +57,9 @@ export interface PhotoRepositoryPort {
   // Owner-scoped manual location set/override (9q4.3): links location_id + writes the
   // captured point; returns whether a row matched (id AND user_id).
   setLocationForUser(userId: string, photoId: string, patch: { locationId: string; lat: number | null; lon: number | null }): Promise<boolean>;
+  // Owner-scoped manual location CLEAR (zvc): unlink location_id + null the point; returns
+  // whether a row matched (id AND user_id). The inverse of setLocationForUser.
+  clearLocationForUser(userId: string, photoId: string): Promise<boolean>;
   // Idempotent upsert of a deduped Location by the normalized place tuple; returns its id.
   upsertLocation(input: NormalizedPlace & { lat: number | null; lon: number | null; rawProviderData: unknown }): Promise<string>;
   // Batched lookup of locations by id, for composing the gallery place-tag.
@@ -173,6 +176,21 @@ export class PhotoDomainService {
     const normalized = normalizePlace(place);
     const locationId = await this.repository.upsertLocation({ ...normalized, lat, lon, rawProviderData: { source: 'manual' } });
     const ok = await this.repository.setLocationForUser(userId, photoId, { locationId, lat, lon });
+    if (!ok) {
+      throw new Error('photo not found'); // owner-scoped write matched no row (the IDOR guard)
+    }
+    const pwv = await this.getPhoto(userId, photoId);
+    if (!pwv) {
+      throw new Error('photo not found');
+    }
+    return pwv;
+  }
+
+  // Clear a photo's manual location (zvc): owner-scoped unlink + null point -> compose the
+  // updated (location-absent) asset. Idempotent (re-clearing an existing photo succeeds).
+  // Throws 'photo not found' (-> gRPC NOT_FOUND) when the owner-scoped write matches no row.
+  async clearPhotoLocation(userId: string, photoId: string): Promise<PhotoWithVariants> {
+    const ok = await this.repository.clearLocationForUser(userId, photoId);
     if (!ok) {
       throw new Error('photo not found'); // owner-scoped write matched no row (the IDOR guard)
     }

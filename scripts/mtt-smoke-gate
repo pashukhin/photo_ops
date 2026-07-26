@@ -17,8 +17,12 @@ base="${MTT_INT_BRANCH:-session-026-migrate-beads-to-mtt}"
 # Fall back to the working-tree diff if the three-dot base can't be resolved.
 changed=$(git diff --name-only "$base"...HEAD 2>/dev/null || git diff --name-only HEAD)
 
-# --- path → smoke table (minimal for the pilot; extend as boundaries grow) ---
+# --- path → smoke table (extend as boundaries grow) ---
+# Order matters: the photo/location/cluster stack is exercised end-to-end by
+# smoke-clusters (upload + manual-location round-trip + clustering), so a change
+# touching any of those layers picks it; a web-only change picks the thin UI smoke.
 select_smoke() {
+  if printf '%s\n' "$changed" | grep -qE '^(apps/photo-service/|apps/api-gateway/|apps/cluster-service/|proto/(photo|cluster|common)/|apps/web/components/(gallery|clusters|map)/)'; then echo smoke-clusters; return; fi
   if printf '%s\n' "$changed" | grep -q '^apps/web/'; then echo smoke-ui; return; fi
   echo ''
 }
