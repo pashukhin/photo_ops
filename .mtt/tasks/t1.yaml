@@ -1,10 +1,10 @@
 id: t1
 type: task
 title: clear/unset a photo location
-status: skeleton
+status: skeleton_review
 parent: s1
 created: "2026-07-26T17:17:17Z"
-updated: "2026-07-26T17:17:17Z"
+updated: "2026-07-26T17:38:07Z"
 history:
     - at: "2026-07-26T17:17:17Z"
       by: Grigorii Pashukhin
@@ -12,4 +12,13 @@ history:
       to: skeleton
       checks:
         - cmd: git switch task/t1 || (git switch session-026-migrate-beads-to-mtt && git switch -c task/t1)
+          exit: 0
+    - at: "2026-07-26T17:38:07Z"
+      by: Grigorii Pashukhin
+      from: skeleton
+      to: skeleton_review
+      checks:
+        - cmd: out=$(git status --porcelain -- ":(exclude).mtt") && test -z "$out" || { echo "working tree not clean — commit your skeleton first (.mtt is swept by the move)" >&2; false; }
+          exit: 0
+        - cmd: make skeleton-gate
           exit: 0
