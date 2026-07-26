@@ -1,10 +1,10 @@
 id: t1
 type: task
 title: clear/unset a photo location
-status: review
+status: human_review
 parent: s1
 created: "2026-07-26T17:17:17Z"
-updated: "2026-07-26T17:49:56Z"
+updated: "2026-07-26T17:51:50Z"
 history:
     - at: "2026-07-26T17:17:17Z"
       by: Grigorii Pashukhin
@@ -44,3 +44,8 @@ history:
           exit: 0
         - cmd: mtt check
           exit: 0
+    - at: "2026-07-26T17:51:50Z"
+      by: Grigorii Pashukhin
+      why: 'agent review: clean mirror of SetPhotoLocation; 100% cov, make gate + live smoke green (operator; pilot)'
+      from: review
+      to: human_review
