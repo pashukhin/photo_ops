@@ -1,9 +1,25 @@
 id: t34
 type: task
+title: 'scripts/sdd start/ship: intent-verbs over bd+git lifecycle'
 status: tbd
 priority: low
 tags:
     - migrated
 created: "2026-07-27T00:26:03Z"
-updated: "2026-07-27T00:26:03Z"
-description: Migrated from beads photo_ops-a2f (full text in archived .beads/issues.jsonl).
+updated: "2026-07-27T01:02:26Z"
+description: |-
+    Extend scripts/sdd with intent-verbs that wrap the bd + git lifecycle deterministically: the agent expresses intent and automation handles mechanics in correct order, no skipped steps, no drift. The git-lifecycle analogue of skeleton-first: turn the session-close protocol from prose-to-follow into a command-to-run, which for an agent is a determinism guarantee against LLM drift.
+
+    start <id> (took into work): bd update <id> --claim (status in_progress); derive branch name from the issue (session/NNN-slug or feat/id-slug); git switch -c branch from main.
+
+    ship <id> (handed in): make gate as a HARD precondition (red gate refuses); bd close <id>; git switch main; git merge --no-ff branch (local); tag; bd dolt push; then STOP for the human/guard go on git push to main.
+
+    Invariants: gate-before-merge; bd status in sync; dolt push before git push (the s008/s010 ordering bug class); correct branch name; no skipped steps.
+
+    Hard guard: do NOT automate merge+push to the default branch. The auth-guard blocks it deliberately as a review gate; ship stops at branch-ready / waiting-for-go. The human checkpoint relocates, it does not vanish.
+
+    Rejected: git-flow (model mismatch, author-deprecated for continuous-delivery); git-town (only the git half, no beads tie). Repo-local helper wins: zero deps, agent-native, ties bd-status + git in one verb.
+
+    Right-size: high recurrence (every session), passes the agent-ergonomics bar; session-sized, behind the process-to-product cap. Do as its own tooling session, e.g. after photo_ops-4vg or when branch ceremony starts costing time. See docs/agent-workflow-evolution.md.
+
+    (migrated from beads photo_ops-a2f)

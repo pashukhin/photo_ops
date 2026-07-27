@@ -6,5 +6,8 @@ priority: high
 tags:
     - migrated
 created: "2026-07-27T00:26:03Z"
-updated: "2026-07-27T00:26:03Z"
-description: Migrated from beads photo_ops-9q4 (full text in archived .beads/issues.jsonl).
+updated: "2026-07-27T01:02:25Z"
+description: |-
+    Product gaps to close before the release / demo recording, beyond the shipped upload→cluster→post→publish→share vertical (epic photo_ops-m71). Grouped by the product owner's priority after session 020: must-have (P1), highly-desirable (P2), nice-to-have (P3).
+
+    (migrated from beads photo_ops-9q4)

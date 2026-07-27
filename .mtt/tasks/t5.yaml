@@ -1,9 +1,26 @@
 id: t5
 type: task
+title: 'Clustering: decompose method into algorithm × feature-space + add HDBSCAN (time-only)'
 status: tbd
 priority: medium
 tags:
     - migrated
 created: "2026-07-27T00:26:03Z"
-updated: "2026-07-27T00:26:03Z"
-description: Migrated from beads photo_ops-2xu (full text in archived .beads/issues.jsonl).
+updated: "2026-07-27T01:02:26Z"
+description: |-
+    User request (post-019): the current single time_only method (threshold-based device-segmented agglomerative) is 'not awful but insufficient' — a fixed merge threshold doesn't adapt to density. Two asks:
+
+    1) Add HDBSCAN as a time-only algorithm (density-based; adapts to variable density, handles noise). New ClusteringMethod subclass; interface fits as-is. Needs a dep (scikit-learn HDBSCAN or the hdbscan package; scipy is present, sklearn is not).
+
+    2) Separate ALGORITHM from FEATURE-SPACE so {time-only, space-time} × {agglomerative, hdbscan, ...} are orthogonal options, not one conflated 'method' id. Recommended model (B/C): method = algorithm; feature-space is a separate axis (param in params_json or a new descriptor field) that selects the metric (1D time vs time+haversine). Rejected: register the cross-product as flat ids (combinatorial, doesn't express orthogonality).
+
+    Architecture ALREADY supports this: ClusteringMethod ABC + registry (methods/base.py, subclass+register), MethodDescriptor carries required_photo_fields + default_params (surfaced by ListClusteringMethods → ClusterView picker), PhotoPoint already carries lat/lon ('for the future space-time method'). space-time is a documented seam.
+
+    Constraints for the brainstorm:
+    - Determinism (ADR-0005): deterministic in input+method+params; HDBSCAN is deterministic given fixed input order — guard it.
+    - merge_distance currently = dendrogram merge height (agglomerative); HDBSCAN's lambda/stability doesn't map 1:1 — decide null vs reinterpret.
+    - space-time metric needs NUMERIC lat/lon (photo-service already extracts EXIF GPS), NOT human-readable Location (that's geo-normalization, photo_ops-3iy / session 022). So space-time clustering is technically NOT blocked on 3iy; GPS-less photos fall into not_clusterable (expected). But natural to co-land with 022 to avoid doing the registry/axis work twice.
+
+    Sequencing: stage 5 (clustering); do in/around session 022 (geo/space-time), after 020 (share/polish). Related: photo_ops-3iy (geo-normalization).
+
+    (migrated from beads photo_ops-2xu)

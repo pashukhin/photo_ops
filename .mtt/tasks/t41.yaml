@@ -1,9 +1,13 @@
 id: t41
 type: task
+title: Backfill ADR-004 (connectors as distribution) and ADR-005 (append-only billing ledger)
 status: tbd
 priority: low
 tags:
     - migrated
 created: "2026-07-27T00:26:03Z"
-updated: "2026-07-27T00:26:03Z"
-description: Migrated from beads photo_ops-83j (full text in archived .beads/issues.jsonl).
+updated: "2026-07-27T01:02:26Z"
+description: |-
+    Problem: project_description.md references ADR-004 'connectors as distribution channels' and ADR-005 'append-only billing ledger', but docs/adr/ only contains 0001-architecture-frame.md. Why: these are load-bearing decisions for the connector and usage stages and should be recorded before that work starts. What: write ADR-004 and ADR-005 in docs/adr/ matching the existing ADR format.
+
+    (migrated from beads photo_ops-83j)

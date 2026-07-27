@@ -1,9 +1,13 @@
 id: t30
 type: task
+title: 'usage: per-operation rollup report (operation_id on billing_events)'
 status: tbd
 priority: low
 tags:
     - migrated
 created: "2026-07-27T00:26:03Z"
-updated: "2026-07-27T00:26:03Z"
-description: Migrated from beads photo_ops-8t5 (full text in archived .beads/issues.jsonl).
+updated: "2026-07-27T01:02:26Z"
+description: |-
+    Owner note from s012 add-on brainstorm: the detail report ships as line items (one row per measurement). Future: add operation_id (idempotency_key) column to billing_events so measurements of one operation (e.g. a processing job: variant bytes + processed count) group into a single per-operation row with its total cost + breakdown. Needs an additive migration + grouped query + UI grouping.
+
+    (migrated from beads photo_ops-8t5)

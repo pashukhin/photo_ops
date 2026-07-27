@@ -1,9 +1,17 @@
 id: t23
 type: task
+title: 'Test gates: mutation testing (anti-gaming for assertion quality; polyglot)'
 status: tbd
 priority: low
 tags:
     - migrated
 created: "2026-07-27T00:26:03Z"
-updated: "2026-07-27T00:26:03Z"
-description: Migrated from beads photo_ops-9n8 (full text in archived .beads/issues.jsonl).
+updated: "2026-07-27T01:02:26Z"
+description: |-
+    Spun out of photo_ops-mp0 during the mp0 brainstorm (2026-07-02): mp0 was scoped down to the mechanical test-integrity diff-guard only. Mutation testing is a separate, heavier capability.
+
+    What: run mutation testing to catch tests that assert nothing / are too weak (surviving mutants = weak coverage — the semantic gap the diff-guard cannot see). Polyglot reality: Stryker (TS), mutmut/cosmic-ray (Python), Go has no mature mutation tool. Likely scoped to TS+Python first, or a representative package. Slow — run on-demand / nightly, not per-PR.
+
+    Why: q2n coverage gate + mp0 diff-guard close "new code has tests" and "tests not deleted", but neither catches a test that runs the code and asserts nothing. Mutation testing is the anti-gaming complement for assertion quality. Its own session; evaluate value vs cost (esp. Go gap).
+
+    (migrated from beads photo_ops-9n8)

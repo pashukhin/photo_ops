@@ -1,9 +1,13 @@
 id: t10
 type: task
+title: Cluster-level manual location (annotation over immutable result)
 status: tbd
 priority: low
 tags:
     - migrated
 created: "2026-07-27T00:26:03Z"
-updated: "2026-07-27T00:26:03Z"
-description: Migrated from beads photo_ops-9jv (full text in archived .beads/issues.jsonl).
+updated: "2026-07-27T01:02:25Z"
+description: |-
+    Deferred from session 023 (9q4.3 shipped photo-level manual location only). A cluster-level place override so a no-GPS trip can be labeled once on the whole cluster instead of per-photo. Immutable results (ADR-0005) need a mutable overlay: a cluster/result_id -> location_id annotation owned by cluster-service (cross-service UUID ref to the photo-service Location), gateway 2-service orchestration, read-join to resolve GeoPlace. Evaluate whether per-photo + Post.location_label already cover the demo need first.
+
+    (migrated from beads photo_ops-9jv)

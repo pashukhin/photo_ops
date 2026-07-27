@@ -1,9 +1,13 @@
 id: t43
 type: task
+title: Document future production infrastructure shape
 status: tbd
 priority: low
 tags:
     - migrated
 created: "2026-07-27T00:26:03Z"
-updated: "2026-07-27T00:26:03Z"
-description: Migrated from beads photo_ops-cmb (full text in archived .beads/issues.jsonl).
+updated: "2026-07-27T01:02:26Z"
+description: |-
+    Capture production gaps for deployment, TLS, secrets, storage policies, backups, observability, and migration execution after the MVP path stabilizes.
+
+    (migrated from beads photo_ops-cmb)

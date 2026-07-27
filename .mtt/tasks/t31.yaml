@@ -1,9 +1,13 @@
 id: t31
 type: task
+title: 'usage-service AMQP consumer: initial-connect retry + supervised restart'
 status: tbd
 priority: low
 tags:
     - migrated
 created: "2026-07-27T00:26:03Z"
-updated: "2026-07-27T00:26:03Z"
-description: Migrated from beads photo_ops-03x (full text in archived .beads/issues.jsonl).
+updated: "2026-07-27T01:02:26Z"
+description: |-
+    From s012 final review (M-new-1). internal/amqp/consumer.go Dial fails once and Start returns; main logs and the goroutine exits -> usage-service runs gRPC-only with ingestion permanently dead (no reconnect on later drop either). photo-service (rabbitmq-bus.ts) and media-worker (rabbitmq.py) retry the INITIAL connect with backoff; usage-service should match (initial-connect retry + a supervised restart loop). Compose gates on rabbitmq service_healthy so boot is fine; this hardens against broker restarts. No-reconnect-on-drop is an accepted repo-wide limitation (separate concern).
+
+    (migrated from beads photo_ops-03x)

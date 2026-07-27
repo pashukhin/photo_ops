@@ -7,5 +7,8 @@ parent: s2
 tags:
     - migrated
 created: "2026-07-27T00:26:03Z"
-updated: "2026-07-27T00:26:03Z"
-description: Migrated from beads photo_ops-9q4.1 (full text in archived .beads/issues.jsonl).
+updated: "2026-07-27T01:02:26Z"
+description: |-
+    MUST (release/demo). A PUBLIC, anonymous-facing page listing a user's published posts: a feed with pagination and a calendar/time navigation. Distinct from the owner-scoped /posts listing shipped in s020 (that is behind AuthGuard and links to the editor). This is the public directory of a user's public stories (unlisted posts stay excluded — unguessable-slug model, s019 D2/D4). Needs: a public gateway route (list published+public posts for a user, paginated, date-filterable), a web public route, and a calendar/date affordance. Was an explicit non-goal through s017-020. Pairs with og:image previews (photo_ops-278).
+
+    (migrated from beads photo_ops-9q4.1)

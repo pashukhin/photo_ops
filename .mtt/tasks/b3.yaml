@@ -1,9 +1,13 @@
 id: b3
 type: bugfix
+title: test-guard cli chokes on binary files in the diff (UnicodeDecodeError)
 status: tbd
 priority: low
 tags:
     - migrated
 created: "2026-07-27T00:26:03Z"
-updated: "2026-07-27T00:26:03Z"
-description: Migrated from beads photo_ops-a5k (full text in archived .beads/issues.jsonl).
+updated: "2026-07-27T01:02:25Z"
+description: |-
+    scripts/testguard/cli.py _git_blob does 'git show ref:path' with text=True; a tracked binary file (e.g. a vendored .gz) in the changed set raises UnicodeDecodeError and crashes the whole gate. Fix: errors='replace' (a binary file has no test declarations, so it should decode to harmless garbage) or skip binary blobs. Surfaced in session 022 (vendored GeoNames data — worked around by shipping plain .tsv instead of .gz).
+
+    (migrated from beads photo_ops-a5k)

@@ -1,9 +1,13 @@
 id: t6
 type: task
+title: Add hermetic integration tests for identity/photo (ephemeral Postgres/MinIO)
 status: tbd
 priority: medium
 tags:
     - migrated
 created: "2026-07-27T00:26:03Z"
-updated: "2026-07-27T00:26:03Z"
-description: Migrated from beads photo_ops-4vg (full text in archived .beads/issues.jsonl).
+updated: "2026-07-27T01:02:26Z"
+description: |-
+    Problem: the only end-to-end coverage is manual bash smoke scripts that need a live 'make dev' stack; changes cannot be verified hermetically. Why now: the identity and photo services have real DB/MinIO behavior worth pinning. What: integration tests using testcontainers (or compose-in-CI) that spin up ephemeral Postgres and MinIO, apply migrations, and exercise signup/login and upload-intent/complete/list. Scope to existing services only; future services get their own coverage when they take shape.
+
+    (migrated from beads photo_ops-4vg)

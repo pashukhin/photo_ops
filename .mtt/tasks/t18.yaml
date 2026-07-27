@@ -1,9 +1,19 @@
 id: t18
 type: task
+title: Publication editor cleanups (s018 review follow-ups)
 status: tbd
 priority: low
 tags:
     - migrated
 created: "2026-07-27T00:26:03Z"
-updated: "2026-07-27T00:26:03Z"
-description: Migrated from beads photo_ops-e9g (full text in archived .beads/issues.jsonl).
+updated: "2026-07-27T01:02:25Z"
+description: |-
+    Non-blocking quality items from the session-018 final /code-review (all deferred; the one correctness bug — empty replace-all 500 — was fixed in-session).
+    1. PostEditor duplicates ClusterView's listPhotos({pageSize:500}) fetch + photosById map verbatim, and over-fetches: it knows its exact photo_id set (post.photos) so a batch-by-ids fetch would pull <30 not 500. Extract a usePhotosById()/variant helper.
+    2. Thumbnail-variant lookup (variants.find(v=>v.variantType==='thumbnail')) is open-coded in PostEditor + ClusterView + PhotoTable; extract variantOfType(photo, kind).
+    3. post.grpc.controller.ts inlines {photoId,caption}[] 3x instead of importing PostPhotoInput from ./post.types; the wrapper type is written twice.
+    4. post.service.updatePost does an extra full-post findByIdForUser read outside updateForUser's transaction (extra round-trip + benign TOCTOU for single-user); consider folding membership validation into the repo transaction.
+    5. Domain node-selection guard uses magic numeric enum literals (node.kind===1||===4); add named constants or reuse a shared ClusterNodeKind map.
+    6. Gateway visibility maps VISIBILITY / VISIBILITY_TO_PROTO are hand-maintained inverses; derive one from the other.
+
+    (migrated from beads photo_ops-e9g)

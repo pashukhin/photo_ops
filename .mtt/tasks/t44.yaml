@@ -1,9 +1,13 @@
 id: t44
 type: task
+title: Migrate smoke-cluster.sh to scripts/lib/photoops-e2e.sh
 status: tbd
 priority: low
 tags:
     - migrated
 created: "2026-07-27T00:26:03Z"
-updated: "2026-07-27T00:26:03Z"
-description: Migrated from beads photo_ops-hfy (full text in archived .beads/issues.jsonl).
+updated: "2026-07-27T01:02:26Z"
+description: |-
+    023 /code-review cleanup: smoke-cluster.sh keeps its own inline gen_jpeg/upload_photo/poll (~90 lines) the shared lib now provides. Convert to source the lib. NB smoke-cluster.sh gen_jpeg uses EMPTY GPS by design (device-segmentation) — the lib now defaults to a BA point, so pass explicit empty or keep a small override.
+
+    (migrated from beads photo_ops-hfy)

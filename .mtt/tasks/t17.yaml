@@ -1,9 +1,17 @@
 id: t17
 type: task
+title: Publication publish/public-page cleanups (s019 review follow-ups)
 status: tbd
 priority: low
 tags:
     - migrated
 created: "2026-07-27T00:26:03Z"
-updated: "2026-07-27T00:26:03Z"
-description: Migrated from beads photo_ops-x36 (full text in archived .beads/issues.jsonl).
+updated: "2026-07-27T01:02:25Z"
+description: |-
+    Non-blocking quality items from the session-019 final /code-review (the two action-worthy findings — lazy-publisher cache-reset on broker blip, stale publication-service CLAUDE.md — were fixed in-session).
+    1. api-gateway PublicationClient repeats the new Promise((resolve,reject)=>...) promisify block 3x for publishPost/unpublishPost/getPublicPostBySlug (7 methods total); PhotoClient already has a private call<T>(invoke) helper — extract the same on PublicationClient.
+    2. web PostEditor publish/unpublish useCallbacks are near-identical (~26 lines dup): setPublishing/setPublishError/try{await X; setStatus/setSlug}catch/finally — extract a shared runPublishAction(fn).
+    3. api-gateway publicPost calls photoClient.getVariantsByIds even when raw.photos is empty — guard with an early return (avoids a wasted cross-service gRPC round-trip on the public hot path for photoless posts).
+    4. photo-service findVariantsByIdsForUser group-by-photoId loop duplicates the same Map-grouping idiom in photo.service.listPhotos — extract a small groupBy helper.
+
+    (migrated from beads photo_ops-x36)

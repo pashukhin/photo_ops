@@ -1,9 +1,13 @@
 id: t15
 type: task
+title: Share text uses live editable title/body (can diverge from published page)
 status: tbd
 priority: low
 tags:
     - migrated
 created: "2026-07-27T00:26:03Z"
-updated: "2026-07-27T00:26:03Z"
-description: Migrated from beads photo_ops-7x5 (full text in archived .beads/issues.jsonl).
+updated: "2026-07-27T01:02:25Z"
+description: |-
+    From s020 final /code-review. PostEditor 'Copy share text' builds shareText({title, body, slug}) from the LIVE editable title/body state, not the last-published values. If the owner edits the title/body after publishing without Saving, then clicks Copy share text, the copied text diverges from the public /posts/<slug> page (which shows the saved post). Low severity (unusual edit-after-publish-without-save sequence; localhost demo unaffected). Fix needs tracking the published/saved title+body separately (extra state) and a test. Consider snapshotting the post at load/save/publish.
+
+    (migrated from beads photo_ops-7x5)

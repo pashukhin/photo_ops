@@ -1,9 +1,13 @@
 id: t27
 type: task
+title: Bill RAM in byte_seconds (memory integral, self-metered during operations)
 status: tbd
 priority: low
 tags:
     - migrated
 created: "2026-07-27T00:26:03Z"
-updated: "2026-07-27T00:26:03Z"
-description: Migrated from beads photo_ops-590 (full text in archived .beads/issues.jsonl).
+updated: "2026-07-27T01:02:26Z"
+description: |-
+    Owner feedback (s012 add-on review): RAM consumption of an operation should be billed as byte_seconds — the integral of memory used over the operation's duration — self-measured by the operation runtime (same mechanism as the cpu_seconds task). Emitted as resource=memory / unit=byte_second. Pricing resolves $/byte_second. See ADR-0004 raw-unit seam.
+
+    (migrated from beads photo_ops-590)
