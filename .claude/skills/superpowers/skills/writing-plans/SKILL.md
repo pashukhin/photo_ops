@@ -29,7 +29,7 @@ Route by how well-understood the work is:
 
 **Crossover:** brainstorm in prose **until you know what should fail**, then skeleton. Use the cheapest executable carrier (a test, or one line of type) — never type-gymnastics.
 
-**Branch rule:** the skeleton touches code, so author it on a regular feature branch (this project uses no worktrees — beads).
+**Branch rule:** the skeleton touches code, so author it on a regular feature branch (this project uses no worktrees — the mtt flow switches branches in a single working tree).
 
 ## Scope Check
 
@@ -77,7 +77,7 @@ The GREEN — making the test pass — is the implementer subagent's job (superp
 
 **Goal:** [One sentence describing what this builds]
 
-**Architecture / WHY:** [2-3 sentences about approach. Entry points: contract → <file>, interfaces → <stubs>, behavior → <test files>. Durable why/invariants/rejected-alternatives go to docs/adr + bd remember + `## Local invariants`, not here.]
+**Architecture / WHY:** [2-3 sentences about approach. Entry points: contract → <file>, interfaces → <stubs>, behavior → <test files>. Durable why/invariants/rejected-alternatives go to docs/adr + mtt notes + `## Local invariants`, not here.]
 
 **Tech Stack:** [Key technologies/libraries]
 
