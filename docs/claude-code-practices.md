@@ -4,6 +4,11 @@ Date: 2026-06-23 (session 005)
 Scope: official Claude Code best practices and how this project adopts them.
 Sources are listed at the bottom; community sources are labelled as such.
 
+> **Historical (pre-mtt).** Session 026 (2026-07-27) migrated tracking beads → mtt and removed
+> the beads git hooks. The `bd:*` permissions, `bd prime` hooks, and "beads bans worktrees"
+> notes below are superseded (now: mtt, `mtt prime` on SessionStart; the no-worktrees rule
+> still holds, now due to the mtt single-working-tree flow). Kept as a dated snapshot.
+
 This is a durable reference. The research behind it was done in session 005;
 the **Adoption Decisions** section records what we actually chose and why, so a
 future agent does not re-litigate it.

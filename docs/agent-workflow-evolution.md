@@ -49,7 +49,7 @@ for gRPC contracts (`proto/` + `make proto-check`); we generalize it.
 | --- | --- |
 | Contract/structure (signatures, fields, deps, enums, exact values, schemas, DDL) | code / stubs / proto / config / migrations |
 | Behavior / acceptance (what it must do, edge cases) | tests (+ a thin e2e scenario) |
-| **Why / invariants / rejected alternatives** | `docs/adr` + `bd remember` + `## Local invariants` |
+| **Why / invariants / rejected alternatives** | `docs/adr` + mtt notes + `## Local invariants` |
 | Exploratory design (form not yet known) | ephemeral brainstorm — not a 600-line doc |
 
 **New process shape:**
@@ -69,7 +69,7 @@ skeleton — the executable skeleton is mandatory only once changing signatures 
 cheaper than continuing prose, so hypotheses are not concreted prematurely.
 
 **Branch rule:** because the spec now touches code, this model runs **only on a
-regular feature branch** (already mandated in AGENTS.md; no worktrees — beads).
+regular feature branch** (already mandated in AGENTS.md; no worktrees — the mtt flow uses one working tree).
 
 **The napильник (superpowers edits, project-level install):**
 - `writing-plans` → stop emitting full implementation as fenced code. Emit
@@ -131,7 +131,7 @@ irreducible (Decisions / Risks / out-of-scope / the cross-service flow diagram).
 ## Decision 3 — Project constitution (`## Principles` at the head of AGENTS.md)
 
 Short, behavior-anchored, **consolidating** rules already scattered across Scope
-Guardrails + `bd remember` — not a new file (a separate `constitution.md` would
+Guardrails + mtt notes — not a new file (a separate `constitution.md` would
 be the exact prose-duplication we are removing). Keep ≤ ~8 one-liners.
 
 **Status: applied** in AGENTS.md (`## Principles`) on this branch.
@@ -148,6 +148,12 @@ be the exact prose-duplication we are removing). Keep ≤ ~8 one-liners.
 ---
 
 ## Decision 4 — Beads: keep until a trigger, then Backlog.md
+
+> **Superseded (session 026, 2026-07-27):** the "trigger" arrived — task tracking was
+> migrated **beads → mtt** (executable gated flows; see
+> `docs/superpowers/specs/2026-07-26-migrate-beads-to-mtt-design.md`). `.beads/` is now a
+> frozen archive and `bd remember` → mtt notes. The reasoning below is kept as the
+> historical record of why beads was retained until then.
 
 bd is kept (it works; sunk cost; the task-graph + ready-queue + `bd remember`
 fit the multi-session model). The "confluence half" (knowledge) is **already**

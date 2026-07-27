@@ -7,6 +7,10 @@ one-liners every session. Distilled from instrumented logs of sessions 005
 
 > The raw per-session bash logs were temporary scratch artifacts. This file is
 > the committed consolidation; the scratch logs are superseded by it.
+>
+> **Note (session 026, 2026-07-27):** task tracking migrated beads → mtt. The beads
+> findings/mentions below (issues.jsonl churn, `core.hooksPath`/hook ownership, `bd create`)
+> are historical; the live conventions are in AGENTS.md › Agent Ergonomics.
 
 ## Source data and method
 
@@ -113,9 +117,9 @@ any abstraction.
 ### T3 — conventions (see AGENTS.md › Agent Ergonomics)
 
 - No post-commit confirmation tails — trust the tool result.
-- The `Co-Authored-By` trailer is required on every commit (kept as a convention,
-  because the `prepare-commit-msg` hook slot is owned by beads).
-- Capture new issue IDs with `bd create --json | jq -r .id`, not `grep`.
+- The `Co-Authored-By` trailer is required on every hand-authored commit (a convention;
+  there are no git hooks — beads' were removed at the mtt migration).
+- Capture new task IDs with `mtt add … --json | jq -r .id`, not `grep`.
 - Rely on the Bash tool's built-in output truncation; add `| tail`/`head` only for
   genuinely unbounded streams.
 - Verify tree assumptions with a command over the whole repo, not by eye on `src/`.

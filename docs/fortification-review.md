@@ -2,6 +2,10 @@
 
 Date: 2026-06-22
 
+> **Historical (pre-mtt).** Session 026 (2026-07-27) migrated task tracking beads → mtt;
+> `.beads/` is a frozen archive. The beads / `bd` / `bd close` references below are superseded —
+> the live workflow is AGENTS.md ("Working under mtt"). Kept as a dated review record.
+
 ## Scope
 
 This consolidation session reviews the project foundation after Sessions 001-003 and before new product-feature work. It does not add EXIF extraction, preview generation, media processing, clustering, publication, usage accounting, or connectors.
