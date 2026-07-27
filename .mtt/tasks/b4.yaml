@@ -4,11 +4,10 @@ title: finalizeResult winner-gate keys on jobId, not photo's current run — sta
 status: tbd
 priority: low
 tags:
-    - "1"
     - migrated
 created: "2026-07-27T00:26:03Z"
-updated: "2026-07-27T01:02:25Z"
+updated: "2026-07-27T01:04:42Z"
 description: |-
-    s021 code-review (finder2 #1). opm's winner-gate applies terminal writes when job.status===outcome. This assumes ONE terminal job per photo (only 'initial' jobs exist today), so a redelivery only re-applies the same job's idempotent writes. If a 'reprocess' second job is ever wired (createProcessingJob already accepts type 'reprocess' with no caller): photo finalized by J1 (variants V1) → reprocess J2 succeeds (variants V2) → broker redelivers J1's SUCCEEDED → gate passes (J1.status==='succeeded') → re-upserts stale V1 over V2, reverting the photo. The old '!applied' early-return prevented this (finalizeJob(J1)=false → return). LATENT: not reachable until reprocess is wired. Fix when reprocess lands: gate on 'is this job the photo's current/latest run' (e.g. compare against the photo's active job), not just the job's own recorded status.
+    s021 code-review (finder2 review-1). opm's winner-gate applies terminal writes when job.status===outcome. This assumes ONE terminal job per photo (only 'initial' jobs exist today), so a redelivery only re-applies the same job's idempotent writes. If a 'reprocess' second job is ever wired (createProcessingJob already accepts type 'reprocess' with no caller): photo finalized by J1 (variants V1) → reprocess J2 succeeds (variants V2) → broker redelivers J1's SUCCEEDED → gate passes (J1.status==='succeeded') → re-upserts stale V1 over V2, reverting the photo. The old '!applied' early-return prevented this (finalizeJob(J1)=false → return). LATENT: not reachable until reprocess is wired. Fix when reprocess lands: gate on 'is this job the photo's current/latest run' (e.g. compare against the photo's active job), not just the job's own recorded status.
 
     (migrated from beads photo_ops-4uj)
