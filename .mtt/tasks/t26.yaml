@@ -1,0 +1,10 @@
+id: t26
+type: task
+status: tbd
+priority: low
+tags:
+    - decision
+    - migrated
+created: "2026-07-27T00:26:03Z"
+updated: "2026-07-27T00:26:03Z"
+description: Migrated from beads photo_ops-aal (full text in archived .beads/issues.jsonl).

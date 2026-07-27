@@ -1,0 +1,9 @@
+id: t6
+type: task
+status: tbd
+priority: medium
+tags:
+    - migrated
+created: "2026-07-27T00:26:03Z"
+updated: "2026-07-27T00:26:03Z"
+description: Migrated from beads photo_ops-4vg (full text in archived .beads/issues.jsonl).

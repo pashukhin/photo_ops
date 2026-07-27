@@ -1,0 +1,11 @@
+id: t2
+type: task
+title: Consistent filtering, sorting, pagination across all list views
+status: tbd
+priority: high
+parent: s2
+tags:
+    - migrated
+created: "2026-07-27T00:26:03Z"
+updated: "2026-07-27T00:26:03Z"
+description: Migrated from beads photo_ops-9q4.4 (full text in archived .beads/issues.jsonl).

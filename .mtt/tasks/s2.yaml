@@ -1,0 +1,10 @@
+id: s2
+type: story
+title: Release / demo readiness — product gaps
+status: tbd
+priority: high
+tags:
+    - migrated
+created: "2026-07-27T00:26:03Z"
+updated: "2026-07-27T00:26:03Z"
+description: Migrated from beads photo_ops-9q4 (full text in archived .beads/issues.jsonl).

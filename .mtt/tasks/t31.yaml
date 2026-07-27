@@ -1,0 +1,9 @@
+id: t31
+type: task
+status: tbd
+priority: low
+tags:
+    - migrated
+created: "2026-07-27T00:26:03Z"
+updated: "2026-07-27T00:26:03Z"
+description: Migrated from beads photo_ops-03x (full text in archived .beads/issues.jsonl).

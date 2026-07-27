@@ -1,0 +1,11 @@
+id: t3
+type: task
+title: Public user posts page — feed + pagination + calendar
+status: tbd
+priority: high
+parent: s2
+tags:
+    - migrated
+created: "2026-07-27T00:26:03Z"
+updated: "2026-07-27T00:26:03Z"
+description: Migrated from beads photo_ops-9q4.1 (full text in archived .beads/issues.jsonl).

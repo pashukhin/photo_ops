@@ -1,0 +1,11 @@
+id: t4
+type: task
+title: Telegram-channel publisher (connector) with per-user settings
+status: tbd
+priority: medium
+parent: s2
+tags:
+    - migrated
+created: "2026-07-27T00:26:03Z"
+updated: "2026-07-27T00:26:03Z"
+description: Migrated from beads photo_ops-9q4.5 (full text in archived .beads/issues.jsonl).
