@@ -5,8 +5,11 @@ status: tbd
 priority: low
 tags:
     - migrated
+    - photo
+    - proto
+    - tech
 created: "2026-07-27T00:26:03Z"
-updated: "2026-07-27T01:02:25Z"
+updated: "2026-07-27T01:16:21Z"
 description: |-
     Session-022 review (3 finders): Location.lat/lon is smuggled media-worker->photo-service inside GeoPlace.raw_provider_data JSON and re-parsed in finalizeResult (parseMetadata(place.rawProviderData) as {lat,lon}). Untyped cross-service contract: if geocode.py's json keys drift, lat/lon coalesce to null with no compile/wire error, breaking the 023 cluster map (9q4.2) which reads Location.lat/lon. Fix: add 'optional double lat=7; optional double lon=8;' to GeoPlace (processing.proto), set them in geocode.py/_lookup + encode_result, map in decodeResult, and read place.lat/lon in finalizeResult instead of parsing raw. 022 ships the raw-parse (smoke-verified working + now asserted non-null in smoke-media); do this when 023 consumes Location.lat/lon.
 

@@ -5,8 +5,9 @@ status: tbd
 priority: low
 tags:
     - migrated
+    - web
 created: "2026-07-27T00:26:03Z"
-updated: "2026-07-27T01:02:25Z"
+updated: "2026-07-27T01:16:21Z"
 description: |-
     Non-blocking quality items from the session-018 final /code-review (all deferred; the one correctness bug — empty replace-all 500 — was fixed in-session).
     1. PostEditor duplicates ClusterView's listPhotos({pageSize:500}) fetch + photosById map verbatim, and over-fetches: it knows its exact photo_id set (post.photos) so a batch-by-ids fetch would pull <30 not 500. Extract a usePhotosById()/variant helper.

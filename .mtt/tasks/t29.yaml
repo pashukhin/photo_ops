@@ -5,8 +5,12 @@ status: tbd
 priority: low
 tags:
     - migrated
+    - tech
+    - usage
+depends_on:
+    - t26
 created: "2026-07-27T00:26:03Z"
-updated: "2026-07-27T01:02:26Z"
+updated: "2026-07-27T01:16:22Z"
 description: |-
     Owner feedback (s012 add-on review): processing consumption is currently emitted as photo_processed / resource=processing / unit=operation (a count, by photo-service). It should be a provider-independent raw unit: cpu_seconds (and likely wall_seconds), self-measured by the operation's runtime (media-worker for media processing; cluster compute already self-meters per s013). Replaces/augments the operation count as the billable processing measure. Pricing resolves $/cpu_second. See ADR-0004 raw-unit seam.
 

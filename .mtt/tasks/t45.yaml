@@ -5,8 +5,10 @@ status: tbd
 priority: low
 tags:
     - migrated
+    - process
+    - tech
 created: "2026-07-27T00:26:03Z"
-updated: "2026-07-27T01:02:26Z"
+updated: "2026-07-27T01:16:22Z"
 description: |-
     The mechanical half of photo_ops-mp0 shipped: the test-integrity guard (Allow-test-removal trailer + make test-guard + CI). Still deferred and trigger-gated: (1) anti-gaming — visible/hidden acceptance-test split + mutation testing to detect specification-gaming (a skeleton whose tests assert their own trivial correctness); (2) proto/schema/migration diff-flagging that forces a design-change note when a contract/DDL changes past the skeleton checkpoint. Not day-one (expensive; over-investment absent a real trigger). Build only if a session surfaces test-gaming or silent contract/schema drift that the current gates (skeleton-gate coverage, test-guard removal-trailer) do not catch. Ref: docs/agent-workflow-evolution.md Decision 1 guardrails + Decision 7.
 

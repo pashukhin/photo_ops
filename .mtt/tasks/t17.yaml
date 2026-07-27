@@ -5,8 +5,9 @@ status: tbd
 priority: low
 tags:
     - migrated
+    - web
 created: "2026-07-27T00:26:03Z"
-updated: "2026-07-27T01:02:25Z"
+updated: "2026-07-27T01:16:21Z"
 description: |-
     Non-blocking quality items from the session-019 final /code-review (the two action-worthy findings — lazy-publisher cache-reset on broker blip, stale publication-service CLAUDE.md — were fixed in-session).
     1. api-gateway PublicationClient repeats the new Promise((resolve,reject)=>...) promisify block 3x for publishPost/unpublishPost/getPublicPostBySlug (7 methods total); PhotoClient already has a private call<T>(invoke) helper — extract the same on PublicationClient.

@@ -5,8 +5,12 @@ status: tbd
 priority: low
 tags:
     - migrated
+    - tech
+    - usage
+depends_on:
+    - t26
 created: "2026-07-27T00:26:03Z"
-updated: "2026-07-27T01:02:26Z"
+updated: "2026-07-27T01:16:22Z"
 description: |-
     Owner note from s012 add-on brainstorm: the detail report ships as line items (one row per measurement). Future: add operation_id (idempotency_key) column to billing_events so measurements of one operation (e.g. a processing job: variant bytes + processed count) group into a single per-operation row with its total cost + breakdown. Needs an additive migration + grouped query + UI grouping.
 

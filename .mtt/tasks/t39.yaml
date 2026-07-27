@@ -5,8 +5,11 @@ status: tbd
 priority: low
 tags:
     - migrated
+    - proto
+    - tech
+    - testing
 created: "2026-07-27T00:26:03Z"
-updated: "2026-07-27T01:02:26Z"
+updated: "2026-07-27T01:16:22Z"
 description: |-
     Follow-up from session-006 final review. make proto-check uses 'git diff --exit-code -- packages/proto-ts', which ignores UNTRACKED files. The realistic regression (editing a .proto without regenerating tracked output) IS caught. But adding a brand-new proto package whose generated .ts files are not yet git-added would pass the check green despite uncommitted generated output. Fix options: use 'git status --porcelain -- packages/proto-ts' (catches untracked), or 'git add -N packages/proto-ts' before the diff. Low priority; the in-scope drift case is already covered.
 

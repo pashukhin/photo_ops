@@ -5,8 +5,12 @@ status: tbd
 priority: low
 tags:
     - migrated
+    - tech
+    - usage
+depends_on:
+    - t26
 created: "2026-07-27T00:26:03Z"
-updated: "2026-07-27T01:02:25Z"
+updated: "2026-07-27T01:16:22Z"
 description: |-
     s013 review: cluster emits raw wall/cpu/byte_second measurements but usage-service demoRateTable prices only storage/byte + processing/operation, so clustering compute resolves to 0 (raw units ledgered; pricing is a read-time seam per ADR-0004). Add rates when compute billing is wanted. Ties to photo_ops-590/9u5.
 

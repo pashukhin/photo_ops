@@ -4,9 +4,10 @@ title: 'Clustering: decompose method into algorithm × feature-space + add HDBSC
 status: tbd
 priority: medium
 tags:
+    - cluster
     - migrated
 created: "2026-07-27T00:26:03Z"
-updated: "2026-07-27T01:02:26Z"
+updated: "2026-07-27T01:16:21Z"
 description: |-
     User request (post-019): the current single time_only method (threshold-based device-segmented agglomerative) is 'not awful but insufficient' — a fixed merge threshold doesn't adapt to density. Two asks:
 

@@ -5,8 +5,10 @@ status: tbd
 priority: low
 tags:
     - migrated
+    - process
+    - tech
 created: "2026-07-27T00:26:03Z"
-updated: "2026-07-27T01:02:26Z"
+updated: "2026-07-27T01:16:22Z"
 description: |-
     Process improvement to the review loop (docs/agent-workflow-evolution.md Decision 2). Before any artifact (skeleton/spec, and/or the final branch) reaches a HUMAN reviewer, a separate reviewer agent runs an automated machine review; only on a clean pass does it go to the human; on findings it is RETURNED to the author for rework (loop), not forwarded. Goal: humans spend attention only on artifacts that already cleared machine-checkable issues.
 

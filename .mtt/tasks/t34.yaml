@@ -5,8 +5,11 @@ status: tbd
 priority: low
 tags:
     - migrated
+    - needs-review
+    - process
+    - tech
 created: "2026-07-27T00:26:03Z"
-updated: "2026-07-27T01:02:26Z"
+updated: "2026-07-27T01:16:22Z"
 description: |-
     Extend scripts/sdd with intent-verbs that wrap the bd + git lifecycle deterministically: the agent expresses intent and automation handles mechanics in correct order, no skipped steps, no drift. The git-lifecycle analogue of skeleton-first: turn the session-close protocol from prose-to-follow into a command-to-run, which for an agent is a determinism guarantee against LLM drift.
 

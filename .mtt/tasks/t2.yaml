@@ -6,8 +6,9 @@ priority: high
 parent: s2
 tags:
     - migrated
+    - web
 created: "2026-07-27T00:26:03Z"
-updated: "2026-07-27T01:02:25Z"
+updated: "2026-07-27T01:16:21Z"
 description: |-
     MUST. Uniform filter + sort + pagination on every list surface. The photos gallery has server-side sort/filter/paginate (s011); the posts listing, clusters list, usage report, and the new public feed are inconsistent or missing controls. Define one shared toolbar + pagination pattern and apply everywhere. Absorbs point items photo_ops-nst (gallery status-filter widget) and photo_ops-jfv (usage combobox filters).
 

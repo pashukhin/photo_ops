@@ -5,8 +5,12 @@ status: tbd
 priority: low
 tags:
     - migrated
+    - tech
+    - usage
+depends_on:
+    - t26
 created: "2026-07-27T00:26:03Z"
-updated: "2026-07-27T01:02:26Z"
+updated: "2026-07-27T01:16:22Z"
 description: |-
     Owner feedback (s012 add-on review): storage should be billed as byte_seconds — bytes stored integrated over time (rent), not the current one-shot bytes-stored level (photo_original_stored / unit=byte). Implement the storage-reconciler (ADR-0004 / TZ §5 Go shell) that periodically emits the byte_seconds integral for live objects (and handles deletes). Pricing resolves $/byte_second (≈ $/GB-month). Replaces the demo bytes-level rent estimate.
 

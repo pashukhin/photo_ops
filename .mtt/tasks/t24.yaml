@@ -5,8 +5,10 @@ status: tbd
 priority: low
 tags:
     - migrated
+    - process
+    - tech
 created: "2026-07-27T00:26:03Z"
-updated: "2026-07-27T01:02:26Z"
+updated: "2026-07-27T01:16:22Z"
 description: |-
     Today the exSDD method is spread across: in-place edits to the project-level superpowers skills (.claude/skills/superpowers/skills/writing-plans, subagent-driven-development), AGENTS.md (## Principles + Workflow Rules), scripts/sdd, and docs/agent-workflow-evolution.md -- and it HARD-REFERENCES this repo's carriers (make gate, make smoke-ui/smoke-stack, bd + bd remember, docs/adr, the Makefile, .beads). That entanglement makes the process non-portable.
 

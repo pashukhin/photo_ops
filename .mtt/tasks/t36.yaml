@@ -5,8 +5,11 @@ status: tbd
 priority: low
 tags:
     - migrated
+    - needs-review
+    - process
+    - tech
 created: "2026-07-27T00:26:03Z"
-updated: "2026-07-27T01:02:26Z"
+updated: "2026-07-27T01:16:22Z"
 description: |-
     Per docs/agent-workflow-evolution.md (Decision 2): replace the hand-rolled reviewer subagent in the finish step with the native /code-review command for the final whole-branch review.
 

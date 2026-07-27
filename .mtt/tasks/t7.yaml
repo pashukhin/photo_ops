@@ -4,9 +4,11 @@ title: Add service readiness checks
 status: tbd
 priority: medium
 tags:
+    - infra
     - migrated
+    - tech
 created: "2026-07-27T00:26:03Z"
-updated: "2026-07-27T01:02:26Z"
+updated: "2026-07-27T01:16:21Z"
 description: |-
     Application services should expose readiness checks that verify their owned dependencies, such as database connectivity for data-owning services and MinIO access for photo-service. This was identified during Session I fortification review and deferred to avoid expanding scope.
 

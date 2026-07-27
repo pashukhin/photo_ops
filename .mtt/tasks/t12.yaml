@@ -4,9 +4,12 @@ title: Pin remaining remote proto plugins (go/python/grpc) for reproducibility
 status: tbd
 priority: low
 tags:
+    - infra
     - migrated
+    - proto
+    - tech
 created: "2026-07-27T00:26:03Z"
-updated: "2026-07-27T01:02:25Z"
+updated: "2026-07-27T01:16:21Z"
 description: |-
     proto/buf.gen.go.yaml (buf.build/protocolbuffers/go, buf.build/grpc/go), buf.gen.python.yaml + buf.gen.cluster-python.yaml (protocolbuffers/python, pyi, grpc/python) still use UNPINNED remote plugins — same latent bug that reddened CI's proto-drift check when ts-proto floated v2.11.8->v2.12.0 (fixed by pinning ts-proto in the s020 branch). Pin each to the version its committed artifacts were generated with (check the generated-file version headers), run make proto, confirm a byte-identical tree. Prevents a surprise red CI on the next go/python plugin bump.
 

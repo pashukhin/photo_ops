@@ -5,8 +5,11 @@ status: tbd
 priority: low
 tags:
     - migrated
+    - photo
+depends_on:
+    - t11
 created: "2026-07-27T00:26:03Z"
-updated: "2026-07-27T01:02:26Z"
+updated: "2026-07-27T01:16:22Z"
 description: |-
     Session 023 manual location makes the user supply BOTH the place labels AND the clicked point. Nice-to-have: reverse-geocode the clicked point to fill the tuple (GeoNames data lives in media-worker today) or forward-geocode a typed city to a point. Reduces the control to one action.
 
