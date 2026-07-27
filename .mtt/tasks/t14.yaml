@@ -1,0 +1,14 @@
+id: t14
+type: task
+title: Extract shared dateRange helper (PostsList + public page duplicate it)
+status: tbd
+priority: low
+tags:
+    - migrated
+    - web
+created: "2026-07-27T00:26:03Z"
+updated: "2026-07-27T01:16:21Z"
+description: |-
+    From s020 final /code-review (reuse). apps/web/components/posts/PostsList.tsx dateRange() and apps/web/app/posts/[id]/page.tsx dateRange() both implement iso.slice(0,10) + '<a> – <b>' / 'a||b' range formatting (differ only in signature PostSummary vs from/to and empty-case null vs ''). A format change must be made in two places and will drift between the owner list and the public page. Extract one shared formatDateRange(from,to): string (returns '' for empty — works for both call sites) into a small web util. Related to e9g-class dedup.
+
+    (migrated from beads photo_ops-0st)

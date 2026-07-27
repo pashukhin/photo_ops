@@ -1,0 +1,15 @@
+id: b2
+type: bugfix
+title: photo-service result-consumer DLQs transient finalize faults → photo stranded in processing
+status: tbd
+priority: medium
+tags:
+    - migrated
+    - photo
+    - tech
+created: "2026-07-27T00:26:03Z"
+updated: "2026-07-27T01:16:21Z"
+description: |-
+    ProcessingResultConsumer (apps/photo-service/src/photo/processing.consumer.ts:21) nacks any finalizeResult exception to DLQ with requeue=false (rabbitmq-bus.ts nack(raw,false,false)). If finalizeJob commits (job→succeeded) but a subsequent write (upsertVariant/applyAttributes/setStatus) throws a TRANSIENT DB fault, the result is dead-lettered and never reprocessed → photo permanently stuck in 'processing'. Neither the opm idempotent-re-apply nor a single finalize transaction fixes this: a rejected tx also DLQs with no redelivery. Fix (parallel to media-worker 0od): classify transient vs permanent finalize faults and requeue/redeliver transient ones (bounded, no callback stall), only DLQ genuinely-permanent. Surfaced by the s021 integrity design review (M3). Out of scope for s021 (opm covers the crash-window + winner-clobber); filed as the residual.
+
+    (migrated from beads photo_ops-55s)

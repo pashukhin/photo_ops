@@ -1,0 +1,14 @@
+id: t16
+type: task
+title: og:image for public post page (needs stable public image URL)
+status: tbd
+priority: low
+tags:
+    - migrated
+    - web
+created: "2026-07-27T00:26:03Z"
+updated: "2026-07-27T01:16:21Z"
+description: |-
+    Deferred from session 020 (share/og design). The public post SSR page emits text OG (og:title/description/type/url + twitter:card) but NO og:image. og:image needs a STABLE image URL: variant urls are short-lived presigned GETs (~1h TTL), so putting one in og:image breaks the stable-link promise (crawlers cache the meta and re-fetch the image later). Options captured: (a) a web route app/posts/[id]/og-image/route.ts that 302-redirects to a fresh first-variant presigned URL (stable web URL, resolves fresh each crawl); (b) a longer-TTL public presign / gateway image proxy (larger infra, drops owner-scope invariant — cf. 019 D1 rejected option C). Also: a purely local demo can't render external previews (Telegram/Twitter can't reach localhost MinIO), so this pays off mainly with a public deploy. RED: shared link preview shows the post's first photo.
+
+    (migrated from beads photo_ops-278)

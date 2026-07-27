@@ -1,0 +1,14 @@
+id: t8
+type: task
+title: Photo detail modal too tall — move location editing to a separate tab
+status: tbd
+priority: low
+tags:
+    - migrated
+    - web
+created: "2026-07-27T00:26:03Z"
+updated: "2026-07-27T01:16:21Z"
+description: |-
+    Session 023 regression: the manual-location control (components/gallery/LocationEditor.tsx — 5 place fields + a 320px h-80 pick map + Save) is mounted INLINE in PhotoDetailModal below the attribute <dl>, making the modal overflow the viewport (doesn't fit on screen). Move location editing out of the always-visible modal body: e.g. a tabbed modal (Details | Location) that only mounts the map/LocationEditor on the Location tab, or a collapsible section, so the default Details view fits. Keep the shared LocationEditor + setPhotoLocation flow; only change where/when it renders. Also lets PhotoMap mount lazily (it's coverage-excluded glue). UX polish, not a data/correctness issue.
+
+    (migrated from beads photo_ops-vey)

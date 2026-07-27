@@ -1,0 +1,279 @@
+version: 1
+# photo_ops flow — the single task tracker (beads retired 2026-07-27, session 026).
+# Adapted from the vendored git-flow flagship (docs/superpowers/vendor/git-flow.yaml)
+# to the 3-type taxonomy of docs/superpowers/specs/2026-07-26-migrate-beads-to-mtt-design.md.
+#
+# Integration branch = `main`: task/<id> branches fork from and deliver onto main via
+# a squash-merged PR whose title is `<id>: …` (the deliver gate greps for it).
+#
+# Only {{.ID}} {{.Type}} {{.From}} {{.To}} expand in commands. command_timeout default
+# is 5m; heavy gates (make gate, smokes) carry their own per-command timeout.
+project:
+  name: photo_ops
+command_timeout: 5m
+require: {who: true}
+
+# Non-flow mutations (add/edit/tag/dep/ref) never traverse an edge — auto-commit
+# each entity's file here, narrowed pathspec + hooks disabled + "mtt:"-namespaced
+# subject (can never satisfy the deliver grep `^<id>: `). Note mutations are
+# committed manually in the KB-seed step (T7), so no note event is wired.
+events:
+  task:
+    create:
+      post:
+        - 'a=.mtt/tasks/{{.ID}}.yaml; git add -- "$a" && { git diff --cached --quiet -- "$a" || git commit -m "mtt: {{.ID}} {{.Event}}" -- "$a"; }'
+    update:
+      post:
+        - 'a=.mtt/tasks/{{.ID}}.yaml; git add -- "$a" && { git diff --cached --quiet -- "$a" || git commit -m "mtt: {{.ID}} {{.Event}}" -- "$a"; }'
+    delete:
+      post:
+        - 'a=.mtt/tasks/{{.ID}}.yaml; git add -- "$a" 2>/dev/null; git commit -m "mtt: {{.ID}} {{.Event}}" -- "$a" 2>/dev/null || true'
+
+types:
+  # ---------------------------------------------------------------------------
+  - name: story
+    prefix: s
+    parents: []               # root type. Story-under-story nesting is engine-impossible in
+                              # v0.11.0 (a type cannot be its own parent) — deferred, like {{.Parent}}.
+    description: "Coherence node: owns spec/e2e/ADR. No branch; children deliver as their own task/bugfix branches."
+    post_defaults:
+      - 'git add .mtt && git commit -m "{{.ID}}: {{.From}} → {{.To}}" -- .mtt'
+    statuses:
+      - {name: tbd,          kind: initial,  description: "queued; `mtt start` to begin speccing"}
+      - {name: speccing,     kind: active,   description: "brainstorm → author docs/superpowers/specs/{{.ID}}-*.md (incl. e2e section); `mtt submit`"}
+      - {name: spec_review,  kind: active,   description: "spec review (agent + human); `mtt approve` / `mtt decline`"}
+      - {name: planning,     kind: active,   description: "author docs/superpowers/plans/{{.ID}}-*.md; `mtt submit`"}
+      - {name: plan_review,  kind: active,   description: "plan review; `mtt approve` (children may start) / `mtt decline`"}
+      - {name: in_progress,  kind: active,   description: "children deliver on their own branches; `mtt submit` when all are done"}
+      - {name: acceptance,   kind: active,   description: "child-completeness + e2e green on the integration branch; `mtt accept` / `mtt decline`"}
+      - {name: done,         kind: terminal, description: "story accepted"}
+      - {name: cancelled,    kind: terminal, description: "abandoned"}
+    transitions:
+      - {from: tbd, to: speccing, name: start, current: set}
+      - from: speccing
+        to: spec_review
+        name: submit
+        description: "spec (incl. e2e-scenario section) must exist"
+        commands:
+          - 'ls docs/superpowers/specs/{{.ID}}-*.md >/dev/null 2>&1 || { echo "no spec docs/superpowers/specs/{{.ID}}-*.md (author it, incl. the e2e-scenario section)" >&2; false; }'
+      - {from: spec_review, to: planning, name: approve, description: "spec signed off"}
+      - {from: spec_review, to: speccing, name: decline}
+      - from: planning
+        to: plan_review
+        name: submit
+        commands:
+          - 'ls docs/superpowers/plans/{{.ID}}-*.md >/dev/null 2>&1 || { echo "no plan docs/superpowers/plans/{{.ID}}-*.md" >&2; false; }'
+      - {from: plan_review, to: in_progress, name: approve, description: "plan signed off; children may start"}
+      - {from: plan_review, to: planning, name: decline}
+      - from: in_progress
+        to: acceptance
+        name: submit
+        description: "all children done + e2e green on the integration branch"
+        commands:
+          - '[ -z "$(mtt list --parent {{.ID}} --json | jq -r ".[] | select(.status != \"done\" and .status != \"cancelled\") | .id")" ] || { echo "story {{.ID}} has children not in done/cancelled — finish them first" >&2; false; }'
+          - {run: 'scripts/mtt-smoke-gate', timeout: 20m}
+          - 'mtt check'
+      - {from: acceptance, to: done, name: accept, description: "human acceptance; optional milestone tag"}
+      - {from: acceptance, to: in_progress, name: decline}
+      - {from: tbd, to: cancelled, name: cancel, current: clear}
+      - {from: speccing, to: cancelled, name: cancel, current: clear}
+      - {from: planning, to: cancelled, name: cancel, current: clear}
+      - {from: in_progress, to: cancelled, name: cancel, current: clear}
+
+  # ---------------------------------------------------------------------------
+  - name: task
+    prefix: t
+    parents: [story]          # parentless internal work: `mtt add --type task --no-parent` + tag #tech
+    default: true
+    description: "Design-closed delivery unit on its own task/{{.ID}} branch → PR → merge."
+    post_defaults:
+      - 'git add .mtt && git commit -m "{{.ID}}: {{.From}} → {{.To}}" -- .mtt'
+    statuses:
+      - {name: tbd,             kind: initial,  description: "queued; `mtt start` branches task/{{.ID}}"}
+      - {name: skeleton,        kind: active,   description: "write the RED test(s) + stubs; commit code, then `mtt submit`"}
+      - {name: skeleton_review, kind: active,   description: "human skeleton checkpoint; `mtt approve` / `mtt decline`"}
+      - {name: implementing,    kind: active,   description: "make the RED tests green; commit, then `mtt submit`"}
+      - {name: review,          kind: active,   description: "agent adversarial review; `mtt approve` (→ human) / `mtt decline`"}
+      - {name: human_review,    kind: active,   description: "human sign-off; `mtt approve` (→ PR) / `mtt decline`"}
+      - {name: fix,             kind: active,   description: "address review findings; `mtt submit` to re-gate"}
+      - {name: approved,        kind: active,   description: "PR opened/updated; ask a human to merge, then `mtt deliver`"}
+      - {name: done,            kind: terminal, description: "delivered to the integration branch"}
+      - {name: cancelled,       kind: terminal, description: "abandoned"}
+    transitions:
+      - from: tbd
+        to: skeleton
+        name: start
+        current: set
+        description: "branch task/{{.ID}} off the integration branch"
+        commands:
+          - 'git switch task/{{.ID}} || (git switch main && git switch -c task/{{.ID}})'
+      - from: skeleton
+        to: skeleton_review
+        name: submit
+        description: "skeleton review-ready: clean tree + skeleton-gate"
+        commands:
+          - 'out=$(git status --porcelain -- ":(exclude).mtt") && test -z "$out" || { echo "working tree not clean — commit your skeleton first (.mtt is swept by the move)" >&2; false; }'
+          - {run: 'make skeleton-gate', timeout: 10m}
+      - {from: skeleton_review, to: implementing, name: approve}
+      - {from: skeleton_review, to: skeleton, name: decline}
+      - from: implementing
+        to: review
+        name: submit
+        description: "green: clean tree + full gate + coverage + test-guard + dqb smoke + mtt check"
+        commands:
+          - 'out=$(git status --porcelain -- ":(exclude).mtt") && test -z "$out" || { echo "working tree not clean — commit your code first" >&2; false; }'
+          - {run: 'make gate', timeout: 20m}
+          - {run: 'make coverage-gate', timeout: 10m}
+          - 'make test-guard'
+          - {run: 'scripts/mtt-smoke-gate', timeout: 20m}
+          - 'mtt check'
+      - {from: review, to: human_review, name: approve, description: "agent review passed"}
+      - {from: review, to: fix, name: decline}
+      - from: human_review
+        to: approved
+        name: approve
+        description: "human signed off; push the branch and open/update the PR (idempotent)"
+        commands:
+          - 'out=$(git status --porcelain -- ":(exclude).mtt") && test -z "$out" || { echo "working tree not clean" >&2; false; }'
+        post:
+          - 'git push -u origin task/{{.ID}}'
+          - '[ -n "$(gh pr list --head task/{{.ID}} --state open --json number --jq ".[].number")" ] || gh pr create --base main --head task/{{.ID}} --title "{{.ID}}: $(mtt show {{.ID}} --json | jq -r ".title // empty")" --body "Automated PR for {{.ID}} — see: mtt show {{.ID}}"'
+      - {from: human_review, to: fix, name: decline}
+      - from: fix
+        to: review
+        name: submit
+        description: "fixes done; re-gate"
+        commands:
+          - 'out=$(git status --porcelain -- ":(exclude).mtt") && test -z "$out" || { echo "working tree not clean — commit your code first" >&2; false; }'
+          - {run: 'make gate', timeout: 20m}
+          - {run: 'make coverage-gate', timeout: 10m}
+          - 'make test-guard'
+          - {run: 'scripts/mtt-smoke-gate', timeout: 20m}
+          - 'mtt check'
+      - from: approved
+        to: done
+        name: deliver
+        current: clear
+        inherit_post: false
+        description: "after the squash-merge onto the integration branch: pull it, then deliver"
+        commands:
+          - 'git switch main'
+          - 'git log -n 1000 --format=%s | grep -v "^mtt: " | head -200 | grep "^{{.ID}}: " || { echo "no squash commit \"{{.ID}}: …\" on the integration branch: pull/merge the PR first" >&2; false; }'
+        post:
+          - 'a=.mtt/tasks/{{.ID}}.yaml; test -f .mtt/audit.log && a="$a .mtt/audit.log"; git add -- $a && git commit -m "{{.ID}}: {{.From}} → {{.To}}" -- $a'
+      - {from: tbd, to: cancelled, name: cancel, current: clear}
+      - from: skeleton
+        to: cancelled
+        name: cancel
+        current: clear
+        inherit_post: false
+        description: "abandon (moves your tree back to the integration branch)"
+        commands:
+          - 'git switch main'
+        post:
+          - 'a=.mtt/tasks/{{.ID}}.yaml; test -f .mtt/audit.log && a="$a .mtt/audit.log"; git add -- $a && git commit -m "{{.ID}}: {{.From}} → {{.To}}" -- $a'
+      - from: implementing
+        to: cancelled
+        name: cancel
+        current: clear
+        inherit_post: false
+        commands:
+          - 'git switch main'
+        post:
+          - 'a=.mtt/tasks/{{.ID}}.yaml; test -f .mtt/audit.log && a="$a .mtt/audit.log"; git add -- $a && git commit -m "{{.ID}}: {{.From}} → {{.To}}" -- $a'
+
+  # ---------------------------------------------------------------------------
+  - name: bugfix
+    prefix: b
+    parents: [story]          # standalone: `mtt add --type bugfix --no-parent`
+    description: "Delivery unit with a MANDATORY failing-repro pre-gate. Same flow as task + `! make test` on submit."
+    post_defaults:
+      - 'git add .mtt && git commit -m "{{.ID}}: {{.From}} → {{.To}}" -- .mtt'
+    statuses:
+      - {name: tbd,             kind: initial,  description: "queued; `mtt start` branches task/{{.ID}}"}
+      - {name: skeleton,        kind: active,   description: "write the RED reproducing test; commit, then `mtt submit`"}
+      - {name: skeleton_review, kind: active,   description: "human skeleton checkpoint; `mtt approve` / `mtt decline`"}
+      - {name: implementing,    kind: active,   description: "fix until green; commit, then `mtt submit`"}
+      - {name: review,          kind: active,   description: "agent adversarial review; `mtt approve` / `mtt decline`"}
+      - {name: human_review,    kind: active,   description: "human sign-off; `mtt approve` (→ PR) / `mtt decline`"}
+      - {name: fix,             kind: active,   description: "address findings; `mtt submit` to re-gate"}
+      - {name: approved,        kind: active,   description: "PR opened/updated; merge, then `mtt deliver`"}
+      - {name: done,            kind: terminal, description: "delivered to the integration branch"}
+      - {name: cancelled,       kind: terminal, description: "abandoned"}
+    transitions:
+      - from: tbd
+        to: skeleton
+        name: start
+        current: set
+        commands:
+          - 'git switch task/{{.ID}} || (git switch main && git switch -c task/{{.ID}})'
+      - from: skeleton
+        to: skeleton_review
+        name: submit
+        description: "clean tree + skeleton-gate + the suite must be RED (repro exists)"
+        commands:
+          - 'out=$(git status --porcelain -- ":(exclude).mtt") && test -z "$out" || { echo "working tree not clean — commit your repro first" >&2; false; }'
+          - {run: 'make skeleton-gate', timeout: 10m}
+          - {run: '! make test', timeout: 10m}
+      - {from: skeleton_review, to: implementing, name: approve}
+      - {from: skeleton_review, to: skeleton, name: decline}
+      - from: implementing
+        to: review
+        name: submit
+        commands:
+          - 'out=$(git status --porcelain -- ":(exclude).mtt") && test -z "$out" || { echo "working tree not clean — commit your code first" >&2; false; }'
+          - {run: 'make gate', timeout: 20m}
+          - {run: 'make coverage-gate', timeout: 10m}
+          - 'make test-guard'
+          - {run: 'scripts/mtt-smoke-gate', timeout: 20m}
+          - 'mtt check'
+      - {from: review, to: human_review, name: approve}
+      - {from: review, to: fix, name: decline}
+      - from: human_review
+        to: approved
+        name: approve
+        commands:
+          - 'out=$(git status --porcelain -- ":(exclude).mtt") && test -z "$out" || { echo "working tree not clean" >&2; false; }'
+        post:
+          - 'git push -u origin task/{{.ID}}'
+          - '[ -n "$(gh pr list --head task/{{.ID}} --state open --json number --jq ".[].number")" ] || gh pr create --base main --head task/{{.ID}} --title "{{.ID}}: $(mtt show {{.ID}} --json | jq -r ".title // empty")" --body "Automated PR for {{.ID}} — see: mtt show {{.ID}}"'
+      - {from: human_review, to: fix, name: decline}
+      - from: fix
+        to: review
+        name: submit
+        commands:
+          - 'out=$(git status --porcelain -- ":(exclude).mtt") && test -z "$out" || { echo "working tree not clean — commit your code first" >&2; false; }'
+          - {run: 'make gate', timeout: 20m}
+          - {run: 'make coverage-gate', timeout: 10m}
+          - 'make test-guard'
+          - {run: 'scripts/mtt-smoke-gate', timeout: 20m}
+          - 'mtt check'
+      - from: approved
+        to: done
+        name: deliver
+        current: clear
+        inherit_post: false
+        commands:
+          - 'git switch main'
+          - 'git log -n 1000 --format=%s | grep -v "^mtt: " | head -200 | grep "^{{.ID}}: " || { echo "no squash commit \"{{.ID}}: …\" on the integration branch: pull/merge the PR first" >&2; false; }'
+        post:
+          - 'a=.mtt/tasks/{{.ID}}.yaml; test -f .mtt/audit.log && a="$a .mtt/audit.log"; git add -- $a && git commit -m "{{.ID}}: {{.From}} → {{.To}}" -- $a'
+      - {from: tbd, to: cancelled, name: cancel, current: clear}
+      - from: skeleton
+        to: cancelled
+        name: cancel
+        current: clear
+        inherit_post: false
+        commands:
+          - 'git switch main'
+        post:
+          - 'a=.mtt/tasks/{{.ID}}.yaml; test -f .mtt/audit.log && a="$a .mtt/audit.log"; git add -- $a && git commit -m "{{.ID}}: {{.From}} → {{.To}}" -- $a'
+      - from: implementing
+        to: cancelled
+        name: cancel
+        current: clear
+        inherit_post: false
+        commands:
+          - 'git switch main'
+        post:
+          - 'a=.mtt/tasks/{{.ID}}.yaml; test -f .mtt/audit.log && a="$a .mtt/audit.log"; git add -- $a && git commit -m "{{.ID}}: {{.From}} → {{.To}}" -- $a'

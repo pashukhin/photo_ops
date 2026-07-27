@@ -8,7 +8,8 @@ beforeEach(() => {
 });
 
 vi.mock('../../lib/api', () => ({
-  setPhotoLocation: vi.fn()
+  setPhotoLocation: vi.fn(),
+  clearPhotoLocation: vi.fn()
 }));
 
 // PhotoMap is Leaflet glue — stub it to a "pick here" button that fires onPick, so
@@ -64,5 +65,24 @@ describe('LocationEditor', () => {
     fireEvent.change(screen.getByLabelText(/city/i), { target: { value: 'Paris' } });
     fireEvent.click(screen.getByRole('button', { name: /save location/i }));
     await screen.findByText(/save boom/);
+  });
+
+  it('clears the location via clearPhotoLocation and reports the updated photo', async () => {
+    // why (zvc): the Clear control removes the manual location with no payload and
+    // threads the location-absent reply back through onSaved — no place/point needed.
+    vi.mocked(api.clearPhotoLocation).mockResolvedValue({ id: 'photo-1' } as never);
+    const onSaved = vi.fn();
+    render(<LocationEditor photoId="photo-1" onSaved={onSaved} />);
+    fireEvent.click(screen.getByRole('button', { name: /clear location/i }));
+    await waitFor(() => expect(api.clearPhotoLocation).toHaveBeenCalledWith('photo-1'));
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+  });
+
+  it('surfaces a clear failure', async () => {
+    // why: a failed clear must not be lost — it shows in the editor's error line
+    vi.mocked(api.clearPhotoLocation).mockRejectedValue(new Error('clear boom'));
+    render(<LocationEditor photoId="photo-1" onSaved={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /clear location/i }));
+    await screen.findByText(/clear boom/);
   });
 });

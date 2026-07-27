@@ -1,8 +1,41 @@
 {
+  "hooks": {
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "scripts/lint-changed",
+            "type": "command"
+          }
+        ],
+        "matcher": "Write|Edit"
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "command": "mtt prime 2>/dev/null || true",
+            "type": "command"
+          }
+        ],
+        "matcher": ""
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "command": "mtt prime 2>/dev/null || true",
+            "type": "command"
+          }
+        ],
+        "matcher": ""
+      }
+    ]
+  },
   "permissions": {
     "allow": [
-      "Bash(bd:*)",
-
       "Bash(git status:*)",
       "Bash(git diff:*)",
       "Bash(git log:*)",
@@ -21,10 +54,8 @@
       "Bash(git remote:*)",
       "Bash(git check-ignore:*)",
       "Bash(git ls-files:*)",
-
       "Bash(gh run:*)",
       "Bash(gh auth:*)",
-
       "Bash(make gate:*)",
       "Bash(make proto:*)",
       "Bash(make proto-check:*)",
@@ -36,47 +67,26 @@
       "Bash(make migrate:*)",
       "Bash(make status:*)",
       "Bash(make logs:*)",
-
       "Bash(scripts/sdd:*)",
       "Bash(./scripts/sdd:*)",
       "Bash(sh scripts/test-smoke-upload-contract.sh)",
       "Bash(scripts/smoke-upload.sh)",
-      "Bash(scripts/smoke-auth-upload-ownership.sh)"
-    ]
-  },
-  "hooks": {
-    "PreCompact": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bd prime"
-          }
-        ]
-      }
-    ],
-    "SessionStart": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bd prime"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "scripts/lint-changed"
-          }
-        ]
-      }
+      "Bash(scripts/smoke-auth-upload-ownership.sh)",
+      "Bash(mtt roadmap:*)",
+      "Bash(mtt list:*)",
+      "Bash(mtt show:*)",
+      "Bash(mtt tree:*)",
+      "Bash(mtt ready:*)",
+      "Bash(mtt types:*)",
+      "Bash(mtt prime:*)",
+      "Bash(mtt check:*)",
+      "Bash(mtt tags:*)",
+      "Bash(mtt version:*)",
+      "Bash(mtt dep list:*)",
+      "Bash(mtt note show:*)",
+      "Bash(mtt note list:*)",
+      "Bash(mtt ref list:*)",
+      "Bash(mtt note ref list:*)"
     ]
   }
 }

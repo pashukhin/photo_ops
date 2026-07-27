@@ -1,0 +1,15 @@
+id: t19
+type: task
+title: 'usage report: shadcn Combobox for the two type filters (split from rh0)'
+status: tbd
+priority: low
+tags:
+    - migrated
+    - usage
+    - web
+created: "2026-07-27T00:26:03Z"
+updated: "2026-07-27T01:16:21Z"
+description: |-
+    Deferred visual-lane piece of rh0 (session 015 shipped the other two rh0 parts: localized occurred_at dates + filter-aware empty state). Replace the input+datalist resource-type/operation-type filters in UsageReport with a shadcn Combobox for visual consistency. Cost that made it unfit for the s015 thin slice: needs a new dep (cmdk) + vendored Popover/Command primitives, and it breaks the existing jsdom test 'refetches with the new filter...' which does fireEvent.change on the datalist input (a Combobox is a button+popover, not an <input>), so that behavioral test must move to the visual/smoke lane (Allow-test-removal trailer). Epic photo_ops-syu context; the datalist works and looks clean today, so this is a polish nicety, not a bug.
+
+    (migrated from beads photo_ops-jfv)

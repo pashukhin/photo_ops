@@ -1,0 +1,15 @@
+id: t4
+type: task
+title: Telegram-channel publisher (connector) with per-user settings
+status: tbd
+priority: medium
+parent: s2
+tags:
+    - connector
+    - migrated
+created: "2026-07-27T00:26:03Z"
+updated: "2026-07-27T01:16:21Z"
+description: |-
+    HIGHLY DESIRABLE for release. At least one working publisher: publish a post to a Telegram channel. Requires per-user connector settings (bot token / channel id) + a settings UI + secure storage of secrets, and a publish-to-connector flow. connector-service is a stub (explicitly deferred through s020; frame-spec §3.9 — own platform is source of truth, connectors secondary; Telegram is 021+). Roadmap stage 7 (Sharing/connectors); see ADR-004 backfill (photo_ops-83j). A PublicationAttempt/connector flow was modeled but deferred in the domain.
+
+    (migrated from beads photo_ops-9q4.5)

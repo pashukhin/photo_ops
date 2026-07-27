@@ -1,0 +1,14 @@
+id: t33
+type: task
+title: 'Gallery: status-filter UI widget (data path done in 011)'
+status: tbd
+priority: low
+tags:
+    - migrated
+    - web
+created: "2026-07-27T00:26:03Z"
+updated: "2026-07-27T01:16:22Z"
+description: |-
+    Session 011 built and tested the multi-status filter end-to-end through the contract (proto status_filter), api-gateway query parsing, and photo-service repo, but GalleryToolbar only renders search + sort — no status-filter widget, so query.status is always []. Add a closed-by-default control (e.g. shadcn DropdownMenu with checkbox items — needs vendoring DropdownMenu) so options aren't always in the DOM (a status-name toggle collides with the status-badge text in PhotoGallery.spec's getByText(/ready/i)). onChange already resets to page 1.
+
+    (migrated from beads photo_ops-nst)

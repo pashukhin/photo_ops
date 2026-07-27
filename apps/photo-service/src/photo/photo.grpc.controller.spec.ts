@@ -46,7 +46,8 @@ function createController() {
     getPhoto: vi.fn(),
     listSpacetime: vi.fn(),
     getVariantsByIds: vi.fn(),
-    setPhotoLocation: vi.fn()
+    setPhotoLocation: vi.fn(),
+    clearPhotoLocation: vi.fn()
   };
   return { controller: new PhotoGrpcController(photoService as never), photoService };
 }
@@ -129,6 +130,31 @@ describe('PhotoGrpcController', () => {
       expect((error as RpcException).getError()).toEqual({ code: status.NOT_FOUND, message: 'photo not found' });
     }
     expect(photoService.setPhotoLocation).toHaveBeenCalledWith('user-1', 'x', {}, null, null);
+  });
+
+  it('ClearPhotoLocation maps the updated photo to the proto reply', async () => {
+    // why: the clear handler passes just userId+photoId and maps the (location-absent) reply
+    const { controller, photoService } = createController();
+    photoService.clearPhotoLocation.mockResolvedValue(makePhotoWithVariants());
+
+    const reply = await controller.clearPhotoLocation({ userId: 'user-1', photoId: 'photo-1' });
+
+    expect(reply.status).toBe(4);
+    expect(photoService.clearPhotoLocation).toHaveBeenCalledWith('user-1', 'photo-1');
+  });
+
+  it('ClearPhotoLocation maps a not-found error to NOT_FOUND', async () => {
+    const { controller, photoService } = createController();
+    photoService.clearPhotoLocation.mockRejectedValue(new Error('photo not found'));
+
+    try {
+      await controller.clearPhotoLocation({ userId: 'user-1', photoId: 'x' });
+      throw new Error('expected rpc exception');
+    } catch (error) {
+      expect(error).toBeInstanceOf(RpcException);
+      expect((error as RpcException).getError()).toEqual({ code: status.NOT_FOUND, message: 'photo not found' });
+    }
+    expect(photoService.clearPhotoLocation).toHaveBeenCalledWith('user-1', 'x');
   });
 
   it('GetPhoto maps a missing photo to not found', async () => {

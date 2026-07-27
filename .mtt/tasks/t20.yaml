@@ -1,0 +1,15 @@
+id: t20
+type: task
+title: 'cluster-db: connection pooling + batch node/item insert (PostgresStore)'
+status: tbd
+priority: low
+tags:
+    - cluster
+    - migrated
+    - tech
+created: "2026-07-27T00:26:03Z"
+updated: "2026-07-27T01:16:21Z"
+description: |-
+    s013 review: PostgresStore opens a psycopg.connect per operation and save_tree inserts nodes/items one row at a time (N+1). Fine at personal-scale; add a pool + executemany/COPY before large runs.
+
+    (migrated from beads photo_ops-bdy)

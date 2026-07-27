@@ -1,0 +1,15 @@
+id: t42
+type: task
+title: Add metrics and tracing (OpenTelemetry) once services take shape
+status: tbd
+priority: low
+tags:
+    - migrated
+    - observability
+    - tech
+created: "2026-07-27T00:26:03Z"
+updated: "2026-07-27T01:16:22Z"
+description: |-
+    Problem: no metrics or distributed tracing exist. Why deferred: full observability value depends on the not-yet-final service topology (Go cluster-service, Python media-worker, async RabbitMQ flows). What (later): OpenTelemetry traces and basic RED metrics across services and gRPC/queue boundaries. Blocked-until: at least one of cluster-service/media-worker has real behavior and async contracts start to exist. Builds on the structured-logging baseline.
+
+    (migrated from beads photo_ops-pb6)

@@ -1,0 +1,68 @@
+id: t1
+type: task
+title: clear/unset a photo location
+status: done
+parent: s1
+created: "2026-07-26T17:17:17Z"
+updated: "2026-07-26T17:55:53Z"
+history:
+    - at: "2026-07-26T17:17:17Z"
+      by: Grigorii Pashukhin
+      from: tbd
+      to: skeleton
+      checks:
+        - cmd: git switch task/t1 || (git switch session-026-migrate-beads-to-mtt && git switch -c task/t1)
+          exit: 0
+    - at: "2026-07-26T17:38:07Z"
+      by: Grigorii Pashukhin
+      from: skeleton
+      to: skeleton_review
+      checks:
+        - cmd: out=$(git status --porcelain -- ":(exclude).mtt") && test -z "$out" || { echo "working tree not clean — commit your skeleton first (.mtt is swept by the move)" >&2; false; }
+          exit: 0
+        - cmd: make skeleton-gate
+          exit: 0
+    - at: "2026-07-26T17:38:29Z"
+      by: Grigorii Pashukhin
+      why: skeleton reviewed (operator; pilot)
+      from: skeleton_review
+      to: implementing
+    - at: "2026-07-26T17:49:56Z"
+      by: Grigorii Pashukhin
+      from: implementing
+      to: review
+      checks:
+        - cmd: out=$(git status --porcelain -- ":(exclude).mtt") && test -z "$out" || { echo "working tree not clean — commit your code first" >&2; false; }
+          exit: 0
+        - cmd: make gate
+          exit: 0
+        - cmd: make coverage-gate
+          exit: 0
+        - cmd: make test-guard
+          exit: 0
+        - cmd: scripts/mtt-smoke-gate
+          exit: 0
+        - cmd: mtt check
+          exit: 0
+    - at: "2026-07-26T17:51:50Z"
+      by: Grigorii Pashukhin
+      why: 'agent review: clean mirror of SetPhotoLocation; 100% cov, make gate + live smoke green (operator; pilot)'
+      from: review
+      to: human_review
+    - at: "2026-07-26T17:51:50Z"
+      by: Grigorii Pashukhin
+      why: human sign-off (operator; pilot)
+      from: human_review
+      to: approved
+      checks:
+        - cmd: out=$(git status --porcelain -- ":(exclude).mtt") && test -z "$out" || { echo "working tree not clean" >&2; false; }
+          exit: 0
+    - at: "2026-07-26T17:55:53Z"
+      by: Grigorii Pashukhin
+      from: approved
+      to: done
+      checks:
+        - cmd: git switch session-026-migrate-beads-to-mtt
+          exit: 0
+        - cmd: 'git log -n 1000 --format=%s | grep -v "^mtt: " | head -200 | grep "^t1: " || { echo "no squash commit \"t1: …\" on the integration branch: pull/merge the PR first" >&2; false; }'
+          exit: 0

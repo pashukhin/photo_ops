@@ -1,0 +1,15 @@
+id: t38
+type: task
+title: RabbitMqBus production hardening (reconnect, publish flow-control, shared topology constants)
+status: tbd
+priority: low
+tags:
+    - messaging
+    - migrated
+    - tech
+created: "2026-07-27T00:26:03Z"
+updated: "2026-07-27T01:16:22Z"
+description: |-
+    Follow-up from session 008 Task 4.1 review. The TS+Python RabbitMQ adapters are skeleton-grade: (1) no automatic reconnect — a dropped broker connection stops consumption until process restart (currently only logged); decide crash-restart vs reconnect-with-backoff. (2) channel.publish/basic_publish return value (flow-control 'false' / drain) is ignored — at high publish rates messages could be dropped silently; await drain. (3) logical topology names ('photo.process','photo.result') are inlined string literals on both sides rather than a shared topology.ts constant (DX/rename risk). Epic photo_ops-861.
+
+    (migrated from beads photo_ops-di8)

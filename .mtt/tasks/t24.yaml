@@ -1,0 +1,21 @@
+id: t24
+type: task
+title: 'exSDD: extract the process into a self-contained, project-independent plugin (no project-file refs)'
+status: tbd
+priority: low
+tags:
+    - migrated
+    - process
+    - tech
+created: "2026-07-27T00:26:03Z"
+updated: "2026-07-27T01:16:22Z"
+description: |-
+    Today the exSDD method is spread across: in-place edits to the project-level superpowers skills (.claude/skills/superpowers/skills/writing-plans, subagent-driven-development), AGENTS.md (## Principles + Workflow Rules), scripts/sdd, and docs/agent-workflow-evolution.md -- and it HARD-REFERENCES this repo's carriers (make gate, make smoke-ui/smoke-stack, bd + bd remember, docs/adr, the Makefile, .beads). That entanglement makes the process non-portable.
+
+    Goal: package the whole exSDD process as its own distributable plugin (skills + optional hooks + a generalized sdd script) with ZERO references to project files. Abstract project-specific carriers behind config/conventions the host repo supplies: the gate command, the smoke/e2e command, the task tracker, the why/ADR home, the memory store. The same plugin then drops into any repo unchanged; it also becomes a shareable portfolio artifact (aligns with the process-to-product framing and the spun-out A/B experiment repo in Decision 6 / the experiment section).
+
+    Note this EVOLVES Decision 1's "napilnik = edit superpowers skills in place at project level": that pinned the method to this repo for diffability; the new goal is the opposite -- decouple it into a standalone plugin. Design must resolve what stays repo-local (the concrete Makefile/bd wiring = a thin host-adapter/config) vs what moves to the portable plugin (the method, skills, gates, sdd verbs). Sibling process issues (photo_ops-dqb rules, photo_ops-gwh routing, photo_ops-a2f sdd verbs, photo_ops-q2n coverage gate, photo_ops-cev review gate) should land IN this plugin, not as more project-local prose. Likely epic / session-sized.
+
+    Acceptance: an installable exSDD plugin containing the process (skills/hooks/sdd) with no hard-coded references to photo_ops files; project-specific carriers injected via configuration; a second repo can consume it unchanged.
+
+    (migrated from beads photo_ops-481)

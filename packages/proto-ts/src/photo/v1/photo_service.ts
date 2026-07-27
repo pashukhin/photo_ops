@@ -146,6 +146,13 @@ export interface SetPhotoLocationRequest {
   lon?: number | undefined;
 }
 
+/** Clear a photo's manual location (9q4.3 follow-up zvc). Owner scope; no payload. */
+export interface ClearPhotoLocationRequest {
+  photoId: string;
+  /** owner scope */
+  userId: string;
+}
+
 /**
  * A generated variant rendition surfaced to the UI, with a short-lived,
  * owner-scoped presigned GET url.
@@ -980,6 +987,54 @@ export const SetPhotoLocationRequest: MessageFns<SetPhotoLocationRequest> = {
   },
 };
 
+function createBaseClearPhotoLocationRequest(): ClearPhotoLocationRequest {
+  return { photoId: "", userId: "" };
+}
+
+export const ClearPhotoLocationRequest: MessageFns<ClearPhotoLocationRequest> = {
+  encode(message: ClearPhotoLocationRequest, writer: BinaryWriter = new BinaryWriter()): BinaryWriter {
+    if (message.photoId !== "") {
+      writer.uint32(10).string(message.photoId);
+    }
+    if (message.userId !== "") {
+      writer.uint32(18).string(message.userId);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): ClearPhotoLocationRequest {
+    const reader = input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseClearPhotoLocationRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 10) {
+            break;
+          }
+
+          message.photoId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.userId = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+};
+
 function createBasePhotoVariantView(): PhotoVariantView {
   return { variantType: "", url: "", width: 0, height: 0 };
 }
@@ -1348,6 +1403,15 @@ export interface PhotoServiceClient {
   setPhotoLocation(request: SetPhotoLocationRequest): Observable<PhotoAsset>;
 
   /**
+   * Remove a photo's manual location entirely (unlink the deduped Location + clear
+   * the point): location_id/lat/lon → NULL, owner-scoped, idempotent. The inverse of
+   * SetPhotoLocation. (Annotation decorative — the hand-written gateway route is
+   * DELETE /photos/{photo_id}/location.)
+   */
+
+  clearPhotoLocation(request: ClearPhotoLocationRequest): Observable<PhotoAsset>;
+
+  /**
    * Internal service-to-service read-RPC: the space-time + device attributes of
    * the caller's `ready` photos, for clustering. Deliberately NOT gateway-exposed
    * (no http annotation) and lean — it must not carry the gallery ListPhotos
@@ -1394,6 +1458,15 @@ export interface PhotoServiceController {
   setPhotoLocation(request: SetPhotoLocationRequest): Promise<PhotoAsset> | Observable<PhotoAsset> | PhotoAsset;
 
   /**
+   * Remove a photo's manual location entirely (unlink the deduped Location + clear
+   * the point): location_id/lat/lon → NULL, owner-scoped, idempotent. The inverse of
+   * SetPhotoLocation. (Annotation decorative — the hand-written gateway route is
+   * DELETE /photos/{photo_id}/location.)
+   */
+
+  clearPhotoLocation(request: ClearPhotoLocationRequest): Promise<PhotoAsset> | Observable<PhotoAsset> | PhotoAsset;
+
+  /**
    * Internal service-to-service read-RPC: the space-time + device attributes of
    * the caller's `ready` photos, for clustering. Deliberately NOT gateway-exposed
    * (no http annotation) and lean — it must not carry the gallery ListPhotos
@@ -1426,6 +1499,7 @@ export function PhotoServiceControllerMethods() {
       "listPhotos",
       "getPhoto",
       "setPhotoLocation",
+      "clearPhotoLocation",
       "listPhotoSpacetime",
       "getVariantsByIds",
     ];
@@ -1510,6 +1584,22 @@ export const PhotoServiceService = {
     responseDeserialize: (value: Buffer): PhotoAsset => PhotoAsset.decode(value),
   },
   /**
+   * Remove a photo's manual location entirely (unlink the deduped Location + clear
+   * the point): location_id/lat/lon → NULL, owner-scoped, idempotent. The inverse of
+   * SetPhotoLocation. (Annotation decorative — the hand-written gateway route is
+   * DELETE /photos/{photo_id}/location.)
+   */
+  clearPhotoLocation: {
+    path: "/photoops.photo.v1.PhotoService/ClearPhotoLocation" as const,
+    requestStream: false as const,
+    responseStream: false as const,
+    requestSerialize: (value: ClearPhotoLocationRequest): Buffer =>
+      Buffer.from(ClearPhotoLocationRequest.encode(value).finish()),
+    requestDeserialize: (value: Buffer): ClearPhotoLocationRequest => ClearPhotoLocationRequest.decode(value),
+    responseSerialize: (value: PhotoAsset): Buffer => Buffer.from(PhotoAsset.encode(value).finish()),
+    responseDeserialize: (value: Buffer): PhotoAsset => PhotoAsset.decode(value),
+  },
+  /**
    * Internal service-to-service read-RPC: the space-time + device attributes of
    * the caller's `ready` photos, for clustering. Deliberately NOT gateway-exposed
    * (no http annotation) and lean — it must not carry the gallery ListPhotos
@@ -1559,6 +1649,13 @@ export interface PhotoServiceServer extends UntypedServiceImplementation {
    * POST /photos/{photo_id}/location.)
    */
   setPhotoLocation: handleUnaryCall<SetPhotoLocationRequest, PhotoAsset>;
+  /**
+   * Remove a photo's manual location entirely (unlink the deduped Location + clear
+   * the point): location_id/lat/lon → NULL, owner-scoped, idempotent. The inverse of
+   * SetPhotoLocation. (Annotation decorative — the hand-written gateway route is
+   * DELETE /photos/{photo_id}/location.)
+   */
+  clearPhotoLocation: handleUnaryCall<ClearPhotoLocationRequest, PhotoAsset>;
   /**
    * Internal service-to-service read-RPC: the space-time + device attributes of
    * the caller's `ready` photos, for clustering. Deliberately NOT gateway-exposed

@@ -1,0 +1,15 @@
+id: t47
+type: task
+title: Fix exSDD artifact-routing behavior (prose-twin incident 2026-06-28)
+status: tbd
+priority: low
+tags:
+    - migrated
+    - process
+    - tech
+created: "2026-07-27T00:26:03Z"
+updated: "2026-07-27T01:16:22Z"
+description: |-
+    Analyze docs/incidents/2026-06-28-exsdd-routing-incident.md and fix the recurring behavior: agent emits code-laden prose docs instead of real exSDD artifacts. Levers: (A) session starts from a method-pinning brief; (B) self-check before presenting any spec/plan artifact (core); (C) AGENTS + brainstorming/writing-plans skill routing notes (why->ADR, plan=real RED/stub files, not fenced code). Validate via superpowers eval harness. History: git tag incident/exsdd-012.
+
+    (migrated from beads photo_ops-gwh)

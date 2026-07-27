@@ -1,0 +1,21 @@
+id: t25
+type: task
+title: 'exSDD: automated machine-review gate before human review (pass->human, fail->return spec)'
+status: tbd
+priority: low
+tags:
+    - migrated
+    - process
+    - tech
+created: "2026-07-27T00:26:03Z"
+updated: "2026-07-27T01:16:22Z"
+description: |-
+    Process improvement to the review loop (docs/agent-workflow-evolution.md Decision 2). Before any artifact (skeleton/spec, and/or the final branch) reaches a HUMAN reviewer, a separate reviewer agent runs an automated machine review; only on a clean pass does it go to the human; on findings it is RETURNED to the author for rework (loop), not forwarded. Goal: humans spend attention only on artifacts that already cleared machine-checkable issues.
+
+    Relationship to photo_ops-41q (no duplicate truth): 41q chooses the TOOL for the final whole-branch review (native /code-review). THIS issue adds the GATING STAGE + reject->rework loop as a hard precondition to human hand-off, and applies it to the skeleton review (Decision 1's relocated checkpoint), reusing the same reviewer. They compose: 41q supplies the reviewer; this wires it as a gate.
+
+    Watch-out (Decision 2 evidence, arXiv:2505.16222): LLM judges rubber-stamp code that asserts its own correctness. The machine gate must include INDEPENDENT, non-self-attesting checks (builds/typechecks, RED tests actually run, the coverage gate from photo_ops-q2n) -- not just an LLM opinion. Right-size per the two lanes (mechanical vs architecture-sensitive) so we do not over-invest review on mechanical skeletons.
+
+    Acceptance: a defined gate where a separate agent reviews before human hand-off, passes clean artifacts through and returns failing ones with actionable findings; scoped by lane; independent (non-self-attesting) checks included.
+
+    (migrated from beads photo_ops-cev)

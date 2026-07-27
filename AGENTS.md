@@ -45,10 +45,10 @@ Before implementing, read:
 
 ## Workflow Rules
 
-- Use `bd` for all task tracking. Do not use markdown TODO lists, TodoWrite, or TaskCreate for project task tracking.
-- Run `bd prime` for detailed beads workflow context at the start of a session.
-- Work in a regular git feature/session branch for each session.
-- Do not use git worktrees in this project; they conflict with the beads workflow.
+- Use **mtt** for all task tracking (see "Working under mtt" below). Do not use markdown TODO lists, TodoWrite, or TaskCreate.
+- Run `mtt roadmap` (what's next) and `mtt prime` (curated KB) at the start of a session.
+- **Branch model (End-state 1):** each change rides its own `task/<id>` branch off `main` → one squash-merged PR (title `<id>: …`) → `mtt deliver`. An mtt **story** is the coherence node (holds the spec/e2e/ADR; no branch); a "session" is at most a milestone tag. The flow's edges create/switch these branches for you.
+- Do not use git worktrees in this project.
 - Prefer running project commands through `Makefile` targets when a suitable target exists.
 - Before implementation starts, write the manual e2e scenario for the target change and get it approved.
 - Follow the accepted implementation plan task-by-task.
@@ -59,9 +59,9 @@ Before implementing, read:
 - Before each commit, inspect `git status`, `git diff`, and recent log.
 - Do not commit unrelated files.
 - Verify claims with commands before reporting success.
-- At session handoff, summarize what changed, verification results, follow-up issues, branch name, and push status.
-- Session briefs are numbered sequentially under `sessions/`; name each brief so its purpose is clear (see `sessions/README.md`).
-- The four gate rules below form an **automated gate tier** around the skeleton→GREEN flow (so the human skeleton-review checkpoint sees a mechanically-trustworthy skeleton); rationale + composition + what was deliberately *not* built (automatic review): `docs/agent-workflow-evolution.md` Decision 7.
+- At session handoff, summarize what changed, verification results, follow-up mtt tasks, branch/PR, and push status.
+- Historical session briefs under `sessions/` are archival (pre-mtt); new work is scoped by an mtt **story**, not a session brief.
+- The four gate rules below form an **automated gate tier** around the skeleton→GREEN flow — now **mechanized as mtt flow-edge gates** (`.mtt/config.yaml`), so a change cannot reach `done` without them. Rationale + composition + what was deliberately *not* built: `docs/agent-workflow-evolution.md` Decision 7.
 - **Coverage gates (q2n):** run `make skeleton-gate` before handing a skeleton to human review; if it fails, the skeleton is NOT review-ready — return to author to add the missing RED test (spec-change protocol applies). Run `make coverage-gate` before final branch review / merge (also enforced by the CI `coverage-gate` job on PRs). Both gates require 100% new/changed-code coverage; override with `COVERAGE_FAIL_UNDER=<n>`. Design: `docs/superpowers/specs/2026-07-02-coverage-gate-design.md`.
 - **Test-integrity guard (mp0):** removing or renaming-away a test declaration, or deleting a test file, requires an `Allow-test-removal: <reason>` trailer on the commit that does it. `make test-guard` enforces this (also a CI PR job). Design: `docs/superpowers/specs/2026-07-02-test-integrity-guard-design.md`.
 - **Edit-time lint hook (8d5):** a `PostToolUse` (Write|Edit) hook `scripts/lint-changed` lints the just-edited file (eslint / ruff-in-media-worker / gofmt) and feeds issues back for a quick fix; it is advisory (`make gate` is authoritative). Disable a session with `LINT_HOOK=0`. Loads at session start. Design: `docs/superpowers/specs/2026-07-02-lint-hook-design.md`.
@@ -81,19 +81,15 @@ one-liners and to avoid wasting the Bash budget.
   equivalent.
 - After a commit, do **not** run `git log -1` / `git rev-parse HEAD` /
   `echo "exit: $?"` to confirm — trust the tool result.
-- Every commit must end with the `Co-Authored-By` trailer. This is a
-  convention, not a hook: the `prepare-commit-msg` slot is owned by beads
-  (`.beads/hooks/*` are marker-managed — do not edit them).
-- Capture a new issue id with `bd create --json | jq -r .id`, not by grepping
-  the human output.
-- Use `scripts/sdd` (repo-root-safe) for SDD brief/package/ledger work; never
-  `cd` into the plugin-cache dir to run the bundled scripts (cwd footgun).
+- Every commit you author by hand must end with the `Co-Authored-By` trailer (a
+  convention; there are no git hooks — beads' `prepare-commit-msg`/`pre-commit`
+  were removed at the mtt migration). mtt's own `.mtt` machine-commits are exempt.
+- Capture a new task id with `mtt add … --json | jq -r .id`, not by grepping the
+  human output.
 - Rely on the Bash tool's built-in output truncation; add `| tail`/`head` only
   for genuinely unbounded streams.
 - Verify tree assumptions with a command over the whole repo, not by eye on a
   partial subtree (e.g. tests and `package.json` may live outside `src/`).
-- Do not hand-firefight `.beads/issues.jsonl` reorder churn; it is cosmetic and
-  `.gitattributes` handles it. Only stage it when `(id, status)` actually changed.
 
 ## Knowledge Placement
 
@@ -104,7 +100,7 @@ Write durable knowledge in the right place so the next agent can find it:
 | Agent working rules & guardrails (canonical, cross-tool) | `AGENTS.md` (this file) |
 | Claude Code specifics + pointer | root `CLAUDE.md` |
 | Local code context + local invariants | nested `CLAUDE.md` (`## Local context` / `## Local invariants`) |
-| Durable facts/decisions not tied to a file | `bd remember` (search with `bd memories <kw>`) |
+| Durable facts/decisions not tied to a file | `mtt note add` (browse `mtt note list`; `mtt prime` surfaces the important ones) |
 | Decisions with rationale / per-session design | `docs/adr`, `docs/superpowers/specs` & `plans` |
 
 Nested `CLAUDE.md` files exist for real services and key directories
@@ -112,39 +108,18 @@ Nested `CLAUDE.md` files exist for real services and key directories
 `proto/`, `infra/docker/`, `packages/proto-ts`). Scaffold services carry a
 one-line stub until they gain real behavior.
 
-## Beads Issue Tracker
-
-This project uses **bd (beads)** for issue tracking. Run `bd prime` to see full workflow context and commands.
-
-### Quick Reference
-
-```bash
-bd ready              # Find available work
-bd show <id>          # View issue details
-bd update <id> --claim  # Claim work
-bd close <id>         # Complete work
-```
-
-### Rules
-
-- Use `bd` for ALL task tracking.
-- Run `bd prime` for detailed command reference and session close protocol.
-- Use `bd remember` for persistent knowledge; do not use MEMORY.md files.
-
 ## Session Completion
 
-When ending a work session, complete all steps below. Work is not complete until `git push` succeeds.
+Under mtt, each change delivers via its own `task/<id>` PR (squash-merged to `main`, then `mtt deliver`). Work is not complete until `git push` succeeds. At the end of a working session:
 
-1. File issues for remaining work.
-2. Run `make gate` if code changed.
-3. Update issue status.
-4. Push beads and git state:
+1. File remaining work as mtt tasks (`mtt add`).
+2. Run `make gate` if code changed (the flow gates enforce it on `submit`; re-run before handoff).
+3. Leave every in-flight task at a coherent status — advance or `mtt decline` it; never hand-edit `.mtt`.
+4. Push git state (a `deliver` lands its `.mtt` done-commit on `main`):
 
 ```bash
-git pull --rebase
-bd dolt push
-git push
 git status
+git push
 ```
 
 5. Verify all changes are committed and pushed.
@@ -155,3 +130,38 @@ Critical rules:
 - Never stop before pushing completed session work.
 - Never say "ready to push when you are"; push the work.
 - If push fails, resolve and retry until it succeeds.
+
+<!-- mtt:begin -->
+## Working under mtt
+
+This project tracks its tasks and workflow in **mtt** — a local, file-backed task **state machine**. You do
+work by moving a task through its type's flow; each transition can run **gate commands that BLOCK the move on
+failure**, so "done" means the checks passed.
+
+**Discover THIS project's flow (don't assume it):**
+- `mtt roadmap` — what to work on next (dependency + priority order).
+- `mtt ready` — tasks that are unblocked and can be started.
+- `mtt types` — the task types with their statuses, transitions, and gate commands (the Definition of Done).
+- `mtt show <id>` — a task's details, current status, and the exact next moves available from here.
+
+**The work loop:**
+1. Pick a task from `mtt roadmap`.
+2. Take it into work using the flow's first move (see the `next:` line in `mtt show <id>` for the exact verb).
+3. Do the work, then advance with `mtt <status> <id>` or `mtt <edge> <id>` — one of the moves `mtt show`
+   lists. A transition's gate commands run first and BLOCK the move if any fails; read the guidance printed on
+   each move.
+4. Close a task only by reaching a terminal status through a flow edge. Never delete a task to "finish" it.
+
+**Attribution:** every move records who made it. Set `author:` once in `.mtt/config.local.yaml` (personal,
+gitignored), or pass `--who <you>`. Record a reason with `--why "<why>"`; the project may **require** who/why
+on some moves and always on dangerous operations (a forced delete, a gate bypass) — mtt tells you when.
+
+**Storage:** `.mtt/` is committed project data. Task files are written **only** by mtt — never hand-edit them;
+use `mtt add` / `mtt edit` / the flow moves, and mtt keeps history and determinism.
+
+**Knowledge:** record durable decisions and lessons with `mtt note add`; `mtt prime` prints the important
+notes — wire it into your agent's session start.
+
+Run `mtt --help` or `mtt <command> --help` for the full surface. This section is scaffolded by
+`mtt agent docs` and is regenerated on re-run — put your own notes OUTSIDE the mtt:begin/mtt:end markers.
+<!-- mtt:end -->

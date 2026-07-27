@@ -1,0 +1,15 @@
+id: t37
+type: task
+title: Implement mise toolchain pin (.mise.toml) - close ADR-0002
+status: tbd
+priority: low
+tags:
+    - infra
+    - migrated
+    - tech
+created: "2026-07-27T00:26:03Z"
+updated: "2026-07-27T01:16:22Z"
+description: |-
+    Per docs/agent-workflow-evolution.md (Decision 5) and ADR-0002: add .mise.toml pinning node=22, pnpm=9.15.4 (matches packageManager), python=3.12; add go when real; buf stays a pnpm devDep. CI already on node 22 (leave it); mise is local hermeticity. Update ADR-0002 status to implemented. Related: photo_ops-78z.
+
+    (migrated from beads photo_ops-lz1)

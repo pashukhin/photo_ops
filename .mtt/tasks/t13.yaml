@@ -1,0 +1,16 @@
+id: t13
+type: task
+title: Hashtag support in post text + hashtag navigation (owner + anon)
+status: tbd
+priority: low
+parent: s2
+tags:
+    - hashtags
+    - migrated
+    - web
+created: "2026-07-27T00:26:03Z"
+updated: "2026-07-27T01:16:21Z"
+description: |-
+    NICE-TO-HAVE (not required for release/demo). Parse #hashtags in post text and make them navigable: the owner browses their OWN objects by hashtag; anonymous visitors browse ALL publicly-available objects by hashtag. Needs: hashtag extraction/indexing, owner-scoped + public hashtag routes, and rendering hashtags as links in post body (body is plain text today; markdown deferred §3.6).
+
+    (migrated from beads photo_ops-9q4.6)

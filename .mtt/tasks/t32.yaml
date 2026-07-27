@@ -1,0 +1,15 @@
+id: t32
+type: task
+title: Consolidate enum<->string maps across gateway + photo-service (no duplicate truth)
+status: tbd
+priority: low
+tags:
+    - migrated
+    - proto
+    - tech
+created: "2026-07-27T00:26:03Z"
+updated: "2026-07-27T01:16:22Z"
+description: |-
+    The PhotoStatus/PhotoSortField/SortDirection numeric<->string maps are duplicated across api-gateway (query parse + mapPhoto) and photo-service (listPhotos controller + toProtoPhoto) — four hand-maintained copies of the proto enum values. Principle 7 (no duplicate truth): a new status needs edits in multiple places with no compiler check. Consolidate onto the generated packages/proto-ts enums / a shared mapping helper. Pre-existing pattern (008) that 011 extended.
+
+    (migrated from beads photo_ops-34t)

@@ -1,0 +1,15 @@
+id: t22
+type: task
+title: 'cluster: carry scope in ClusterProcessJob (worker currently always clusters all)'
+status: tbd
+priority: low
+tags:
+    - cluster
+    - migrated
+    - tech
+created: "2026-07-27T00:26:03Z"
+updated: "2026-07-27T01:16:22Z"
+description: |-
+    s013 review: GenerateClusters stores+validates scope but ClusterProcessJob/encode_job omit it, so the worker always lists all ready photos. Latent while only scope=all is valid; wire scope through the job when scope=query|explicit_set lands.
+
+    (migrated from beads photo_ops-72f)

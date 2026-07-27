@@ -1,0 +1,51 @@
+id: s1
+type: story
+title: manual location editing
+status: done
+created: "2026-07-26T17:14:49Z"
+updated: "2026-07-26T17:59:30Z"
+history:
+    - at: "2026-07-26T17:14:49Z"
+      by: Grigorii Pashukhin
+      from: tbd
+      to: speccing
+    - at: "2026-07-26T17:15:42Z"
+      by: Grigorii Pashukhin
+      from: speccing
+      to: spec_review
+      checks:
+        - cmd: ls docs/superpowers/specs/s1-*.md >/dev/null 2>&1 || { echo "no spec docs/superpowers/specs/s1-*.md (author it, incl. the e2e-scenario section)" >&2; false; }
+          exit: 0
+    - at: "2026-07-26T17:15:42Z"
+      by: Grigorii Pashukhin
+      why: spec reviewed (operator; pilot)
+      from: spec_review
+      to: planning
+    - at: "2026-07-26T17:16:42Z"
+      by: Grigorii Pashukhin
+      from: planning
+      to: plan_review
+      checks:
+        - cmd: ls docs/superpowers/plans/s1-*.md >/dev/null 2>&1 || { echo "no plan docs/superpowers/plans/s1-*.md" >&2; false; }
+          exit: 0
+    - at: "2026-07-26T17:16:42Z"
+      by: Grigorii Pashukhin
+      why: plan reviewed (operator; pilot)
+      from: plan_review
+      to: in_progress
+    - at: "2026-07-26T17:59:30Z"
+      by: Grigorii Pashukhin
+      from: in_progress
+      to: acceptance
+      checks:
+        - cmd: '[ -z "$(mtt list --parent s1 --json | jq -r ".[] | select(.status != \"done\" and .status != \"cancelled\") | .id")" ] || { echo "story s1 has children not in done/cancelled — finish them first" >&2; false; }'
+          exit: 0
+        - cmd: scripts/mtt-smoke-gate
+          exit: 0
+        - cmd: mtt check
+          exit: 0
+    - at: "2026-07-26T17:59:30Z"
+      by: Grigorii Pashukhin
+      why: 'story accepted: ClearPhotoLocation delivered + e2e green (operator; pilot)'
+      from: acceptance
+      to: done

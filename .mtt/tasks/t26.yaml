@@ -1,0 +1,15 @@
+id: t26
+type: task
+title: Evaluate OpenMeter/Lago (ready-made metering) vs bespoke usage-service (build-vs-adopt)
+status: tbd
+priority: low
+tags:
+    - decision
+    - migrated
+    - usage
+created: "2026-07-27T00:26:03Z"
+updated: "2026-07-27T01:16:22Z"
+description: |-
+    Principle-1 gap surfaced in s012 retro: we shipped a bespoke thin Go usage ledger (append-only + charge-once inbox + read-time pricing) without formally benchmarking a ready-made usage-metering/billing platform. NOTE: this is NOT about metrics (Prometheus/OTel = pb6) — metrics are lossy/aggregate/low-cardinality/non-idempotent and cannot serve as a billing system-of-record; that's a different, complementary concern. The real 'don't reinvent the wheel' candidates are purpose-built metering platforms: OpenMeter (event ingestion + idempotency/dedup + aggregation + usage API; built on Kafka/ClickHouse) and Lago (open-source billing/metering); hosted: Metronome/Orb. Evaluate build-vs-adopt: what each offloads (ingestion, exactly-once, aggregation, usage API, per-operation reports) vs our bespoke; trade-offs to weigh — infra weight (Kafka/ClickHouse) vs our thin Postgres+RabbitMQ; dependency size + demo/portfolio fit; control over our specific model (provider-independent RAW units + provenance + pricing-resolved-at-read, ADR-0004); migration cost from the current ledger + the usage.events contract (013 depends on it). Trigger to revisit: if usage scope grows toward real pay-as-you-go billing at scale, or when the pricing/rate-card seams (versioned/multi-provider, ADR-0004) come due. Outcome: a keep-bespoke vs adopt-platform decision with rationale (record as an ADR).
+
+    (migrated from beads photo_ops-aal)

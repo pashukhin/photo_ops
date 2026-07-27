@@ -1,0 +1,15 @@
+id: t40
+type: task
+title: Evaluate adopting codebase-memory-mcp for code navigation
+status: tbd
+priority: low
+tags:
+    - migrated
+    - process
+    - tech
+created: "2026-07-27T00:26:03Z"
+updated: "2026-07-27T01:16:22Z"
+description: |-
+    From docs/agent-tooling-research.md: single static binary, 158 languages (TS/Go/Python/proto confirmed), 14 MCP tools including cross-service HTTP linking; auto-detects Claude Code. Integration cost: very low (download binary, run install). Pilot on the existing TS services first; decide before wiring into agent workflow.
+
+    (migrated from beads photo_ops-cdk)

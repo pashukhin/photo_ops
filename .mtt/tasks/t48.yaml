@@ -1,0 +1,12 @@
+id: t48
+type: task
+title: 'mtt flow: harden deliver against integration-branch divergence'
+status: tbd
+priority: high
+tags:
+    - mtt-flow
+    - process
+    - tech
+created: "2026-07-27T00:34:36Z"
+updated: "2026-07-27T01:16:22Z"
+description: 'Pilot t1 (session 026): the integration branch wasn''t pushed before task/t1 branched, so the PR squash folded in the story commits and local main diverged; recovered via ''git reset --hard origin/main''. Fix: push the integration branch before branching a task, and/or make the deliver edge pull-with-strategy (or document the reset recovery). #tech'

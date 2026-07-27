@@ -1,0 +1,19 @@
+id: t46
+type: task
+title: 'Test gates: visible/hidden acceptance-test split (anti-overfit; process change)'
+status: tbd
+priority: low
+tags:
+    - migrated
+    - tech
+    - testing
+created: "2026-07-27T00:26:03Z"
+updated: "2026-07-27T01:16:22Z"
+description: |-
+    Spun out of photo_ops-mp0 during the mp0 brainstorm (2026-07-02): mp0 scoped to the diff-guard only. The visible/hidden acceptance-test split is a PROCESS/orchestration change, not a mechanical gate.
+
+    What: keep a subset of acceptance tests HIDDEN from the implementer subagent so it cannot overfit/game to the visible tests; the hidden set runs only at review/branch level. Changes the subagent-driven-development flow (skeleton authoring reveals only some tests; controller holds the hidden set). Anti-gaming for specification-overfitting.
+
+    Why: with executable skeletons, an implementer sees the RED tests and could implement narrowly to them. A hidden acceptance set is the classic countermeasure. Process experiment; design must address where hidden tests live, how they run, and how they avoid leaking into the implementer's context.
+
+    (migrated from beads photo_ops-wyq)
