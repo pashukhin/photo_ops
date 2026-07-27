@@ -1,13 +1,19 @@
 id: t35
 type: task
 title: 'Beads: pin known-good version + record migration trigger (to Backlog.md)'
-status: tbd
+status: cancelled
 priority: low
 tags:
     - migrated
 created: "2026-07-27T00:26:03Z"
-updated: "2026-07-27T01:02:26Z"
+updated: "2026-07-27T01:16:21Z"
 description: |-
     Per docs/agent-workflow-evolution.md (Decision 4): pin the known-good bd version; record the migration trigger (bd churn/regressions/bugs over ~10 min per session) and target (Backlog.md, git-native markdown). Keep-until-trigger; do not build bespoke tracker tooling.
 
     (migrated from beads photo_ops-d62)
+history:
+    - at: "2026-07-27T01:16:21Z"
+      by: Grigorii Pashukhin
+      why: beads retired 2026-07-27 — task moot
+      from: tbd
+      to: cancelled
