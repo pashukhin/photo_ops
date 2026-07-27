@@ -6,6 +6,12 @@ version: 1
 # Integration branch = `main`: task/<id> branches fork from and deliver onto main via
 # a squash-merged PR whose title is `<id>: …` (the deliver gate greps for it).
 #
+# Sync discipline (t48 — avoids integration-branch divergence): `start` pulls+pushes main
+# before branching (so origin/main == local main → the PR base has everything → the squash
+# can't diverge local main); `deliver`/`cancel` push main after landing state. Residual: story
+# moves committed on main between a task's start and deliver can still diverge (deliver blocks
+# loudly via pull --ff-only) — full fix (story pushes per-move) deferred, see t48.
+#
 # Only {{.ID}} {{.Type}} {{.From}} {{.To}} expand in commands. command_timeout default
 # is 5m; heavy gates (make gate, smokes) carry their own per-command timeout.
 project:
@@ -106,7 +112,7 @@ types:
         current: set
         description: "branch task/{{.ID}} off the integration branch"
         commands:
-          - 'git switch task/{{.ID}} || (git switch main && git switch -c task/{{.ID}})'
+          - 'git switch task/{{.ID}} 2>/dev/null || (git switch main && git pull --ff-only && git push origin main && git switch -c task/{{.ID}})'
       - from: skeleton
         to: skeleton_review
         name: submit
@@ -158,9 +164,11 @@ types:
         description: "after the squash-merge onto the integration branch: pull it, then deliver"
         commands:
           - 'git switch main'
+          - 'git pull --ff-only || { echo "local main diverges from origin/main (unpushed commits?) — reconcile before deliver" >&2; false; }'
           - 'git log -n 1000 --format=%s | grep -v "^mtt: " | head -200 | grep "^{{.ID}}: " || { echo "no squash commit \"{{.ID}}: …\" on the integration branch: pull/merge the PR first" >&2; false; }'
         post:
           - 'a=.mtt/tasks/{{.ID}}.yaml; test -f .mtt/audit.log && a="$a .mtt/audit.log"; git add -- $a && git commit -m "{{.ID}}: {{.From}} → {{.To}}" -- $a'
+          - 'git push origin main'
       - {from: tbd, to: cancelled, name: cancel, current: clear}
       - from: skeleton
         to: cancelled
@@ -172,6 +180,7 @@ types:
           - 'git switch main'
         post:
           - 'a=.mtt/tasks/{{.ID}}.yaml; test -f .mtt/audit.log && a="$a .mtt/audit.log"; git add -- $a && git commit -m "{{.ID}}: {{.From}} → {{.To}}" -- $a'
+          - 'git push origin main'
       - from: implementing
         to: cancelled
         name: cancel
@@ -181,6 +190,7 @@ types:
           - 'git switch main'
         post:
           - 'a=.mtt/tasks/{{.ID}}.yaml; test -f .mtt/audit.log && a="$a .mtt/audit.log"; git add -- $a && git commit -m "{{.ID}}: {{.From}} → {{.To}}" -- $a'
+          - 'git push origin main'
 
   # ---------------------------------------------------------------------------
   - name: bugfix
@@ -206,7 +216,7 @@ types:
         name: start
         current: set
         commands:
-          - 'git switch task/{{.ID}} || (git switch main && git switch -c task/{{.ID}})'
+          - 'git switch task/{{.ID}} 2>/dev/null || (git switch main && git pull --ff-only && git push origin main && git switch -c task/{{.ID}})'
       - from: skeleton
         to: skeleton_review
         name: submit
@@ -255,9 +265,11 @@ types:
         inherit_post: false
         commands:
           - 'git switch main'
+          - 'git pull --ff-only || { echo "local main diverges from origin/main (unpushed commits?) — reconcile before deliver" >&2; false; }'
           - 'git log -n 1000 --format=%s | grep -v "^mtt: " | head -200 | grep "^{{.ID}}: " || { echo "no squash commit \"{{.ID}}: …\" on the integration branch: pull/merge the PR first" >&2; false; }'
         post:
           - 'a=.mtt/tasks/{{.ID}}.yaml; test -f .mtt/audit.log && a="$a .mtt/audit.log"; git add -- $a && git commit -m "{{.ID}}: {{.From}} → {{.To}}" -- $a'
+          - 'git push origin main'
       - {from: tbd, to: cancelled, name: cancel, current: clear}
       - from: skeleton
         to: cancelled
@@ -268,6 +280,7 @@ types:
           - 'git switch main'
         post:
           - 'a=.mtt/tasks/{{.ID}}.yaml; test -f .mtt/audit.log && a="$a .mtt/audit.log"; git add -- $a && git commit -m "{{.ID}}: {{.From}} → {{.To}}" -- $a'
+          - 'git push origin main'
       - from: implementing
         to: cancelled
         name: cancel
@@ -277,3 +290,4 @@ types:
           - 'git switch main'
         post:
           - 'a=.mtt/tasks/{{.ID}}.yaml; test -f .mtt/audit.log && a="$a .mtt/audit.log"; git add -- $a && git commit -m "{{.ID}}: {{.From}} → {{.To}}" -- $a'
+          - 'git push origin main'
