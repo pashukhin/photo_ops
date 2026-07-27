@@ -1,0 +1,11 @@
+id: t49
+type: task
+title: 'mtt flow: story-acceptance dqb-smoke exempts on the integration branch'
+status: tbd
+priority: medium
+tags:
+    - mtt-flow
+    - tech
+created: "2026-07-27T00:34:36Z"
+updated: "2026-07-27T00:34:36Z"
+description: 'The story acceptance edge runs scripts/mtt-smoke-gate with base=main; on the integration branch the diff is empty so it exempts (the e2e ran at the child''s big-gate instead). Fix: story acceptance should diff vs the merge-base with main (or run a fixed story e2e). #tech'

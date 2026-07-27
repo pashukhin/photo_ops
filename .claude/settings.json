@@ -15,44 +15,27 @@
       {
         "hooks": [
           {
-            "command": "bd prime",
+            "command": "mtt prime 2>/dev/null || true",
             "type": "command"
           }
         ],
         "matcher": ""
-      },
-      {
-        "hooks": [
-          {
-            "command": "mtt prime 2>/dev/null || true",
-            "type": "command"
-          }
-        ]
       }
     ],
     "SessionStart": [
       {
         "hooks": [
           {
-            "command": "bd prime",
+            "command": "mtt prime 2>/dev/null || true",
             "type": "command"
           }
         ],
         "matcher": ""
-      },
-      {
-        "hooks": [
-          {
-            "command": "mtt prime 2>/dev/null || true",
-            "type": "command"
-          }
-        ]
       }
     ]
   },
   "permissions": {
     "allow": [
-      "Bash(bd:*)",
       "Bash(git status:*)",
       "Bash(git diff:*)",
       "Bash(git log:*)",

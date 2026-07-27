@@ -1,16 +1,13 @@
 version: 1
-# photo_ops flow — adapted from the vendored git-flow flagship
-# (docs/superpowers/vendor/git-flow.yaml) to the 3-type taxonomy of
-# docs/superpowers/specs/2026-07-26-migrate-beads-to-mtt-design.md.
+# photo_ops flow — the single task tracker (beads retired 2026-07-27, session 026).
+# Adapted from the vendored git-flow flagship (docs/superpowers/vendor/git-flow.yaml)
+# to the 3-type taxonomy of docs/superpowers/specs/2026-07-26-migrate-beads-to-mtt-design.md.
 #
-# PILOT SCOPE: the integration branch is the SESSION branch
-# `session-026-migrate-beads-to-mtt`, NOT main — no auto-push to main. At GO this
-# is parameterized to main/develop.
+# Integration branch = `main`: task/<id> branches fork from and deliver onto main via
+# a squash-merged PR whose title is `<id>: …` (the deliver gate greps for it).
 #
-# Only {{.ID}} {{.Type}} {{.From}} {{.To}} expand in commands. Machine-commits of
-# .mtt run with hooks disabled (`-c core.hooksPath=/dev/null`) so the beads
-# pre-commit/prepare-commit-msg hooks don't fire on bookkeeping commits
-# (confirmed in T5). command_timeout default is 5m; heavy gates carry their own.
+# Only {{.ID}} {{.Type}} {{.From}} {{.To}} expand in commands. command_timeout default
+# is 5m; heavy gates (make gate, smokes) carry their own per-command timeout.
 project:
   name: photo_ops
 command_timeout: 5m
@@ -24,13 +21,13 @@ events:
   task:
     create:
       post:
-        - 'a=.mtt/tasks/{{.ID}}.yaml; git add -- "$a" && { git diff --cached --quiet -- "$a" || git -c core.hooksPath=/dev/null commit -m "mtt: {{.ID}} {{.Event}}" -- "$a"; }'
+        - 'a=.mtt/tasks/{{.ID}}.yaml; git add -- "$a" && { git diff --cached --quiet -- "$a" || git commit -m "mtt: {{.ID}} {{.Event}}" -- "$a"; }'
     update:
       post:
-        - 'a=.mtt/tasks/{{.ID}}.yaml; git add -- "$a" && { git diff --cached --quiet -- "$a" || git -c core.hooksPath=/dev/null commit -m "mtt: {{.ID}} {{.Event}}" -- "$a"; }'
+        - 'a=.mtt/tasks/{{.ID}}.yaml; git add -- "$a" && { git diff --cached --quiet -- "$a" || git commit -m "mtt: {{.ID}} {{.Event}}" -- "$a"; }'
     delete:
       post:
-        - 'a=.mtt/tasks/{{.ID}}.yaml; git add -- "$a" 2>/dev/null; git -c core.hooksPath=/dev/null commit -m "mtt: {{.ID}} {{.Event}}" -- "$a" 2>/dev/null || true'
+        - 'a=.mtt/tasks/{{.ID}}.yaml; git add -- "$a" 2>/dev/null; git commit -m "mtt: {{.ID}} {{.Event}}" -- "$a" 2>/dev/null || true'
 
 types:
   # ---------------------------------------------------------------------------
@@ -40,7 +37,7 @@ types:
                               # v0.11.0 (a type cannot be its own parent) — deferred, like {{.Parent}}.
     description: "Coherence node: owns spec/e2e/ADR. No branch; children deliver as their own task/bugfix branches."
     post_defaults:
-      - 'git add .mtt && git -c core.hooksPath=/dev/null commit -m "{{.ID}}: {{.From}} → {{.To}}" -- .mtt'
+      - 'git add .mtt && git commit -m "{{.ID}}: {{.From}} → {{.To}}" -- .mtt'
     statuses:
       - {name: tbd,          kind: initial,  description: "queued; `mtt start` to begin speccing"}
       - {name: speccing,     kind: active,   description: "brainstorm → author docs/superpowers/specs/{{.ID}}-*.md (incl. e2e section); `mtt submit`"}
@@ -90,7 +87,7 @@ types:
     default: true
     description: "Design-closed delivery unit on its own task/{{.ID}} branch → PR → merge."
     post_defaults:
-      - 'git add .mtt && git -c core.hooksPath=/dev/null commit -m "{{.ID}}: {{.From}} → {{.To}}" -- .mtt'
+      - 'git add .mtt && git commit -m "{{.ID}}: {{.From}} → {{.To}}" -- .mtt'
     statuses:
       - {name: tbd,             kind: initial,  description: "queued; `mtt start` branches task/{{.ID}}"}
       - {name: skeleton,        kind: active,   description: "write the RED test(s) + stubs; commit code, then `mtt submit`"}
@@ -109,7 +106,7 @@ types:
         current: set
         description: "branch task/{{.ID}} off the integration branch"
         commands:
-          - 'git switch task/{{.ID}} || (git switch session-026-migrate-beads-to-mtt && git switch -c task/{{.ID}})'
+          - 'git switch task/{{.ID}} || (git switch main && git switch -c task/{{.ID}})'
       - from: skeleton
         to: skeleton_review
         name: submit
@@ -140,7 +137,7 @@ types:
           - 'out=$(git status --porcelain -- ":(exclude).mtt") && test -z "$out" || { echo "working tree not clean" >&2; false; }'
         post:
           - 'git push -u origin task/{{.ID}}'
-          - '[ -n "$(gh pr list --head task/{{.ID}} --state open --json number --jq ".[].number")" ] || gh pr create --base session-026-migrate-beads-to-mtt --head task/{{.ID}} --title "{{.ID}}: $(mtt show {{.ID}} --json | jq -r ".title // empty")" --body "Automated PR for {{.ID}} — see: mtt show {{.ID}}"'
+          - '[ -n "$(gh pr list --head task/{{.ID}} --state open --json number --jq ".[].number")" ] || gh pr create --base main --head task/{{.ID}} --title "{{.ID}}: $(mtt show {{.ID}} --json | jq -r ".title // empty")" --body "Automated PR for {{.ID}} — see: mtt show {{.ID}}"'
       - {from: human_review, to: fix, name: decline}
       - from: fix
         to: review
@@ -160,10 +157,10 @@ types:
         inherit_post: false
         description: "after the squash-merge onto the integration branch: pull it, then deliver"
         commands:
-          - 'git switch session-026-migrate-beads-to-mtt'
+          - 'git switch main'
           - 'git log -n 1000 --format=%s | grep -v "^mtt: " | head -200 | grep "^{{.ID}}: " || { echo "no squash commit \"{{.ID}}: …\" on the integration branch: pull/merge the PR first" >&2; false; }'
         post:
-          - 'a=.mtt/tasks/{{.ID}}.yaml; test -f .mtt/audit.log && a="$a .mtt/audit.log"; git add -- $a && git -c core.hooksPath=/dev/null commit -m "{{.ID}}: {{.From}} → {{.To}}" -- $a'
+          - 'a=.mtt/tasks/{{.ID}}.yaml; test -f .mtt/audit.log && a="$a .mtt/audit.log"; git add -- $a && git commit -m "{{.ID}}: {{.From}} → {{.To}}" -- $a'
       - {from: tbd, to: cancelled, name: cancel, current: clear}
       - from: skeleton
         to: cancelled
@@ -172,18 +169,18 @@ types:
         inherit_post: false
         description: "abandon (moves your tree back to the integration branch)"
         commands:
-          - 'git switch session-026-migrate-beads-to-mtt'
+          - 'git switch main'
         post:
-          - 'a=.mtt/tasks/{{.ID}}.yaml; test -f .mtt/audit.log && a="$a .mtt/audit.log"; git add -- $a && git -c core.hooksPath=/dev/null commit -m "{{.ID}}: {{.From}} → {{.To}}" -- $a'
+          - 'a=.mtt/tasks/{{.ID}}.yaml; test -f .mtt/audit.log && a="$a .mtt/audit.log"; git add -- $a && git commit -m "{{.ID}}: {{.From}} → {{.To}}" -- $a'
       - from: implementing
         to: cancelled
         name: cancel
         current: clear
         inherit_post: false
         commands:
-          - 'git switch session-026-migrate-beads-to-mtt'
+          - 'git switch main'
         post:
-          - 'a=.mtt/tasks/{{.ID}}.yaml; test -f .mtt/audit.log && a="$a .mtt/audit.log"; git add -- $a && git -c core.hooksPath=/dev/null commit -m "{{.ID}}: {{.From}} → {{.To}}" -- $a'
+          - 'a=.mtt/tasks/{{.ID}}.yaml; test -f .mtt/audit.log && a="$a .mtt/audit.log"; git add -- $a && git commit -m "{{.ID}}: {{.From}} → {{.To}}" -- $a'
 
   # ---------------------------------------------------------------------------
   - name: bugfix
@@ -191,7 +188,7 @@ types:
     parents: [story]          # standalone: `mtt add --type bugfix --no-parent`
     description: "Delivery unit with a MANDATORY failing-repro pre-gate. Same flow as task + `! make test` on submit."
     post_defaults:
-      - 'git add .mtt && git -c core.hooksPath=/dev/null commit -m "{{.ID}}: {{.From}} → {{.To}}" -- .mtt'
+      - 'git add .mtt && git commit -m "{{.ID}}: {{.From}} → {{.To}}" -- .mtt'
     statuses:
       - {name: tbd,             kind: initial,  description: "queued; `mtt start` branches task/{{.ID}}"}
       - {name: skeleton,        kind: active,   description: "write the RED reproducing test; commit, then `mtt submit`"}
@@ -209,7 +206,7 @@ types:
         name: start
         current: set
         commands:
-          - 'git switch task/{{.ID}} || (git switch session-026-migrate-beads-to-mtt && git switch -c task/{{.ID}})'
+          - 'git switch task/{{.ID}} || (git switch main && git switch -c task/{{.ID}})'
       - from: skeleton
         to: skeleton_review
         name: submit
@@ -239,7 +236,7 @@ types:
           - 'out=$(git status --porcelain -- ":(exclude).mtt") && test -z "$out" || { echo "working tree not clean" >&2; false; }'
         post:
           - 'git push -u origin task/{{.ID}}'
-          - '[ -n "$(gh pr list --head task/{{.ID}} --state open --json number --jq ".[].number")" ] || gh pr create --base session-026-migrate-beads-to-mtt --head task/{{.ID}} --title "{{.ID}}: $(mtt show {{.ID}} --json | jq -r ".title // empty")" --body "Automated PR for {{.ID}} — see: mtt show {{.ID}}"'
+          - '[ -n "$(gh pr list --head task/{{.ID}} --state open --json number --jq ".[].number")" ] || gh pr create --base main --head task/{{.ID}} --title "{{.ID}}: $(mtt show {{.ID}} --json | jq -r ".title // empty")" --body "Automated PR for {{.ID}} — see: mtt show {{.ID}}"'
       - {from: human_review, to: fix, name: decline}
       - from: fix
         to: review
@@ -257,10 +254,10 @@ types:
         current: clear
         inherit_post: false
         commands:
-          - 'git switch session-026-migrate-beads-to-mtt'
+          - 'git switch main'
           - 'git log -n 1000 --format=%s | grep -v "^mtt: " | head -200 | grep "^{{.ID}}: " || { echo "no squash commit \"{{.ID}}: …\" on the integration branch: pull/merge the PR first" >&2; false; }'
         post:
-          - 'a=.mtt/tasks/{{.ID}}.yaml; test -f .mtt/audit.log && a="$a .mtt/audit.log"; git add -- $a && git -c core.hooksPath=/dev/null commit -m "{{.ID}}: {{.From}} → {{.To}}" -- $a'
+          - 'a=.mtt/tasks/{{.ID}}.yaml; test -f .mtt/audit.log && a="$a .mtt/audit.log"; git add -- $a && git commit -m "{{.ID}}: {{.From}} → {{.To}}" -- $a'
       - {from: tbd, to: cancelled, name: cancel, current: clear}
       - from: skeleton
         to: cancelled
@@ -268,15 +265,15 @@ types:
         current: clear
         inherit_post: false
         commands:
-          - 'git switch session-026-migrate-beads-to-mtt'
+          - 'git switch main'
         post:
-          - 'a=.mtt/tasks/{{.ID}}.yaml; test -f .mtt/audit.log && a="$a .mtt/audit.log"; git add -- $a && git -c core.hooksPath=/dev/null commit -m "{{.ID}}: {{.From}} → {{.To}}" -- $a'
+          - 'a=.mtt/tasks/{{.ID}}.yaml; test -f .mtt/audit.log && a="$a .mtt/audit.log"; git add -- $a && git commit -m "{{.ID}}: {{.From}} → {{.To}}" -- $a'
       - from: implementing
         to: cancelled
         name: cancel
         current: clear
         inherit_post: false
         commands:
-          - 'git switch session-026-migrate-beads-to-mtt'
+          - 'git switch main'
         post:
-          - 'a=.mtt/tasks/{{.ID}}.yaml; test -f .mtt/audit.log && a="$a .mtt/audit.log"; git add -- $a && git -c core.hooksPath=/dev/null commit -m "{{.ID}}: {{.From}} → {{.To}}" -- $a'
+          - 'a=.mtt/tasks/{{.ID}}.yaml; test -f .mtt/audit.log && a="$a .mtt/audit.log"; git add -- $a && git commit -m "{{.ID}}: {{.From}} → {{.To}}" -- $a'

@@ -5,7 +5,7 @@ for this project live in `AGENTS.md` — read it first.
 
 ## Read First
 
-- `AGENTS.md` — agent working rules, beads workflow, session completion, knowledge placement.
+- `AGENTS.md` — agent working rules, the mtt workflow, session completion, knowledge placement.
 - `README.md`, `project_description.md` — what the project is.
 - `docs/architecture.md`, `docs/domain-model.md` — durable boundaries and domain.
 
@@ -13,9 +13,10 @@ for this project live in `AGENTS.md` — read it first.
 
 - Nested `CLAUDE.md` files are auto-loaded when working in their subdirectory;
   read the one nearest the code you are changing.
-- Session briefs are numbered sequentially under `sessions/` (see `sessions/README.md`).
-- This project uses `bd` (beads) for task tracking and `bd remember` for
-  durable cross-session knowledge — not TodoWrite or markdown TODO lists.
+- `sessions/` holds archival pre-mtt session briefs; new work is scoped by an mtt **story**.
+- This project uses **mtt** for task tracking and `mtt note add` for durable
+  cross-session knowledge — not TodoWrite or markdown TODO lists. See the "Working
+  under mtt" runbook in `AGENTS.md`. (Beads was retired 2026-07-27; `.beads/` is a frozen archive.)
 
 <!-- mtt:begin -->
 ## Working under mtt

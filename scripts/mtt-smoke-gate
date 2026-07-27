@@ -11,7 +11,7 @@
 #   MTT_SMOKE_DRYRUN=1  print the decision instead of running the smoke (selftest)
 set -eu
 
-base="${MTT_INT_BRANCH:-session-026-migrate-beads-to-mtt}"
+base="${MTT_INT_BRANCH:-main}"
 
 # base...HEAD = changes introduced on this branch since it forked from base.
 # Fall back to the working-tree diff if the three-dot base can't be resolved.
